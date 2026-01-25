@@ -1,6 +1,6 @@
 export interface Segment {
-  id: number
-  source: string
-  target: string
-  isTmMatch?: boolean
+  id: number;
+  source: string;
+  target: string;
+  isTmMatch?: boolean;
 }

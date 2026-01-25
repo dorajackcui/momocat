@@ -26,6 +26,6 @@ npm run dev
 
 ## Features
 
-- **Open File**: Load a `.txt` file. The content is split by newlines into segments.
-- **Translate**: Enter translation in the right column.
-- **Export**: Save the translated text to a new file (appends `_translated.txt`).
+- **Open File**: Load an Excel (`.xlsx`) file. The tool expects a file with source text in the first column.
+- **Translate**: Enter translation in the target column. The interface supports easy navigation.
+- **Export**: Save the translated text to a new Excel file (appends `_translated.xlsx`).
