@@ -118,8 +118,8 @@ release/
 *.app
 
 # Local Database
-resources/tm.db
-resources/*.db
+resources/*
+!resources/.gitkeep
 *.sqlite
 *.sqlite3
 
