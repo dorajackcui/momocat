@@ -127,3 +127,7 @@ resources/*
 .trae/
 .idea/
 .vscode/
+
+# Temporary Files
+*.tmp
+*._translated.xlsx

@@ -16,5 +16,12 @@ interface Window {
     fuzzySearchTM: (
       query: string,
     ) => Promise<Array<{ source: string; target: string; score: number }>>;
+    // Project APIs
+    getFiles: () => Promise<any[]>;
+    addFiles: () => Promise<any[]>;
+    deleteFile: (id: number) => Promise<boolean>;
+    openProjectFile: (id: number) => Promise<any>;
+    saveProgress: (id: number, segments: any[], colMapping: any) => Promise<boolean>;
+    batchMatchTM: (id: number) => Promise<number>;
   };
 }

@@ -4,6 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils';
 import * as XLSX from 'xlsx';
 import XlsxPopulate from 'xlsx-populate';
 import { TMManager } from './tmManager';
+import { ProjectManager } from './projectManager';
 
 // Disable hardware acceleration to avoid crashes in some environments
 app.disableHardwareAcceleration();
@@ -65,6 +66,7 @@ app.whenReady().then(() => {
 
   // TM Manager
   const tmManager = new TMManager();
+  const projectManager = new ProjectManager(tmManager);
 
   ipcMain.handle('tm-update', (_event, source: string, target: string) => {
     tmManager.set(source, target);
@@ -86,6 +88,32 @@ app.whenReady().then(() => {
 
   ipcMain.handle('tm-fuzzy-search', (_event, query: string) => {
     return tmManager.fuzzySearch(query);
+  });
+
+  // Project Management IPC
+  ipcMain.handle('project-get-files', () => {
+    return projectManager.getFiles();
+  });
+
+  ipcMain.handle('project-add-files', async () => {
+    return projectManager.addFiles();
+  });
+
+  ipcMain.handle('project-delete-file', (_event, id: number) => {
+    return projectManager.deleteFile(id);
+  });
+
+  ipcMain.handle('project-open-file', (_event, id: number) => {
+    return projectManager.getFileContent(id);
+  });
+
+  ipcMain.handle('project-save-progress', (_event, id: number, segments: any[], colMapping: any) => {
+    projectManager.saveProgress(id, segments, colMapping);
+    return true;
+  });
+
+  ipcMain.handle('project-batch-tm-match', async (_event, id: number) => {
+    return projectManager.batchMatchTM(id);
   });
 
   // File Handling IPC

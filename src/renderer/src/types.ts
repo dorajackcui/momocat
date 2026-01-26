@@ -4,3 +4,12 @@ export interface Segment {
   target: string;
   isTmMatch?: boolean;
 }
+
+export interface ProjectFile {
+  id: number;
+  name: string;
+  originalPath: string;
+  storedPath: string;
+  progress: number;
+  createdAt: string;
+}

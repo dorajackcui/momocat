@@ -21,6 +21,14 @@ const api = {
     query: string,
   ): Promise<Array<{ source: string; target: string; score: number }>> =>
     ipcRenderer.invoke('tm-fuzzy-search', query),
+  // Project Management APIs
+  getFiles: (): Promise<any[]> => ipcRenderer.invoke('project-get-files'),
+  addFiles: (): Promise<any[]> => ipcRenderer.invoke('project-add-files'),
+  deleteFile: (id: number): Promise<boolean> => ipcRenderer.invoke('project-delete-file', id),
+  openProjectFile: (id: number): Promise<any> => ipcRenderer.invoke('project-open-file', id),
+  saveProgress: (id: number, segments: any[], colMapping: any): Promise<boolean> =>
+    ipcRenderer.invoke('project-save-progress', id, segments, colMapping),
+  batchMatchTM: (id: number): Promise<number> => ipcRenderer.invoke('project-batch-tm-match', id),
 };
 
 // Use `contextBridge` APIs to expose Electron APIs to
