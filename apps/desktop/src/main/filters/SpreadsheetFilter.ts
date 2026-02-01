@@ -61,7 +61,6 @@ export class SpreadsheetFilter {
       segments.push({
         segmentId: randomUUID(),
         fileId,
-        projectId,
         orderIndex: i,
         sourceTokens,
         targetTokens,

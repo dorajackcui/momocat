@@ -3,16 +3,23 @@ import { SpreadsheetFilter, ImportOptions } from '../filters/SpreadsheetFilter';
 import { Project, ProjectFile, Segment, SegmentStatus, Token } from '@cat/core';
 import { join, basename } from 'path';
 import { copyFileSync, existsSync, mkdirSync, rmSync, unlinkSync } from 'fs';
+import { TMService } from './TMService';
+import { SegmentService } from './SegmentService';
 
 export class ProjectService {
   private db: CATDatabase;
   private filter: SpreadsheetFilter;
   private projectsDir: string;
+  private tmService: TMService;
+  private segmentService: SegmentService;
 
   constructor(db: CATDatabase, projectsDir: string) {
     this.db = db;
     this.filter = new SpreadsheetFilter();
     this.projectsDir = projectsDir;
+    this.tmService = new TMService(this.db);
+    this.segmentService = new SegmentService(this.db, this.tmService);
+
     if (!existsSync(this.projectsDir)) {
       mkdirSync(this.projectsDir, { recursive: true });
     }
@@ -114,15 +121,19 @@ export class ProjectService {
   }
 
   public getSegments(fileId: number, offset: number, limit: number): Segment[] {
-    return this.db.getSegmentsPage(fileId, offset, limit);
+    return this.segmentService.getSegments(fileId, offset, limit);
   }
 
   public async getSpreadsheetPreview(filePath: string): Promise<any[][]> {
     return this.filter.getPreview(filePath);
   }
 
-  public updateSegment(segmentId: string, targetTokens: Token[], status: SegmentStatus) {
-    this.db.updateSegmentTarget(segmentId, targetTokens, status);
+  public async updateSegment(segmentId: string, targetTokens: Token[], status: SegmentStatus) {
+    await this.segmentService.updateSegment(segmentId, targetTokens, status);
+  }
+
+  public async get100Match(projectId: number, srcHash: string) {
+    return this.tmService.find100Match(projectId, srcHash);
   }
 
   public async exportFile(fileId: number, outputPath: string, options: ImportOptions) {

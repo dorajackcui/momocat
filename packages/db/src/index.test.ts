@@ -45,7 +45,6 @@ describe('CATDatabase', () => {
       {
         segmentId: 'seg1',
         fileId: fileId,
-        projectId: projectId,
         orderIndex: 0,
         sourceTokens: [{ type: 'text', content: 'Hello' }],
         targetTokens: [],
@@ -80,7 +79,6 @@ describe('CATDatabase', () => {
       {
         segmentId: 's1',
         fileId: fileId,
-        projectId: projectId,
         orderIndex: 0,
         sourceTokens: [{ type: 'text', content: 'A' }],
         targetTokens: [],
@@ -93,7 +91,6 @@ describe('CATDatabase', () => {
       {
         segmentId: 's2',
         fileId: fileId,
-        projectId: projectId,
         orderIndex: 1,
         sourceTokens: [{ type: 'text', content: 'B' }],
         targetTokens: [],

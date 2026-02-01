@@ -11,7 +11,6 @@ export type SegmentStatus = 'new' | 'draft' | 'translated' | 'confirmed' | 'revi
 export interface Segment {
   segmentId: string;
   fileId: number;
-  projectId: number;
   orderIndex: number;
   sourceTokens: Token[];
   targetTokens: Token[];
@@ -27,8 +26,25 @@ export interface Segment {
   };
 }
 
+export interface TMEntry {
+  id: string;
+  projectId: number;
+  srcLang: string;
+  tgtLang: string;
+  srcHash: string;
+  matchKey: string;
+  tagsSignature: string;
+  sourceTokens: Token[];
+  targetTokens: Token[];
+  originSegmentId?: string;
+  createdAt: string;
+  updatedAt: string;
+  usageCount: number;
+}
+
 export interface ProjectFile {
   id: number;
+  uuid: string;
   projectId: number;
   name: string;
   totalSegments: number;
@@ -39,6 +55,7 @@ export interface ProjectFile {
 
 export interface Project {
   id: number;
+  uuid: string;
   name: string;
   srcLang: string;
   tgtLang: string;
