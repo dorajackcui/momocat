@@ -3,7 +3,8 @@ import {
   parseDisplayTextToTokens, 
   serializeTokensToDisplayText, 
   computeTagsSignature,
-  computeMatchKey
+  computeMatchKey,
+  validateSegmentTags
 } from './index';
 
 describe('CAT Core Tokenizer', () => {
@@ -46,9 +47,36 @@ describe('CAT Core Tokenizer', () => {
       { type: 'text', content: ' world ' },
       { type: 'tag', content: '{2}', meta: { id: '{2}' } }
     ];
-    // @ts-ignore
-    const signature = computeTagsSignature(tokens);
+    const signature = computeTagsSignature(tokens as any);
     expect(signature).toBe('{1}|{2}');
+  });
+
+  it('should validate tag integrity correctly', () => {
+    const sourceTokens = [
+      { type: 'text', content: 'Hello ' },
+      { type: 'tag', content: '{1}' },
+      { type: 'text', content: ' world' }
+    ];
+    const segment = {
+      sourceTokens,
+      targetTokens: [{ type: 'text', content: '你好' }],
+      status: 'draft',
+      tagsSignature: '{1}'
+    } as any;
+
+    // Missing tag
+    let issues = validateSegmentTags(segment);
+    expect(issues[0].ruleId).toBe('tag-missing');
+
+    // Correct tag
+    segment.targetTokens = [{ type: 'tag', content: '{1}' }, { type: 'text', content: '你好' }];
+    issues = validateSegmentTags(segment);
+    expect(issues).toHaveLength(0);
+
+    // Extra tag
+    segment.targetTokens.push({ type: 'tag', content: '{2}' });
+    issues = validateSegmentTags(segment);
+    expect(issues[0].ruleId).toBe('tag-extra');
   });
 
   it('should compute consistent match key (lowercase and trimmed)', () => {

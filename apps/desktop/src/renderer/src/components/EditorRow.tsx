@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Segment, serializeTokensToDisplayText, Token } from '@cat/core';
+import { Segment, serializeTokensToDisplayText, Token, validateSegmentTags } from '@cat/core';
 
 interface EditorRowProps {
   segment: Segment;
@@ -17,6 +17,9 @@ export const EditorRow: React.FC<EditorRowProps> = ({
   onConfirm,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const qaIssues = validateSegmentTags(segment);
+  const hasError = qaIssues.some(issue => issue.severity === 'error');
+  const hasWarning = qaIssues.some(issue => issue.severity === 'warning');
 
   // Auto-resize textarea
   useEffect(() => {
@@ -62,7 +65,9 @@ export const EditorRow: React.FC<EditorRowProps> = ({
 
   return (
     <div 
-      className={`grid grid-cols-2 border-b border-gray-100 transition-colors ${isActive ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+      className={`grid grid-cols-2 border-b border-gray-100 transition-all ${
+        isActive ? 'bg-blue-50/50' : 'hover:bg-gray-50'
+      } ${hasError ? 'border-l-4 border-l-red-500' : hasWarning ? 'border-l-4 border-l-yellow-400' : ''}`}
       onClick={() => onActivate(segment.segmentId)}
     >
       <div className="p-4 border-r border-gray-100">
@@ -87,12 +92,29 @@ export const EditorRow: React.FC<EditorRowProps> = ({
           ref={textareaRef}
           className={`w-full min-h-[40px] p-3 text-sm rounded-lg border focus:ring-2 focus:ring-blue-200 outline-none transition-all resize-none overflow-hidden ${
             isActive ? 'border-blue-400 bg-white shadow-sm' : 'border-gray-200 bg-transparent'
-          }`}
+          } ${hasError ? 'ring-1 ring-red-200 border-red-300' : ''}`}
           value={targetText}
           onChange={(e) => onChange(segment.segmentId, e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Translate here..."
         />
+        
+        {/* QA Issues Display */}
+        {qaIssues.length > 0 && (
+          <div className="mt-2 space-y-1">
+            {qaIssues.map((issue, idx) => (
+              <div 
+                key={idx} 
+                className={`text-[11px] flex items-center gap-1.5 px-2 py-1 rounded ${
+                  issue.severity === 'error' ? 'bg-red-50 text-red-600' : 'bg-yellow-50 text-yellow-700'
+                }`}
+              >
+                <span className="font-bold uppercase text-[9px]">{issue.severity}:</span>
+                {issue.message}
+              </div>
+            ))}
+          </div>
+        )}
         
         {segment.meta?.context && (
           <div className="mt-2 px-1 flex items-start gap-1.5 group">

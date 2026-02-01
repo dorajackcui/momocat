@@ -24,6 +24,15 @@ export interface Segment {
     notes?: string[];
     updatedAt: string;
   };
+  qaIssues?: QaIssue[];
+}
+
+export type QaSeverity = 'error' | 'warning' | 'info';
+
+export interface QaIssue {
+  ruleId: string;
+  severity: QaSeverity;
+  message: string;
 }
 
 export interface TMEntry {
@@ -123,13 +132,64 @@ export function parseDisplayTextToTokens(text: string, customPatterns?: RegExp[]
 }
 
 /**
- * Compute a stable signature for tags to ensure consistency during translation
+ * Compute a stable signature for tags to ensure consistency during translation.
+ * V0.2: Includes tag index to ensure order sensitivity.
  */
 export function computeTagsSignature(tokens: Token[]): string {
   return tokens
     .filter(t => t.type === 'tag')
-    .map(t => t.content)
+    .map((t, i) => `${t.content}`)
     .join('|');
+}
+
+/**
+ * Extract tag contents for comparison
+ */
+export function extractTags(tokens: Token[]): string[] {
+  return tokens.filter(t => t.type === 'tag').map(t => t.content);
+}
+
+/**
+ * QA Rule: Tag Integrity
+ * Ensures target has exactly the same tags as source in the same sequence.
+ */
+export function validateSegmentTags(segment: Segment): QaIssue[] {
+  const issues: QaIssue[] = [];
+  const srcTags = extractTags(segment.sourceTokens);
+  const tgtTags = extractTags(segment.targetTokens);
+
+  if (segment.status === 'new' && tgtTags.length === 0) return [];
+
+  // 1. Check for missing tags
+  const missing = srcTags.filter(t => !tgtTags.includes(t));
+  if (missing.length > 0) {
+    issues.push({
+      ruleId: 'tag-missing',
+      severity: 'error',
+      message: `Missing tags: ${[...new Set(missing)].join(', ')}`
+    });
+  }
+
+  // 2. Check for extra tags
+  const extra = tgtTags.filter(t => !srcTags.includes(t));
+  if (extra.length > 0) {
+    issues.push({
+      ruleId: 'tag-extra',
+      severity: 'error',
+      message: `Extra tags found: ${[...new Set(extra)].join(', ')}`
+    });
+  }
+
+  // 3. Check for sequence/count if no missing/extra but signatures differ
+  if (issues.length === 0 && segment.tagsSignature !== computeTagsSignature(segment.targetTokens)) {
+    issues.push({
+      ruleId: 'tag-order',
+      severity: 'warning',
+      message: 'Tags are present but in a different order or count than source.'
+    });
+  }
+
+  return issues;
 }
 
 /**

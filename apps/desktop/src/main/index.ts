@@ -135,6 +135,50 @@ app.whenReady().then(() => {
     return projectService.exportFile(fileId, outputPath, options);
   });
 
+  ipcMain.handle('tm-get-100', async (_event, projectId: number, srcHash: string) => {
+    return projectService.get100Match(projectId, srcHash);
+  });
+
+  ipcMain.handle('tm-concordance', async (_event, projectId: number, query: string) => {
+    return projectService.searchConcordance(projectId, query);
+  });
+
+  // TM Management IPCs
+  ipcMain.handle('tm-list', async (_event, type?: 'working' | 'main') => {
+    return projectService.listTMs(type);
+  });
+
+  ipcMain.handle('tm-create', async (_event, name: string, srcLang: string, tgtLang: string, type?: 'working' | 'main') => {
+    return projectService.createTM(name, srcLang, tgtLang, type);
+  });
+
+  ipcMain.handle('tm-delete', async (_event, tmId: string) => {
+    return projectService.deleteTM(tmId);
+  });
+
+  ipcMain.handle('tm-project-mounted', async (_event, projectId: number) => {
+    return projectService.getProjectMountedTMs(projectId);
+  });
+
+  ipcMain.handle('tm-mount', async (_event, projectId: number, tmId: string, priority?: number, permission?: string) => {
+    return projectService.mountTMToProject(projectId, tmId, priority, permission);
+  });
+
+  ipcMain.handle('tm-unmount', async (_event, projectId: number, tmId: string) => {
+    return projectService.unmountTMFromProject(projectId, tmId);
+  });
+
+  ipcMain.handle('tm-commit-file', async (_event, tmId: string, fileId: number) => {
+    return projectService.commitToMainTM(tmId, fileId);
+  });
+
+  // Listen for segment updates and broadcast to all windows
+  projectService.onSegmentsUpdated((data) => {
+    BrowserWindow.getAllWindows().forEach(win => {
+      win.webContents.send('segments-updated', data);
+    });
+  });
+
   // IPC: Job Management
   jobManager.on('progress', (progress) => {
     BrowserWindow.getAllWindows().forEach(win => {

@@ -2,10 +2,13 @@ import React, { useState } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { ProjectDetail } from './components/ProjectDetail';
 import { Editor } from './components/Editor';
+import { TMManager } from './components/TMManager';
 import { useProjects } from './hooks/useProjects';
 
+type View = 'dashboard' | 'projectDetail' | 'editor' | 'tms';
+
 function App(): JSX.Element {
-  const [currentView, setCurrentView] = useState<'dashboard' | 'projectDetail' | 'editor'>('dashboard');
+  const [currentView, setCurrentView] = useState<View>('dashboard');
   const [activeProjectId, setActiveProjectId] = useState<number | null>(null);
   const [activeFileId, setActiveFileId] = useState<number | null>(null);
 
@@ -43,7 +46,7 @@ function App(): JSX.Element {
   if (currentView === 'editor' && activeFileId !== null) {
     return (
       <Editor
-        activeFileId={activeFileId}
+        fileId={activeFileId}
         onBack={handleBackToProject}
       />
     );
@@ -67,14 +70,30 @@ function App(): JSX.Element {
           onClick={handleBackToDashboard}
         >
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">C</div>
-          <h1 className="text-xl font-bold text-gray-900 tracking-tight">Simple CAT Tool <span className="text-xs font-normal text-blue-500 ml-1">v0.1.1</span></h1>
+          <h1 className="text-xl font-bold text-gray-900 tracking-tight">Simple CAT Tool <span className="text-xs font-normal text-blue-500 ml-1">v0.2</span></h1>
         </div>
-        <div className="flex gap-4">
-           {/* Global Actions: TM, Settings */}
-        </div>
+        <nav className="flex gap-1">
+          <button
+            onClick={() => setCurrentView('dashboard')}
+            className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${
+              currentView === 'dashboard' ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-100'
+            }`}
+          >
+            Dashboard
+          </button>
+          <button
+            onClick={() => setCurrentView('tms')}
+            className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${
+              currentView === 'tms' ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-100'
+            }`}
+          >
+            TM Manager
+          </button>
+        </nav>
       </header>
       
-      <main className="flex-1 overflow-hidden">
+      <main className="flex-1 overflow-hidden flex">
+        {currentView === 'dashboard' ? (
           <Dashboard
             projects={projects}
             loading={loading}
@@ -82,6 +101,9 @@ function App(): JSX.Element {
             onCreateProject={handleCreateProject}
             onDeleteProject={deleteProject}
           />
+        ) : (
+          <TMManager />
+        )}
       </main>
 
       <footer className="px-10 py-3 bg-white border-t border-gray-200 text-[10px] text-gray-400 flex justify-between">

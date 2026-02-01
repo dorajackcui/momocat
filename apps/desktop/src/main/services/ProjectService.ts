@@ -1,8 +1,9 @@
 import { CATDatabase } from '@cat/db';
 import { SpreadsheetFilter, ImportOptions } from '../filters/SpreadsheetFilter';
-import { Project, ProjectFile, Segment, SegmentStatus, Token } from '@cat/core';
+import { Project, ProjectFile, Segment, SegmentStatus, Token, validateSegmentTags } from '@cat/core';
 import { join, basename } from 'path';
 import { copyFileSync, existsSync, mkdirSync, rmSync, unlinkSync } from 'fs';
+import { randomUUID } from 'crypto';
 import { TMService } from './TMService';
 import { SegmentService } from './SegmentService';
 
@@ -54,7 +55,7 @@ export class ProjectService {
 
     console.log(`[ProjectService] Adding file ${filePath} to project ${projectId}`);
     const fileName = basename(filePath);
-    const fileId = this.db.createFile(projectId, fileName);
+    const fileId = this.db.createFile(projectId, fileName, JSON.stringify(options));
     
     // Store in project-specific subfolder
     const projectDir = join(this.projectsDir, projectId.toString());
@@ -129,23 +130,113 @@ export class ProjectService {
   }
 
   public async updateSegment(segmentId: string, targetTokens: Token[], status: SegmentStatus) {
-    await this.segmentService.updateSegment(segmentId, targetTokens, status);
+    return await this.segmentService.updateSegment(segmentId, targetTokens, status);
+  }
+
+  public onSegmentsUpdated(callback: (data: any) => void) {
+    this.segmentService.on('segments-updated', callback);
+    return () => this.segmentService.off('segments-updated', callback);
   }
 
   public async get100Match(projectId: number, srcHash: string) {
     return this.tmService.find100Match(projectId, srcHash);
   }
 
-  public async exportFile(fileId: number, outputPath: string, options: ImportOptions) {
+  public async searchConcordance(projectId: number, query: string) {
+    return this.db.searchConcordance(projectId, query);
+  }
+
+  // TM Management
+  public async listTMs(type?: 'working' | 'main') {
+    const tms = this.db.listTMs(type);
+    return tms.map(tm => ({
+      ...tm,
+      stats: this.db.getTMStats(tm.id)
+    }));
+  }
+
+  public async createTM(name: string, srcLang: string, tgtLang: string, type: 'working' | 'main' = 'main') {
+    return this.db.createTM(name, srcLang, tgtLang, type);
+  }
+
+  public async deleteTM(tmId: string) {
+    return this.db.deleteTM(tmId);
+  }
+
+  public async getProjectMountedTMs(projectId: number) {
+    return this.db.getProjectMountedTMs(projectId);
+  }
+
+  public async mountTMToProject(projectId: number, tmId: string, priority?: number, permission?: string) {
+    return this.db.mountTMToProject(projectId, tmId, priority, permission);
+  }
+
+  public async unmountTMFromProject(projectId: number, tmId: string) {
+    return this.db.unmountTMFromProject(projectId, tmId);
+  }
+
+  public async commitToMainTM(tmId: string, fileId: number) {
+    const tm = this.db.getTM(tmId);
+    if (!tm) throw new Error('Target TM not found');
+
+    const segments = this.db.getSegmentsPage(fileId, 0, 1000000);
+    const confirmedSegments = segments.filter(s => s.status === 'confirmed');
+    
+    for (const seg of confirmedSegments) {
+      this.db.upsertTMEntry({
+        id: randomUUID(),
+        tmId,
+        projectId: 0, // Not strictly used in v5 schema for lookups
+        srcLang: tm.srcLang,
+        tgtLang: tm.tgtLang,
+        srcHash: seg.srcHash,
+        matchKey: seg.matchKey,
+        tagsSignature: seg.tagsSignature,
+        sourceTokens: seg.sourceTokens,
+        targetTokens: seg.targetTokens,
+        originSegmentId: seg.segmentId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        usageCount: 1
+      });
+    }
+    return confirmedSegments.length;
+  }
+
+  public async exportFile(fileId: number, outputPath: string, options?: ImportOptions) {
     const file = this.db.getFile(fileId);
     if (!file) throw new Error('File not found');
     
     const project = this.db.getProject(file.projectId);
     if (!project) throw new Error('Project not found');
 
+    // Use provided options or stored options
+    const finalOptions = options || (file.importOptionsJson ? JSON.parse(file.importOptionsJson) : null);
+    if (!finalOptions) {
+      throw new Error('Export options not found for this file. Please specify columns.');
+    }
+
     const segments = this.db.getSegmentsPage(fileId, 0, 1000000);
-    const storedPath = join(this.projectsDir, file.projectId.toString(), `${file.id}_${file.name}`);
     
-    await this.filter.export(storedPath, segments, options, outputPath);
+    // QA Check before export
+    const errors: { row: number, message: string }[] = [];
+    for (const seg of segments) {
+      const issues = validateSegmentTags(seg);
+      const criticalErrors = issues.filter(i => i.severity === 'error');
+      if (criticalErrors.length > 0) {
+        errors.push({
+          row: seg.meta.rowRef || 0,
+          message: criticalErrors.map(e => e.message).join('; ')
+        });
+      }
+    }
+
+    if (errors.length > 0) {
+      const errorMsg = errors.slice(0, 5).map(e => `Row ${e.row}: ${e.message}`).join('\n');
+      throw new Error(`Export blocked by QA errors:\n${errorMsg}${errors.length > 5 ? `\n...and ${errors.length - 5} more.` : ''}`);
+    }
+
+    const storedPath = join(this.projectsDir, file.projectId.toString(), `${file.id}_${file.name}`);
+    await this.filter.export(storedPath, segments, finalOptions, outputPath);
   }
 }

@@ -14,8 +14,21 @@ declare global {
       deleteFile: (fileId: number) => Promise<void>;
       addFileToProject: (projectId: number, filePath: string, options: any) => Promise<any>;
       getSegments: (fileId: number, offset: number, limit: number) => Promise<any[]>;
-      exportFile: (fileId: number, outputPath: string, options: any) => Promise<void>;
-      updateSegment: (segmentId: string, targetTokens: any[], status: string) => Promise<void>;
+      exportFile: (fileId: number, outputPath: string, options?: any) => Promise<void>;
+      updateSegment: (segmentId: string, targetTokens: any[], status: string) => Promise<any>;
+      get100Match: (projectId: number, srcHash: string) => Promise<any>;
+      searchConcordance: (projectId: number, query: string) => Promise<any[]>;
+      onSegmentsUpdated: (callback: (data: any) => void) => () => void;
+      
+      // TM Management
+      listTMs: (type?: 'working' | 'main') => Promise<any[]>;
+      createTM: (name: string, srcLang: string, tgtLang: string, type?: 'working' | 'main') => Promise<string>;
+      deleteTM: (tmId: string) => Promise<void>;
+      getProjectMountedTMs: (projectId: number) => Promise<any[]>;
+      mountTMToProject: (projectId: number, tmId: string, priority?: number, permission?: string) => Promise<void>;
+      unmountTMFromProject: (projectId: number, tmId: string) => Promise<void>;
+      commitToMainTM: (tmId: string, fileId: number) => Promise<number>;
+
       openFileDialog: (filters: any[]) => Promise<string | null>;
       saveFileDialog: (defaultPath: string, filters: any[]) => Promise<string | null>;
       onJobProgress: (callback: (progress: any) => void) => () => void;

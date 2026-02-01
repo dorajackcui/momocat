@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Segment, Token, parseDisplayTextToTokens } from '@cat/core';
+import { Segment, Token, parseDisplayTextToTokens, TMEntry } from '@cat/core';
 
 interface UseEditorProps {
   activeFileId: number | null;
@@ -7,18 +7,27 @@ interface UseEditorProps {
 
 export function useEditor({ activeFileId }: UseEditorProps) {
   const [segments, setSegments] = useState<Segment[]>([]);
+  const [projectId, setProjectId] = useState<number | null>(null);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
+  const [activeMatch, setActiveMatch] = useState<TMEntry | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Load Segments
-  const loadSegments = useCallback(async () => {
+  // Load Segments & Project Info
+  const loadEditorData = useCallback(async () => {
     if (activeFileId === null) {
       setSegments([]);
+      setProjectId(null);
       return;
     }
 
     setLoading(true);
     try {
+      // Get file to find projectId
+      const file = await window.api.getFile(activeFileId);
+      if (file) {
+        setProjectId(file.projectId);
+      }
+
       const data = await window.api.getSegments(activeFileId, 0, 1000);
       const segmentsArray = Array.isArray(data) ? data : [];
       setSegments(segmentsArray);
@@ -26,15 +35,61 @@ export function useEditor({ activeFileId }: UseEditorProps) {
         setActiveSegmentId(segmentsArray[0].segmentId);
       }
     } catch (error) {
-      console.error('Failed to load segments:', error);
+      console.error('Failed to load editor data:', error);
     } finally {
       setLoading(false);
     }
   }, [activeFileId]);
 
   useEffect(() => {
-    loadSegments();
-  }, [loadSegments]);
+    loadEditorData();
+  }, [loadEditorData]);
+
+  // Listen for real-time updates from backend (Propagation, etc.)
+  useEffect(() => {
+    const unsubscribe = window.api.onSegmentsUpdated((data: any) => {
+      setSegments(prev => {
+        let changed = false;
+        const newSegments = prev.map(seg => {
+          // 1. Is it the directly updated segment?
+          if (seg.segmentId === data.segmentId) {
+            changed = true;
+            return { ...seg, targetTokens: data.targetTokens, status: data.status };
+          }
+          // 2. Is it a propagated segment?
+          if (data.propagatedIds?.includes(seg.segmentId)) {
+            changed = true;
+            return { 
+              ...seg, 
+              targetTokens: [...data.targetTokens], 
+              status: 'draft' as any
+            };
+          }
+          return seg;
+        });
+        return changed ? newSegments : prev;
+      });
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Load TM Match for active segment
+  useEffect(() => {
+    const loadMatch = async () => {
+      if (!activeSegmentId || projectId === null) {
+        setActiveMatch(null);
+        return;
+      }
+      const segment = segments.find(s => s.segmentId === activeSegmentId);
+      if (segment) {
+        // @ts-ignore - added to api in preload
+        const match = await window.api.get100Match(projectId, segment.srcHash); 
+        setActiveMatch(match);
+      }
+    };
+    loadMatch();
+  }, [activeSegmentId, segments, projectId]);
 
   // Actions
   const handleTranslationChange = (segmentId: string, text: string) => {
@@ -55,16 +110,30 @@ export function useEditor({ activeFileId }: UseEditorProps) {
     }));
   };
 
+  const handleApplyMatch = (tokens: Token[]) => {
+    if (!activeSegmentId) return;
+    
+    setSegments(prev => prev.map(seg => {
+      if (seg.segmentId === activeSegmentId) {
+        const updated = { 
+          ...seg, 
+          targetTokens: tokens,
+          status: 'draft' as any
+        };
+        window.api.updateSegment(activeSegmentId, tokens, updated.status);
+        return updated;
+      }
+      return seg;
+    }));
+  };
+
   const confirmSegment = async (segmentId: string) => {
     const segment = segments.find(s => s.segmentId === segmentId);
     if (!segment) return;
 
+    // We don't need to manually update state here anymore because the listener will handle it!
     await window.api.updateSegment(segmentId, segment.targetTokens, 'confirmed');
     
-    setSegments(prev => prev.map(seg => 
-      seg.segmentId === segmentId ? { ...seg, status: 'confirmed' } : seg
-    ));
-
     // Jump to next
     const currentIndex = segments.findIndex(s => s.segmentId === segmentId);
     if (currentIndex < segments.length - 1) {
@@ -76,11 +145,14 @@ export function useEditor({ activeFileId }: UseEditorProps) {
 
   return {
     segments,
+    projectId,
     activeSegmentId,
+    activeMatch,
     setActiveSegmentId,
     loading,
     handleTranslationChange,
     confirmSegment,
+    handleApplyMatch,
     getActiveSegment,
   };
 }

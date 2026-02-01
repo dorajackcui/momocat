@@ -19,12 +19,35 @@ const api = {
   // Files & Segments
   getSegments: (fileId: number, offset: number, limit: number) => 
     ipcRenderer.invoke('file-get-segments', fileId, offset, limit),
-  exportFile: (fileId: number, outputPath: string, options: any) =>
+  exportFile: (fileId: number, outputPath: string, options?: any) =>
     ipcRenderer.invoke('file-export', fileId, outputPath, options),
   
   // Segments
   updateSegment: (segmentId: string, targetTokens: any[], status: string) =>
     ipcRenderer.invoke('segment-update', segmentId, targetTokens, status),
+  
+  // TM & Search
+  get100Match: (projectId: number, srcHash: string) =>
+    ipcRenderer.invoke('tm-get-100', projectId, srcHash),
+  searchConcordance: (projectId: number, query: string) =>
+    ipcRenderer.invoke('tm-concordance', projectId, query),
+  
+  // TM Management
+  listTMs: (type?: 'working' | 'main') => ipcRenderer.invoke('tm-list', type),
+  createTM: (name: string, srcLang: string, tgtLang: string, type?: 'working' | 'main') => 
+    ipcRenderer.invoke('tm-create', name, srcLang, tgtLang, type),
+  deleteTM: (tmId: string) => ipcRenderer.invoke('tm-delete', tmId),
+  getProjectMountedTMs: (projectId: number) => ipcRenderer.invoke('tm-project-mounted', projectId),
+  mountTMToProject: (projectId: number, tmId: string, priority?: number, permission?: string) => 
+    ipcRenderer.invoke('tm-mount', projectId, tmId, priority, permission),
+  unmountTMFromProject: (projectId: number, tmId: string) => ipcRenderer.invoke('tm-unmount', projectId, tmId),
+  commitToMainTM: (tmId: string, fileId: number) => ipcRenderer.invoke('tm-commit-file', tmId, fileId),
+  
+  onSegmentsUpdated: (callback: (data: any) => void) => {
+    const listener = (_event: any, data: any) => callback(data);
+    ipcRenderer.on('segments-updated', listener);
+    return () => ipcRenderer.removeListener('segments-updated', listener);
+  },
   
   // Dialogs
   openFileDialog: (filters: any[]) => ipcRenderer.invoke('dialog-open-file', filters),

@@ -3,15 +3,37 @@ import { Segment } from '@cat/core';
 
 interface ProgressBarProps {
   segments: Segment[];
+  compact?: boolean;
 }
 
-export const ProgressBar: React.FC<ProgressBarProps> = ({ segments }) => {
+export const ProgressBar: React.FC<ProgressBarProps> = ({ segments, compact }) => {
   const total = segments.length;
   const completed = segments.filter((s) => s.status === 'confirmed').length;
   const draft = segments.filter((s) => s.status === 'draft').length;
   
   const completedPct = total === 0 ? 0 : (completed / total) * 100;
   const draftPct = total === 0 ? 0 : (draft / total) * 100;
+
+  if (compact) {
+    return (
+      <div className="flex flex-col gap-1 w-full">
+        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden flex w-full">
+          <div
+            className="h-full bg-green-500 transition-all duration-500"
+            style={{ width: `${completedPct}%` }}
+          />
+          <div
+            className="h-full bg-yellow-400 transition-all duration-500"
+            style={{ width: `${draftPct}%` }}
+          />
+        </div>
+        <div className="flex justify-between text-[8px] font-bold text-gray-400 uppercase tracking-tight">
+          <span>{Math.round(completedPct)}% Confirmed</span>
+          <span>{total} Segments</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-100 flex flex-col gap-2">

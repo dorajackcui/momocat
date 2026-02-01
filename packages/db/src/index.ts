@@ -48,8 +48,7 @@ export class CATDatabase {
             totalSegments INTEGER DEFAULT 0,
             confirmedSegments INTEGER DEFAULT 0,
             createdAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-            updatedAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-            FOREIGN KEY (projectId) REFERENCES projects_v3(id) ON DELETE CASCADE
+            updatedAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
           );
 
           CREATE TABLE segments_v3 (
@@ -63,8 +62,7 @@ export class CATDatabase {
             matchKey TEXT NOT NULL,
             srcHash TEXT NOT NULL,
             metaJson TEXT NOT NULL,
-            updatedAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-            FOREIGN KEY (fileId) REFERENCES files_v3(id) ON DELETE CASCADE
+            updatedAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
           );
 
           CREATE TABLE tm_entries (
@@ -80,8 +78,7 @@ export class CATDatabase {
             originSegmentId TEXT,
             createdAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
             updatedAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-            usageCount INTEGER NOT NULL DEFAULT 0,
-            FOREIGN KEY (projectId) REFERENCES projects_v3(id) ON DELETE CASCADE
+            usageCount INTEGER NOT NULL DEFAULT 0
           );
 
           CREATE VIRTUAL TABLE tm_fts USING fts5(
@@ -150,21 +147,10 @@ export class CATDatabase {
         `).all() as any[];
 
         for (const s of confirmedSegments) {
-          this.upsertTMEntry({
-            id: randomUUID(),
-            projectId: s.projectId,
-            srcLang: s.srcLang,
-            tgtLang: s.tgtLang,
-            srcHash: s.srcHash,
-            matchKey: s.matchKey,
-            tagsSignature: s.tagsSignature,
-            sourceTokens: JSON.parse(s.sourceTokensJson),
-            targetTokens: JSON.parse(s.targetTokensJson),
-            originSegmentId: s.segmentId,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            usageCount: 1
-          });
+          // Note: In v5 migration, we don't have tmId yet here easily.
+          // But since we are migrating TO v5, we should probably skip this v3-style call
+          // or handle it after v5 tables are ready.
+          // For safety in migration, let's just use the v5 logic inside the migration loop below.
         }
 
         if (!versionRow) {
@@ -172,6 +158,171 @@ export class CATDatabase {
         } else {
           this.db.prepare('UPDATE schema_version SET version = 3').run();
         }
+      })();
+    }
+
+    if (currentVersion < 4) {
+      console.log(`[DB] Upgrading schema to v4 (Adding importOptionsJson to files)...`);
+      this.db.exec(`
+        ALTER TABLE files ADD COLUMN importOptionsJson TEXT;
+      `);
+    }
+
+    if (currentVersion < 5) {
+      console.log(`[DB] Upgrading schema to v5 (Multi-TM Architecture)...`);
+      this.db.transaction(() => {
+        // 1. Create new TM related tables
+        this.db.exec(`
+          CREATE TABLE tms (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            srcLang TEXT NOT NULL,
+            tgtLang TEXT NOT NULL,
+            type TEXT NOT NULL, -- 'working' | 'main'
+            createdAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+            updatedAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+          );
+
+          CREATE TABLE project_tms (
+            projectId INTEGER NOT NULL,
+            tmId TEXT NOT NULL,
+            priority INTEGER NOT NULL DEFAULT 0,
+            permission TEXT NOT NULL DEFAULT 'read', -- 'read' | 'write' | 'readwrite'
+            isEnabled INTEGER NOT NULL DEFAULT 1,
+            PRIMARY KEY(projectId, tmId),
+            FOREIGN KEY (projectId) REFERENCES projects(id) ON DELETE CASCADE,
+            FOREIGN KEY (tmId) REFERENCES tms(id) ON DELETE CASCADE
+          );
+
+          -- Temporary table to restructure tm_entries
+          CREATE TABLE tm_entries_v5 (
+            id TEXT PRIMARY KEY,
+            tmId TEXT NOT NULL,
+            srcHash TEXT NOT NULL,
+            matchKey TEXT NOT NULL,
+            tagsSignature TEXT NOT NULL,
+            sourceTokensJson TEXT NOT NULL,
+            targetTokensJson TEXT NOT NULL,
+            originSegmentId TEXT,
+            createdAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+            updatedAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+            usageCount INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (tmId) REFERENCES tms(id) ON DELETE CASCADE
+          );
+        `);
+
+        // 2. Migrate existing data
+        const projects = this.db.prepare('SELECT * FROM projects').all() as any[];
+        for (const p of projects) {
+          const workingTmId = randomUUID();
+          // Create a Working TM for each project
+          this.db.prepare(`
+            INSERT INTO tms (id, name, srcLang, tgtLang, type, createdAt, updatedAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `).run(workingTmId, `${p.name} (Working TM)`, p.srcLang, p.tgtLang, 'working', p.createdAt, p.updatedAt);
+
+          // Bind project to its Working TM
+          this.db.prepare(`
+            INSERT INTO project_tms (projectId, tmId, priority, permission, isEnabled)
+            VALUES (?, ?, ?, ?, ?)
+          `).run(p.id, workingTmId, 0, 'readwrite', 1);
+
+          // Migrate tm_entries for this project to its new Working TM
+          const oldEntries = this.db.prepare('SELECT * FROM tm_entries WHERE projectId = ?').all(p.id) as any[];
+          for (const e of oldEntries) {
+            this.db.prepare(`
+              INSERT INTO tm_entries_v5 (
+                id, tmId, srcHash, matchKey, tagsSignature, 
+                sourceTokensJson, targetTokensJson, originSegmentId, 
+                createdAt, updatedAt, usageCount
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).run(
+              e.id, workingTmId, e.srcHash, e.matchKey, e.tagsSignature,
+              e.sourceTokensJson, e.targetTokensJson, e.originSegmentId,
+              e.createdAt, e.updatedAt, e.usageCount
+            );
+          }
+        }
+
+        // 3. Swap tm_entries table
+        this.db.exec(`
+          DROP TABLE tm_entries;
+          ALTER TABLE tm_entries_v5 RENAME TO tm_entries;
+
+          -- Re-create indices
+          CREATE INDEX idx_project_tms_project ON project_tms(projectId, isEnabled, priority);
+          CREATE INDEX idx_tm_entries_tm_srcHash ON tm_entries(tmId, srcHash);
+          CREATE INDEX idx_tm_entries_tm_matchKey ON tm_entries(tmId, matchKey);
+        `);
+
+        // 4. Update FTS table to use tmId instead of projectId
+        this.db.exec(`
+          DROP TABLE tm_fts;
+          CREATE VIRTUAL TABLE tm_fts USING fts5(
+            tmId UNINDEXED,
+            srcText,
+            tgtText,
+            tmEntryId UNINDEXED
+          );
+        `);
+
+        // Populate FTS from new tm_entries
+        const allEntries = this.db.prepare('SELECT * FROM tm_entries').all() as any[];
+        for (const e of allEntries) {
+          const srcText = JSON.parse(e.sourceTokensJson).map((t: any) => t.content).join('');
+          const tgtText = JSON.parse(e.targetTokensJson).map((t: any) => t.content).join('');
+          this.db.prepare('INSERT INTO tm_fts (tmId, srcText, tgtText, tmEntryId) VALUES (?, ?, ?, ?)')
+            .run(e.tmId, srcText, tgtText, e.id);
+        }
+
+        this.db.prepare('UPDATE schema_version SET version = 5').run();
+      })();
+    }
+
+    if (currentVersion < 6) {
+      console.log(`[DB] Upgrading schema to v6 (Fixing Foreign Keys for Files/Segments)...`);
+      this.db.transaction(() => {
+        // 1. Fix files table
+        this.db.exec(`
+          CREATE TABLE files_v6 (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            uuid TEXT UNIQUE NOT NULL,
+            projectId INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            totalSegments INTEGER DEFAULT 0,
+            confirmedSegments INTEGER DEFAULT 0,
+            importOptionsJson TEXT,
+            createdAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+            updatedAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+            FOREIGN KEY (projectId) REFERENCES projects(id) ON DELETE CASCADE
+          );
+          INSERT INTO files_v6 SELECT id, uuid, projectId, name, totalSegments, confirmedSegments, importOptionsJson, createdAt, updatedAt FROM files;
+          DROP TABLE files;
+          ALTER TABLE files_v6 RENAME TO files;
+        `);
+
+        // 2. Fix segments table
+        this.db.exec(`
+          CREATE TABLE segments_v6 (
+            segmentId TEXT PRIMARY KEY,
+            fileId INTEGER NOT NULL,
+            orderIndex INTEGER NOT NULL,
+            sourceTokensJson TEXT NOT NULL,
+            targetTokensJson TEXT NOT NULL,
+            status TEXT NOT NULL,
+            tagsSignature TEXT NOT NULL,
+            matchKey TEXT NOT NULL,
+            srcHash TEXT NOT NULL,
+            metaJson TEXT NOT NULL,
+            updatedAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+            FOREIGN KEY (fileId) REFERENCES files(id) ON DELETE CASCADE
+          );
+          INSERT INTO segments_v6 SELECT * FROM segments;
+          DROP TABLE segments;
+          ALTER TABLE segments_v6 RENAME TO segments;
+        `);
+
+        this.db.prepare('UPDATE schema_version SET version = 6').run();
       })();
     }
   }
@@ -182,7 +333,21 @@ export class CATDatabase {
     const result = this.db.prepare(
       'INSERT INTO projects (uuid, name, srcLang, tgtLang) VALUES (?, ?, ?, ?)'
     ).run(randomUUID(), name, srcLang, tgtLang);
-    return result.lastInsertRowid as number;
+    const projectId = result.lastInsertRowid as number;
+
+    // V5: Auto-create and mount Working TM for new project
+    const workingTmId = randomUUID();
+    this.db.prepare(`
+      INSERT INTO tms (id, name, srcLang, tgtLang, type)
+      VALUES (?, ?, ?, ?, 'working')
+    `).run(workingTmId, `${name} (Working TM)`, srcLang, tgtLang);
+
+    this.db.prepare(`
+      INSERT INTO project_tms (projectId, tmId, priority, permission, isEnabled)
+      VALUES (?, ?, 0, 'readwrite', 1)
+    `).run(projectId, workingTmId);
+
+    return projectId;
   }
 
   public listProjects(): (Project & { progress: number; fileCount: number })[] {
@@ -209,10 +374,10 @@ export class CATDatabase {
   }
 
   // File Repo
-  public createFile(projectId: number, name: string): number {
+  public createFile(projectId: number, name: string, importOptionsJson?: string): number {
     const result = this.db.prepare(
-      'INSERT INTO files (uuid, projectId, name) VALUES (?, ?, ?)'
-    ).run(randomUUID(), projectId, name);
+      'INSERT INTO files (uuid, projectId, name, importOptionsJson) VALUES (?, ?, ?, ?)'
+    ).run(randomUUID(), projectId, name, importOptionsJson || null);
     return result.lastInsertRowid as number;
   }
 
@@ -220,8 +385,8 @@ export class CATDatabase {
     return this.db.prepare('SELECT * FROM files WHERE projectId = ? ORDER BY createdAt DESC').all(projectId) as ProjectFile[];
   }
 
-  public getFile(id: number): ProjectFile | undefined {
-    return this.db.prepare('SELECT * FROM files WHERE id = ?').get(id) as ProjectFile | undefined;
+  public getFile(id: number): (ProjectFile & { importOptionsJson?: string }) | undefined {
+    return this.db.prepare('SELECT * FROM files WHERE id = ?').get(id) as (ProjectFile & { importOptionsJson?: string }) | undefined;
   }
 
   public deleteFile(id: number) {
@@ -272,7 +437,29 @@ export class CATDatabase {
     
     if (segments.length > 0) {
       this.updateFileStats(segments[0].fileId);
-    }
+    };
+  }
+
+  public getProjectSegmentsByHash(projectId: number, srcHash: string): Segment[] {
+    const rows = this.db.prepare(`
+      SELECT segments.* 
+      FROM segments 
+      JOIN files ON segments.fileId = files.id 
+      WHERE files.projectId = ? AND segments.srcHash = ?
+    `).all(projectId, srcHash) as any[];
+
+    return rows.map(row => ({
+      segmentId: row.segmentId,
+      fileId: row.fileId,
+      orderIndex: row.orderIndex,
+      sourceTokens: JSON.parse(row.sourceTokensJson),
+      targetTokens: JSON.parse(row.targetTokensJson),
+      status: row.status as SegmentStatus,
+      tagsSignature: row.tagsSignature,
+      matchKey: row.matchKey,
+      srcHash: row.srcHash,
+      meta: JSON.parse(row.metaJson)
+    }));
   }
 
   public getSegmentsPage(fileId: number, offset: number, limit: number): Segment[] {
@@ -342,22 +529,19 @@ export class CATDatabase {
     `).all(projectId) as { status: string, count: number }[];
   }
 
-  // TM Repo
-  public upsertTMEntry(entry: TMEntry) {
+  public upsertTMEntry(entry: TMEntry & { tmId: string }) {
     this.db.prepare(`
       INSERT INTO tm_entries (
-        id, projectId, srcLang, tgtLang, srcHash, matchKey, tagsSignature,
+        id, tmId, srcHash, matchKey, tagsSignature,
         sourceTokensJson, targetTokensJson, originSegmentId, usageCount
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         targetTokensJson = excluded.targetTokensJson,
         updatedAt = (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
         usageCount = usageCount + 1
     `).run(
       entry.id,
-      entry.projectId,
-      entry.srcLang,
-      entry.tgtLang,
+      entry.tmId,
       entry.srcHash,
       entry.matchKey,
       entry.tagsSignature,
@@ -371,15 +555,14 @@ export class CATDatabase {
     const srcText = entry.sourceTokens.map(t => t.content).join('');
     const tgtText = entry.targetTokens.map(t => t.content).join('');
     
-    // Simple FTS update: delete old and insert new
     this.db.prepare('DELETE FROM tm_fts WHERE tmEntryId = ?').run(entry.id);
-    this.db.prepare('INSERT INTO tm_fts (projectId, srcText, tgtText, tmEntryId) VALUES (?, ?, ?, ?)')
-      .run(entry.projectId, srcText, tgtText, entry.id);
+    this.db.prepare('INSERT INTO tm_fts (tmId, srcText, tgtText, tmEntryId) VALUES (?, ?, ?, ?)')
+      .run(entry.tmId, srcText, tgtText, entry.id);
   }
 
-  public findTMEntryByHash(projectId: number, srcHash: string): TMEntry | undefined {
-    const row = this.db.prepare('SELECT * FROM tm_entries WHERE projectId = ? AND srcHash = ?')
-      .get(projectId, srcHash) as any;
+  public findTMEntryByHash(tmId: string, srcHash: string): TMEntry | undefined {
+    const row = this.db.prepare('SELECT * FROM tm_entries WHERE tmId = ? AND srcHash = ?')
+      .get(tmId, srcHash) as any;
     
     if (!row) return undefined;
     
@@ -388,5 +571,81 @@ export class CATDatabase {
       sourceTokens: JSON.parse(row.sourceTokensJson),
       targetTokens: JSON.parse(row.targetTokensJson)
     };
+  }
+
+  public getProjectMountedTMs(projectId: number) {
+    return this.db.prepare(`
+      SELECT tms.*, project_tms.priority, project_tms.permission, project_tms.isEnabled
+      FROM project_tms
+      JOIN tms ON project_tms.tmId = tms.id
+      WHERE project_tms.projectId = ? AND project_tms.isEnabled = 1
+      ORDER BY project_tms.priority ASC
+    `).all(projectId) as any[];
+  }
+
+  public searchConcordance(projectId: number, query: string): TMEntry[] {
+    const tmIds = this.getProjectMountedTMs(projectId).map(tm => tm.id);
+    if (tmIds.length === 0) return [];
+
+    const placeholders = tmIds.map(() => '?').join(',');
+    const ftsQuery = `(srcText:"${query}" OR tgtText:"${query}")`;
+    const rows = this.db.prepare(`
+      SELECT tm_entries.* 
+      FROM tm_fts 
+      JOIN tm_entries ON tm_fts.tmEntryId = tm_entries.id 
+      WHERE tm_fts.tmId IN (${placeholders}) AND tm_fts MATCH ?
+      LIMIT 50
+    `).all(...tmIds, ftsQuery) as any[];
+
+    return rows.map(row => ({
+      ...row,
+      sourceTokens: JSON.parse(row.sourceTokensJson),
+      targetTokens: JSON.parse(row.targetTokensJson)
+    }));
+  }
+
+  // Multi-TM Management
+  public listTMs(type?: 'working' | 'main'): any[] {
+    if (type) {
+      return this.db.prepare('SELECT * FROM tms WHERE type = ? ORDER BY updatedAt DESC').all(type);
+    }
+    return this.db.prepare('SELECT * FROM tms ORDER BY updatedAt DESC').all();
+  }
+
+  public createTM(name: string, srcLang: string, tgtLang: string, type: 'working' | 'main'): string {
+    const id = randomUUID();
+    this.db.prepare(`
+      INSERT INTO tms (id, name, srcLang, tgtLang, type)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(id, name, srcLang, tgtLang, type);
+    return id;
+  }
+
+  public deleteTM(id: string) {
+    this.db.prepare('DELETE FROM tms WHERE id = ?').run(id);
+  }
+
+  public mountTMToProject(projectId: number, tmId: string, priority: number = 10, permission: string = 'read') {
+    this.db.prepare(`
+      INSERT INTO project_tms (projectId, tmId, priority, permission, isEnabled)
+      VALUES (?, ?, ?, ?, 1)
+      ON CONFLICT(projectId, tmId) DO UPDATE SET
+        priority = excluded.priority,
+        permission = excluded.permission,
+        isEnabled = 1
+    `).run(projectId, tmId, priority, permission);
+  }
+
+  public unmountTMFromProject(projectId: number, tmId: string) {
+    this.db.prepare('DELETE FROM project_tms WHERE projectId = ? AND tmId = ?').run(projectId, tmId);
+  }
+
+  public getTMStats(tmId: string) {
+    const count = this.db.prepare('SELECT COUNT(*) as count FROM tm_entries WHERE tmId = ?').get(tmId) as { count: number };
+    return { entryCount: count.count };
+  }
+
+  public getTM(tmId: string): any | undefined {
+    return this.db.prepare('SELECT * FROM tms WHERE id = ?').get(tmId);
   }
 }

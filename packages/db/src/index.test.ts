@@ -112,4 +112,72 @@ describe('CATDatabase', () => {
     file = db.getFile(fileId);
     expect(file?.confirmedSegments).toBe(1);
   });
+
+  describe('Multi-TM Architecture (v5)', () => {
+    it('should automatically create and mount a Working TM when a project is created', () => {
+      const projectId = db.createProject('Auto TM Project', 'en', 'zh');
+      const mounted = db.getProjectMountedTMs(projectId);
+      
+      expect(mounted).toHaveLength(1);
+      expect(mounted[0].type).toBe('working');
+      expect(mounted[0].name).toBe('Auto TM Project (Working TM)');
+      expect(mounted[0].permission).toBe('readwrite');
+    });
+
+    it('should allow creating and mounting a Main TM', () => {
+      const projectId = db.createProject('Main TM Project', 'en', 'zh');
+      const tmId = db.createTM('Global Main TM', 'en', 'zh', 'main');
+      
+      db.mountTMToProject(projectId, tmId, 10, 'read');
+      
+      const mounted = db.getProjectMountedTMs(projectId);
+      expect(mounted).toHaveLength(2);
+      
+      const mainTM = mounted.find(m => m.type === 'main');
+      expect(mainTM).toBeDefined();
+      expect(mainTM.name).toBe('Global Main TM');
+      expect(mainTM.permission).toBe('read');
+    });
+
+    it('should search concordance across multiple mounted TMs', () => {
+      const projectId = db.createProject('Concordance Project', 'en', 'zh');
+      const mounted = db.getProjectMountedTMs(projectId);
+      const workingTmId = mounted[0].id;
+      
+      const mainTmId = db.createTM('Main Asset', 'en', 'zh', 'main');
+      db.mountTMToProject(projectId, mainTmId, 10, 'read');
+
+      // Insert into Working TM
+      db.upsertTMEntry({
+        id: 'e1',
+        tmId: workingTmId,
+        srcHash: 'h1',
+        matchKey: 'hello',
+        tagsSignature: '',
+        sourceTokens: [{ type: 'text', content: 'Hello' }],
+        targetTokens: [{ type: 'text', content: '你好' }],
+        usageCount: 1
+      } as any);
+
+      // Insert into Main TM
+      db.upsertTMEntry({
+        id: 'e2',
+        tmId: mainTmId,
+        srcHash: 'h2',
+        matchKey: 'world',
+        tagsSignature: '',
+        sourceTokens: [{ type: 'text', content: 'World' }],
+        targetTokens: [{ type: 'text', content: '世界' }],
+        usageCount: 1
+      } as any);
+
+      const results = db.searchConcordance(projectId, 'hello');
+      expect(results).toHaveLength(1);
+      expect(results[0].srcHash).toBe('h1');
+
+      const allResults = db.searchConcordance(projectId, 'world');
+      expect(allResults).toHaveLength(1);
+      expect(allResults[0].srcHash).toBe('h2');
+    });
+  });
 });

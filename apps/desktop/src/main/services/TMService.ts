@@ -16,9 +16,19 @@ export class TMService {
     const project = this.db.getProject(projectId);
     if (!project) return;
 
-    const entry: TMEntry = {
+    // V5: Find the writable TM (Working TM) for this project
+    const mountedTMs = this.db.getProjectMountedTMs(projectId);
+    const workingTM = mountedTMs.find(tm => tm.type === 'working' && (tm.permission === 'write' || tm.permission === 'readwrite'));
+    
+    if (!workingTM) {
+      console.warn(`[TMService] No writable Working TM found for project ${projectId}`);
+      return;
+    }
+
+    const entry: TMEntry & { tmId: string } = {
       id: randomUUID(),
-      projectId: projectId,
+      tmId: workingTM.id,
+      projectId: projectId, // Keep for compatibility if needed in core type
       srcLang: project.srcLang,
       tgtLang: project.tgtLang,
       srcHash: segment.srcHash,
@@ -32,8 +42,8 @@ export class TMService {
       usageCount: 1
     };
 
-    // Check if an entry with same hash already exists for this project to update it
-    const existing = this.db.findTMEntryByHash(projectId, segment.srcHash);
+    // Check if entry exists in THIS TM
+    const existing = this.db.findTMEntryByHash(workingTM.id, segment.srcHash);
     if (existing) {
       entry.id = existing.id;
     }
@@ -41,10 +51,21 @@ export class TMService {
     this.db.upsertTMEntry(entry);
   }
 
-  /**
-   * Find a 100% match in the working TM
-   */
-  public find100Match(projectId: number, srcHash: string): TMEntry | undefined {
-    return this.db.findTMEntryByHash(projectId, srcHash);
+  public async find100Match(projectId: number, srcHash: string) {
+    // V5: Search across all mounted and enabled TMs
+    const mountedTMs = this.db.getProjectMountedTMs(projectId);
+    
+    for (const tm of mountedTMs) {
+      const match = this.db.findTMEntryByHash(tm.id, srcHash);
+      if (match) {
+        return {
+          ...match,
+          tmName: tm.name,
+          tmType: tm.type
+        };
+      }
+    }
+    
+    return null;
   }
 }
