@@ -23,7 +23,6 @@ export const TMManager: React.FC = () => {
   const [importPreview, setImportPreview] = useState<any[][]>([]);
   const [importFilePath, setImportFilePath] = useState<string | null>(null);
   const [isImportWizardOpen, setIsImportWizardOpen] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
 
   const loadTMs = async () => {
     setLoading(true);
@@ -84,17 +83,16 @@ export const TMManager: React.FC = () => {
   const handleConfirmImport = async (options: any) => {
     if (!importingTMId || !importFilePath) return;
     
-    setIsImporting(true);
-    setIsImportWizardOpen(false);
-    
+    // Don't close wizard yet, it will show progress
     try {
       const result = await window.api.importTMEntries(importingTMId, importFilePath, options);
+      setIsImportWizardOpen(false); // Close it after done
       alert(`Import completed!\nSuccess: ${result.success}\nSkipped: ${result.skipped}`);
       loadTMs();
     } catch (e) {
       alert('Import failed');
+      setIsImportWizardOpen(false);
     } finally {
-      setIsImporting(false);
       setImportingTMId(null);
       setImportFilePath(null);
     }
@@ -108,15 +106,6 @@ export const TMManager: React.FC = () => {
         onClose={() => setIsImportWizardOpen(false)}
         onConfirm={handleConfirmImport}
       />
-
-      {isImporting && (
-        <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-[200] flex items-center justify-center">
-          <div className="bg-white p-6 rounded-xl shadow-xl flex items-center gap-4">
-            <div className="animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-            <span className="text-sm font-bold text-gray-700">Importing TM entries, please wait...</span>
-          </div>
-        </div>
-      )}
 
       <div className="max-w-5xl mx-auto">
         <div className="flex justify-between items-center mb-8">

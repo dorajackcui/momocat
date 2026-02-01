@@ -529,6 +529,10 @@ export class CATDatabase {
     `).all(projectId) as { status: string, count: number }[];
   }
 
+  public runInTransaction(fn: () => void) {
+    this.db.transaction(fn)();
+  }
+
   public upsertTMEntry(entry: TMEntry & { tmId: string }) {
     this.db.prepare(`
       INSERT INTO tm_entries (
@@ -588,7 +592,10 @@ export class CATDatabase {
     if (tmIds.length === 0) return [];
 
     const placeholders = tmIds.map(() => '?').join(',');
-    const ftsQuery = `(srcText:"${query}" OR tgtText:"${query}")`;
+    // Improved FTS Query: Use logic operators and escape quotes
+    const cleanQuery = query.replace(/"/g, '""');
+    const ftsQuery = `(srcText:(${cleanQuery}) OR tgtText:(${cleanQuery}))`;
+    
     const rows = this.db.prepare(`
       SELECT tm_entries.* 
       FROM tm_fts 

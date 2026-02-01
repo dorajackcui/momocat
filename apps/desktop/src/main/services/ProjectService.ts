@@ -24,6 +24,7 @@ export class ProjectService {
   private projectsDir: string;
   private tmService: TMService;
   private segmentService: SegmentService;
+  private progressCallbacks: ((data: { type: string; current: number; total: number; message?: string }) => void)[] = [];
 
   constructor(db: CATDatabase, projectsDir: string) {
     this.db = db;
@@ -149,8 +150,23 @@ export class ProjectService {
     return () => this.segmentService.off('segments-updated', callback);
   }
 
+  public onProgress(callback: (data: { type: string; current: number; total: number; message?: string }) => void) {
+    this.progressCallbacks.push(callback);
+    return () => {
+      this.progressCallbacks = this.progressCallbacks.filter(c => c !== callback);
+    };
+  }
+
+  private emitProgress(type: string, current: number, total: number, message?: string) {
+    this.progressCallbacks.forEach(cb => cb({ type, current, total, message }));
+  }
+
   public async get100Match(projectId: number, srcHash: string) {
     return this.tmService.find100Match(projectId, srcHash);
+  }
+
+  public async findMatches(projectId: number, segment: Segment) {
+    return this.tmService.findMatches(projectId, segment);
   }
 
   public async searchConcordance(projectId: number, query: string) {
@@ -200,58 +216,68 @@ export class ProjectService {
     const tm = this.db.getTM(tmId);
     if (!tm) throw new Error('Target TM not found');
 
-    const filter = new SpreadsheetFilter();
     const workbook = require('xlsx').readFile(filePath);
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
     const rawData = require('xlsx').utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
 
     const startIndex = options.hasHeader ? 1 : 0;
+    const totalRows = rawData.length - startIndex;
     let success = 0;
     let skipped = 0;
 
-    for (let i = startIndex; i < rawData.length; i++) {
-      const row = rawData[i];
-      if (!row) continue;
+    // Process in chunks to allow progress reporting and avoid blocking the UI
+    const CHUNK_SIZE = 500;
+    for (let i = startIndex; i < rawData.length; i += CHUNK_SIZE) {
+      const end = Math.min(i + CHUNK_SIZE, rawData.length);
+      
+      this.db.runInTransaction(() => {
+        for (let j = i; j < end; j++) {
+          const row = rawData[j];
+          if (!row) continue;
 
-      const sourceText = row[options.sourceCol] !== undefined ? String(row[options.sourceCol]).trim() : '';
-      const targetText = row[options.targetCol] !== undefined ? String(row[options.targetCol]).trim() : '';
+          const sourceText = row[options.sourceCol] !== undefined ? String(row[options.sourceCol]).trim() : '';
+          const targetText = row[options.targetCol] !== undefined ? String(row[options.targetCol]).trim() : '';
 
-      // Filter: Skip empty rows
-      if (!sourceText || !targetText) {
-        skipped++;
-        continue;
-      }
+          if (!sourceText || !targetText) {
+            skipped++;
+            continue;
+          }
 
-      const sourceTokens = parseDisplayTextToTokens(sourceText);
-      const targetTokens = parseDisplayTextToTokens(targetText);
-      const tagsSignature = computeTagsSignature(sourceTokens);
-      const matchKey = computeMatchKey(sourceTokens);
-      const srcHash = computeSrcHash(matchKey, tagsSignature);
+          const sourceTokens = parseDisplayTextToTokens(sourceText);
+          const targetTokens = parseDisplayTextToTokens(targetText);
+          const tagsSignature = computeTagsSignature(sourceTokens);
+          const matchKey = computeMatchKey(sourceTokens);
+          const srcHash = computeSrcHash(matchKey, tagsSignature);
 
-      // Check for duplication in this specific TM
-      const existing = this.db.findTMEntryByHash(tmId, srcHash);
-      if (existing && !options.overwrite) {
-        skipped++;
-        continue;
-      }
+          const existing = this.db.findTMEntryByHash(tmId, srcHash);
+          if (existing && !options.overwrite) {
+            skipped++;
+            continue;
+          }
 
-      this.db.upsertTMEntry({
-        id: existing ? existing.id : randomUUID(),
-        tmId,
-        projectId: 0,
-        srcLang: tm.srcLang,
-        tgtLang: tm.tgtLang,
-        srcHash,
-        matchKey,
-        tagsSignature,
-        sourceTokens,
-        targetTokens,
-        usageCount: existing ? existing.usageCount + 1 : 1,
-        createdAt: existing ? existing.createdAt : new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+          this.db.upsertTMEntry({
+            id: existing ? existing.id : randomUUID(),
+            tmId,
+            projectId: 0,
+            srcLang: tm.srcLang,
+            tgtLang: tm.tgtLang,
+            srcHash,
+            matchKey,
+            tagsSignature,
+            sourceTokens,
+            targetTokens,
+            usageCount: existing ? existing.usageCount + 1 : 1,
+            createdAt: existing ? existing.createdAt : new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+          success++;
+        }
       });
-      success++;
+
+      this.emitProgress('tm-import', end - startIndex, totalRows, `Imported ${end - startIndex} of ${totalRows} rows...`);
+      // Small delay to let the event loop breathe and allow IPC messages to be sent
+      await new Promise(resolve => setTimeout(resolve, 10));
     }
 
     return { success, skipped };

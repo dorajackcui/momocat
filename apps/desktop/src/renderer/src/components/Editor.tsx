@@ -19,7 +19,7 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
   const { 
     segments, 
     activeSegmentId, 
-    activeMatch,
+    activeMatches,
     loading, 
     setActiveSegmentId, 
     handleTranslationChange,
@@ -166,7 +166,7 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
           {/* Panel Content */}
           <div className="flex-1 overflow-y-auto">
             {activeTab === 'tm' ? (
-              <TMPanel match={activeMatch} onApply={handleApplyMatch} />
+              <TMPanel matches={activeMatches} onApply={handleApplyMatch} />
             ) : (
               <ConcordancePanel projectId={projectId || 0} />
             )}

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Segment, serializeTokensToDisplayText, Token, validateSegmentTags } from '@cat/core';
 
 interface EditorRowProps {
@@ -17,6 +17,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
   onConfirm,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [isContextExpanded, setIsContextExpanded] = useState(false);
   const qaIssues = validateSegmentTags(segment);
   const hasError = qaIssues.some(issue => issue.severity === 'error');
   const hasWarning = qaIssues.some(issue => issue.severity === 'warning');
@@ -63,10 +64,22 @@ export const EditorRow: React.FC<EditorRowProps> = ({
 
   const targetText = serializeTokensToDisplayText(segment.targetTokens);
 
+  // Minimalist status bar color
+  const statusColor = 
+    segment.status === 'confirmed' ? 'bg-green-500' :
+    segment.status === 'draft' ? 'bg-yellow-400' :
+    'bg-gray-200';
+
+  const contextText = segment.meta?.context || '';
+  const isLongContext = contextText.length > 120;
+  const displayContext = isContextExpanded || !isLongContext 
+    ? contextText 
+    : contextText.substring(0, 110) + '...';
+
   return (
     <div 
-      className={`grid grid-cols-2 border-b border-gray-100 transition-all ${
-        isActive ? 'bg-blue-50/50' : 'hover:bg-gray-50'
+      className={`grid grid-cols-[1fr_1fr_4px] border-b border-gray-100 transition-all ${
+        isActive ? 'bg-blue-50/40' : 'hover:bg-gray-50/50'
       } ${hasError ? 'border-l-4 border-l-red-500' : hasWarning ? 'border-l-4 border-l-yellow-400' : ''}`}
       onClick={() => onActivate(segment.segmentId)}
     >
@@ -90,13 +103,13 @@ export const EditorRow: React.FC<EditorRowProps> = ({
       <div className="p-4 relative">
         <textarea
           ref={textareaRef}
-          className={`w-full min-h-[40px] p-3 text-sm rounded-lg border focus:ring-2 focus:ring-blue-200 outline-none transition-all resize-none overflow-hidden ${
-            isActive ? 'border-blue-400 bg-white shadow-sm' : 'border-gray-200 bg-transparent'
+          className={`w-full min-h-[40px] p-2 text-sm rounded-md border focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-none overflow-hidden ${
+            isActive ? 'border-blue-300 bg-white shadow-sm' : 'border-transparent bg-transparent hover:border-gray-200'
           } ${hasError ? 'ring-1 ring-red-200 border-red-300' : ''}`}
           value={targetText}
           onChange={(e) => onChange(segment.segmentId, e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Translate here..."
+          placeholder="Translate..."
         />
         
         {/* QA Issues Display */}
@@ -105,11 +118,11 @@ export const EditorRow: React.FC<EditorRowProps> = ({
             {qaIssues.map((issue, idx) => (
               <div 
                 key={idx} 
-                className={`text-[11px] flex items-center gap-1.5 px-2 py-1 rounded ${
+                className={`text-[10px] flex items-center gap-1.5 px-2 py-0.5 rounded ${
                   issue.severity === 'error' ? 'bg-red-50 text-red-600' : 'bg-yellow-50 text-yellow-700'
                 }`}
               >
-                <span className="font-bold uppercase text-[9px]">{issue.severity}:</span>
+                <span className="font-bold uppercase text-[8px]">{issue.severity}:</span>
                 {issue.message}
               </div>
             ))}
@@ -117,29 +130,27 @@ export const EditorRow: React.FC<EditorRowProps> = ({
         )}
         
         {segment.meta?.context && (
-          <div className="mt-2 px-1 flex items-start gap-1.5 group">
-            <svg className="w-3 h-3 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-            </svg>
-            <span className="text-[11px] text-gray-500 italic leading-snug">
-              {segment.meta.context}
-            </span>
+          <div className="mt-2 px-1 flex flex-col group">
+            <div className="text-[11px] text-gray-400 italic leading-snug">
+              {displayContext}
+              {isLongContext && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsContextExpanded(!isContextExpanded);
+                  }}
+                  className="ml-1 text-blue-500 hover:text-blue-700 font-medium not-italic"
+                >
+                  {isContextExpanded ? 'Collapse' : 'more'}
+                </button>
+              )}
+            </div>
           </div>
         )}
-
-        <div className="mt-3 flex justify-between items-center">
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-            segment.status === 'confirmed' ? 'bg-green-100 text-green-700' :
-            segment.status === 'draft' ? 'bg-yellow-100 text-yellow-700' :
-            'bg-gray-100 text-gray-500'
-          }`}>
-            {segment.status}
-          </span>
-          {isActive && (
-            <span className="text-[10px] text-gray-400">Ctrl + Enter to confirm</span>
-          )}
-        </div>
       </div>
+
+      {/* Minimalist Status Indicator Bar */}
+      <div className={`w-1 h-full ${statusColor}`} title={`Status: ${segment.status}`} />
     </div>
   );
 };

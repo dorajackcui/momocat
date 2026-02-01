@@ -135,8 +135,12 @@ app.whenReady().then(() => {
     return projectService.exportFile(fileId, outputPath, options);
   });
 
-  ipcMain.handle('tm-get-100', async (_event, projectId: number, srcHash: string) => {
+  ipcMain.handle('tm-get-100-match', async (_event, projectId: number, srcHash: string) => {
     return projectService.get100Match(projectId, srcHash);
+  });
+
+  ipcMain.handle('tm-get-matches', async (_event, projectId: number, segment: any) => {
+    return projectService.findMatches(projectId, segment);
   });
 
   ipcMain.handle('tm-concordance', async (_event, projectId: number, query: string) => {
@@ -178,6 +182,13 @@ app.whenReady().then(() => {
 
   ipcMain.handle('tm-import-execute', async (_event, tmId: string, filePath: string, options: any) => {
     return projectService.importTMEntries(tmId, filePath, options);
+  });
+
+  // Listen for progress updates and broadcast to all windows
+  projectService.onProgress((data) => {
+    BrowserWindow.getAllWindows().forEach((win) => {
+      win.webContents.send('app-progress', data);
+    });
   });
 
   // Listen for segment updates and broadcast to all windows

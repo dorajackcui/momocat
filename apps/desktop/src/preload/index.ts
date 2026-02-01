@@ -28,7 +28,9 @@ const api = {
   
   // TM & Search
   get100Match: (projectId: number, srcHash: string) =>
-    ipcRenderer.invoke('tm-get-100', projectId, srcHash),
+    ipcRenderer.invoke('tm-get-100-match', projectId, srcHash),
+  getMatches: (projectId: number, segment: any) =>
+    ipcRenderer.invoke('tm-get-matches', projectId, segment),
   searchConcordance: (projectId: number, query: string) =>
     ipcRenderer.invoke('tm-concordance', projectId, query),
   
@@ -45,17 +47,21 @@ const api = {
   getTMImportPreview: (filePath: string) => ipcRenderer.invoke('tm-import-preview', filePath),
   importTMEntries: (tmId: string, filePath: string, options: any) => ipcRenderer.invoke('tm-import-execute', tmId, filePath, options),
   
+  // Dialogs
+  openFileDialog: (filters: any[]) => ipcRenderer.invoke('dialog-open-file', filters),
+  saveFileDialog: (defaultPath: string, filters: any[]) => ipcRenderer.invoke('dialog-save-file', defaultPath, filters),
+
+  // Events
   onSegmentsUpdated: (callback: (data: any) => void) => {
     const listener = (_event: any, data: any) => callback(data);
     ipcRenderer.on('segments-updated', listener);
     return () => ipcRenderer.removeListener('segments-updated', listener);
   },
-  
-  // Dialogs
-  openFileDialog: (filters: any[]) => ipcRenderer.invoke('dialog-open-file', filters),
-  saveFileDialog: (defaultPath: string, filters: any[]) => ipcRenderer.invoke('dialog-save-file', defaultPath, filters),
-  
-  // Events
+  onProgress: (callback: (data: any) => void) => {
+    const listener = (_event: any, data: any) => callback(data);
+    ipcRenderer.on('app-progress', listener);
+    return () => ipcRenderer.removeListener('app-progress', listener);
+  },
   onJobProgress: (callback: (progress: any) => void) => {
     const listener = (_event: any, progress: any) => callback(progress);
     ipcRenderer.on('job-progress', listener);

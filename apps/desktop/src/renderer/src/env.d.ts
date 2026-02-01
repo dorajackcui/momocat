@@ -17,8 +17,10 @@ declare global {
       exportFile: (fileId: number, outputPath: string, options?: any) => Promise<void>;
       updateSegment: (segmentId: string, targetTokens: any[], status: string) => Promise<any>;
       get100Match: (projectId: number, srcHash: string) => Promise<any>;
+      getMatches: (projectId: number, segment: any) => Promise<any[]>;
       searchConcordance: (projectId: number, query: string) => Promise<any[]>;
       onSegmentsUpdated: (callback: (data: any) => void) => () => void;
+      onProgress: (callback: (data: any) => void) => () => void;
       
       // TM Management
       listTMs: (type?: 'working' | 'main') => Promise<any[]>;

@@ -9,7 +9,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [projectId, setProjectId] = useState<number | null>(null);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
-  const [activeMatch, setActiveMatch] = useState<TMEntry | null>(null);
+  const [activeMatches, setActiveMatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Load Segments & Project Info
@@ -78,14 +78,13 @@ export function useEditor({ activeFileId }: UseEditorProps) {
   useEffect(() => {
     const loadMatch = async () => {
       if (!activeSegmentId || projectId === null) {
-        setActiveMatch(null);
+        setActiveMatches([]);
         return;
       }
       const segment = segments.find(s => s.segmentId === activeSegmentId);
       if (segment) {
-        // @ts-ignore - added to api in preload
-        const match = await window.api.get100Match(projectId, segment.srcHash); 
-        setActiveMatch(match);
+        const matches = await window.api.getMatches(projectId, segment); 
+        setActiveMatches(matches || []);
       }
     };
     loadMatch();
@@ -147,7 +146,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
     segments,
     projectId,
     activeSegmentId,
-    activeMatch,
+    activeMatches,
     setActiveSegmentId,
     loading,
     handleTranslationChange,

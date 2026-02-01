@@ -80,6 +80,19 @@ export function serializeTokensToDisplayText(tokens: Token[]): string {
 }
 
 /**
+ * Serialize tokens to pure text only, excluding all tags and markers.
+ * Used for linguistic fuzzy matching.
+ */
+export function serializeTokensToTextOnly(tokens: Token[]): string {
+  return tokens
+    .filter(t => t.type === 'text')
+    .map(t => t.content)
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
  * Extensible tokenizer for v0.1.1+: 
  * Supports configurable patterns and maintains correct inline positioning.
  */

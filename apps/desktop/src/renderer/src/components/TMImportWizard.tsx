@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface TMImportWizardProps {
   isOpen: boolean;
@@ -12,11 +12,67 @@ export function TMImportWizard({ isOpen, onClose, onConfirm, previewData }: TMIm
   const [sourceCol, setSourceCol] = useState(0);
   const [targetCol, setTargetCol] = useState(1);
   const [overwrite, setOverwrite] = useState(false);
+  const [progress, setProgress] = useState<{ current: number; total: number; message?: string } | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      const unsubscribe = window.api.onProgress((data: any) => {
+        if (data.type === 'tm-import') {
+          setProgress({ current: data.current, total: data.total, message: data.message });
+        }
+      });
+      return () => unsubscribe();
+    } else {
+      setProgress(null);
+    }
+    return undefined;
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const maxCols = previewData.length > 0 ? previewData[0].length : 0;
   const colIndexes = Array.from({ length: maxCols }, (_, i) => i);
+
+  if (progress) {
+    const percent = Math.round((progress.current / progress.total) * 100);
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] backdrop-blur-sm">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center animate-in fade-in zoom-in duration-200">
+          <div className="mb-6">
+            <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+            <h2 className="text-xl font-bold text-gray-900">Importing TM...</h2>
+            <p className="text-sm text-gray-500 mt-1">{progress.message || 'Processing rows...'}</p>
+          </div>
+
+          <div className="relative pt-1">
+            <div className="flex mb-2 items-center justify-between">
+              <div>
+                <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-blue-600 bg-blue-200">
+                  Progress
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="text-xs font-semibold inline-block text-blue-600">
+                  {percent}%
+                </span>
+              </div>
+            </div>
+            <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-blue-100">
+              <div 
+                style={{ width: `${percent}%` }}
+                className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-500 transition-all duration-300"
+              />
+            </div>
+            <p className="text-[10px] text-gray-400 font-medium">
+              {progress.current.toLocaleString()} / {progress.total.toLocaleString()} rows processed
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] backdrop-blur-sm">
