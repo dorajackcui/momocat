@@ -91,20 +91,48 @@ app.whenReady().then(() => {
     return projectService.listProjects();
   });
 
-  ipcMain.handle('project-create', async (_event, filePath: string, srcLang: string, tgtLang: string, options: ImportOptions) => {
-    return projectService.createProject(filePath, srcLang, tgtLang, options);
+  ipcMain.handle('project-create', async (_event, name: string, srcLang: string, tgtLang: string) => {
+    return projectService.createProject(name, srcLang, tgtLang);
   });
 
-  ipcMain.handle('project-get-segments', (_event, projectId: number, offset: number, limit: number) => {
-    return projectService.getSegments(projectId, offset, limit);
+  ipcMain.handle('project-get', async (_event, projectId: number) => {
+    return projectService.getProject(projectId);
+  });
+
+  ipcMain.handle('project-delete', async (_event, projectId: number) => {
+    return projectService.deleteProject(projectId);
+  });
+
+  ipcMain.handle('project-get-files', async (_event, projectId: number) => {
+    return projectService.listFiles(projectId);
+  });
+
+  ipcMain.handle('file-get', async (_event, fileId: number) => {
+    return projectService.getFile(fileId);
+  });
+
+  ipcMain.handle('file-delete', async (_event, fileId: number) => {
+    return projectService.deleteFile(fileId);
+  });
+
+  ipcMain.handle('project-add-file', async (_event, projectId: number, filePath: string, options: ImportOptions) => {
+    return projectService.addFileToProject(projectId, filePath, options);
+  });
+
+  ipcMain.handle('file-get-segments', (_event, fileId: number, offset: number, limit: number) => {
+    return projectService.getSegments(fileId, offset, limit);
+  });
+
+  ipcMain.handle('file-get-preview', (_event, filePath: string) => {
+    return projectService.getSpreadsheetPreview(filePath);
   });
 
   ipcMain.handle('segment-update', (_event, segmentId: string, targetTokens: any[], status: any) => {
     return projectService.updateSegment(segmentId, targetTokens, status);
   });
 
-  ipcMain.handle('project-export', async (_event, projectId: number, outputPath: string, options: ImportOptions) => {
-    return projectService.exportProject(projectId, outputPath, options);
+  ipcMain.handle('file-export', async (_event, fileId: number, outputPath: string, options: ImportOptions) => {
+    return projectService.exportFile(fileId, outputPath, options);
   });
 
   // IPC: Job Management

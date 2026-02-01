@@ -9,7 +9,10 @@
     "esModuleInterop": true,
     "composite": true,
     "skipLibCheck": true,
-    "baseUrl": "."
+    "baseUrl": ".",
+    "paths": {
+      "@cat/core": ["../core/src"]
+    }
   },
   "include": ["src"],
   "references": [

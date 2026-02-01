@@ -1,12 +1,13 @@
-import React from 'react';
-import { ProjectFile } from '../types';
+import React, { useState } from 'react';
+import { CreateProjectModal } from './CreateProjectModal';
+import { ProjectWithStats } from '../hooks/useProjects';
 
 interface DashboardProps {
-  projects: ProjectFile[];
+  projects: ProjectWithStats[];
   loading?: boolean;
   onOpenProject: (id: number) => void;
-  onCreateProject: () => void;
-  onExportProject: (id: number, name: string) => void;
+  onCreateProject: (name: string, srcLang: string, tgtLang: string) => void;
+  onDeleteProject: (id: number) => void;
 }
 
 export function Dashboard({
@@ -14,22 +15,28 @@ export function Dashboard({
   loading,
   onOpenProject,
   onCreateProject,
-  onExportProject,
+  onDeleteProject,
 }: DashboardProps) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleConfirmCreate = async (name: string, srcLang: string, tgtLang: string) => {
+    await onCreateProject(name, srcLang, tgtLang);
+    setIsModalOpen(false);
+  };
+
   return (
     <div className="p-10 max-w-[1000px] mx-auto h-full overflow-y-auto relative">
-      {loading && (
-        <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-xl shadow-xl border border-gray-100 flex flex-col items-center gap-4">
-            <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
-            <p className="text-sm font-medium text-gray-600">Processing...</p>
-          </div>
-        </div>
-      )}
+      <CreateProjectModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onConfirm={handleConfirmCreate}
+        loading={!!loading}
+      />
+      
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold text-gray-800">Projects</h1>
+        <h1 className="text-2xl font-bold text-gray-800">Translation Projects</h1>
         <button
-          onClick={onCreateProject}
+          onClick={() => setIsModalOpen(true)}
           className="px-5 py-2.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
         >
           + Create Project
@@ -57,20 +64,32 @@ export function Dashboard({
                   >
                     {project.name}
                   </h3>
-                  <div className="text-xs text-gray-500 mt-1 flex items-center">
-                    <span className="bg-gray-100 px-2 py-0.5 rounded mr-2">
+                  <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                    <span className="bg-gray-100 px-2 py-0.5 rounded">
                       {project.createdAt ? new Date(project.createdAt).toLocaleDateString() : 'N/A'}
                     </span>
-                    <span className="text-[10px] text-gray-400">
-                      {project.srcLang} → {project.tgtLang}
+                    <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded font-bold">
+                      {project.fileCount || 0} Files
                     </span>
                   </div>
                 </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteProject(project.id);
+                  }}
+                  className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-all ml-2"
+                  title="Delete Project"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
               </div>
 
               <div className="mb-6">
-                <div className="flex justify-between text-xs font-medium mb-2 text-gray-600">
-                  <span>Translation Progress</span>
+                <div className="flex justify-between text-[10px] font-bold mb-2 text-gray-400 uppercase tracking-tight">
+                  <span>Total Progress</span>
                   <span>{project.progress}%</span>
                 </div>
                 <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -81,18 +100,12 @@ export function Dashboard({
                 </div>
               </div>
 
-              <div className="mt-auto flex gap-3">
+              <div className="mt-auto">
                 <button
                   onClick={() => onOpenProject(project.id)}
-                  className="flex-1 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors text-sm"
+                  className="w-full py-2.5 bg-gray-900 text-white rounded-lg font-bold hover:bg-gray-800 transition-colors text-sm"
                 >
-                  Open
-                </button>
-                <button
-                  onClick={() => onExportProject(project.id, project.name)}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors text-sm"
-                >
-                  Export
+                  Open Project
                 </button>
               </div>
             </div>

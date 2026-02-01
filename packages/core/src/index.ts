@@ -10,6 +10,7 @@ export type SegmentStatus = 'new' | 'draft' | 'translated' | 'confirmed' | 'revi
 
 export interface Segment {
   segmentId: string;
+  fileId: number;
   projectId: number;
   orderIndex: number;
   sourceTokens: Token[];
@@ -24,6 +25,16 @@ export interface Segment {
     notes?: string[];
     updatedAt: string;
   };
+}
+
+export interface ProjectFile {
+  id: number;
+  projectId: number;
+  name: string;
+  totalSegments: number;
+  confirmedSegments: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Project {
@@ -43,29 +54,44 @@ export function serializeTokensToDisplayText(tokens: Token[]): string {
 }
 
 /**
- * Basic tokenizer for v0.1: Identifies {...} as tags
+ * Extensible tokenizer for v0.1.1+: 
+ * Supports configurable patterns and maintains correct inline positioning.
  */
-export function parseDisplayTextToTokens(text: string): Token[] {
-  const tokens: Token[] = [];
-  const tagRegex = /\{[^{}]+\}/g;
-  let lastIndex = 0;
-  let match;
+export function parseDisplayTextToTokens(text: string, customPatterns?: RegExp[]): Token[] {
+  // Default patterns: 
+  // 1. {1}, {tag}
+  // 2. <tag>, </tag>, <tag/>
+  // 3. %s, %d, %1$s (common printf-style)
+  const patterns = customPatterns || [
+    /\{[^{}]+\}/g,
+    /<[^>]+>/g,
+    /%(?:\d+\$)?[-#+ 0]*[\d\.]*[hlLzjt]*[diuoxXfFeEgGaAcspn%]/g
+  ];
 
-  while ((match = tagRegex.exec(text)) !== null) {
-    // Add text before tag
+  const tokens: Token[] = [];
+  let lastIndex = 0;
+
+  // Combine all patterns into one global regex to find matches in order
+  const combinedRegex = new RegExp(patterns.map(p => `(${p.source})`).join('|'), 'g');
+  
+  let match;
+  while ((match = combinedRegex.exec(text)) !== null) {
+    // Add text before the match
     if (match.index > lastIndex) {
       tokens.push({
         type: 'text',
         content: text.substring(lastIndex, match.index)
       });
     }
-    // Add tag
+
+    // The match itself is a tag
     tokens.push({
       type: 'tag',
       content: match[0],
       meta: { id: match[0] }
     });
-    lastIndex = tagRegex.lastIndex;
+
+    lastIndex = combinedRegex.lastIndex;
   }
 
   // Add remaining text

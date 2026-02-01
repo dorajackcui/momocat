@@ -1,16 +1,18 @@
-import React from 'react';
-import { ProjectFile } from '../types';
+import React, { useState, useEffect } from 'react';
+import { Project, ProjectFile } from '@cat/core';
 import { EditorRow } from './EditorRow';
 import { ProgressBar } from './ProgressBar';
 import { useEditor } from '../hooks/useEditor';
 
 interface EditorProps {
-  activeProjectId: number;
-  projects: ProjectFile[];
+  activeFileId: number;
   onBack: () => void;
 }
 
-export function Editor({ activeProjectId, projects, onBack }: EditorProps) {
+export function Editor({ activeFileId, onBack }: EditorProps) {
+  const [file, setFile] = useState<ProjectFile | null>(null);
+  const [project, setProject] = useState<Project | null>(null);
+
   const {
     segments,
     activeSegmentId,
@@ -19,10 +21,24 @@ export function Editor({ activeProjectId, projects, onBack }: EditorProps) {
     handleTranslationChange,
     confirmSegment,
   } = useEditor({
-    activeProjectId,
+    activeFileId,
   });
 
-  const project = projects.find(p => p.id === activeProjectId);
+  useEffect(() => {
+    const loadInfo = async () => {
+      try {
+        const f = await window.api.getFile(activeFileId); // Need to add getFile to preload
+        if (f) {
+          setFile(f);
+          const p = await window.api.getProject(f.projectId);
+          setProject(p);
+        }
+      } catch (e) {
+        console.error('Failed to load file info', e);
+      }
+    };
+    loadInfo();
+  }, [activeFileId]);
 
   return (
     <div className="flex-1 flex flex-col h-full bg-gray-50">
@@ -31,15 +47,17 @@ export function Editor({ activeProjectId, projects, onBack }: EditorProps) {
           <button
             onClick={onBack}
             className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all"
-            title="Back to Dashboard"
+            title="Back to Project"
           >
             ←
           </button>
           <div>
             <h1 className="text-lg font-bold text-gray-900">
-              {project?.name || 'Editor'}
+              {file?.name || 'Editor'}
             </h1>
             <div className="text-[10px] text-gray-500 flex gap-2">
+              <span className="font-bold text-blue-600">{project?.name}</span>
+              <span>•</span>
               <span>Source: {project?.srcLang}</span>
               <span>•</span>
               <span>Target: {project?.tgtLang}</span>

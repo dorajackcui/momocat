@@ -2,26 +2,24 @@ import { useState, useEffect, useCallback } from 'react';
 import { Segment, Token, parseDisplayTextToTokens } from '@cat/core';
 
 interface UseEditorProps {
-  activeProjectId: number | null;
-  onProgressUpdate?: (projectId: number, progress: number) => void;
+  activeFileId: number | null;
 }
 
-export function useEditor({ activeProjectId, onProgressUpdate }: UseEditorProps) {
+export function useEditor({ activeFileId }: UseEditorProps) {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   // Load Segments
   const loadSegments = useCallback(async () => {
-    if (activeProjectId === null) {
+    if (activeFileId === null) {
       setSegments([]);
       return;
     }
 
     setLoading(true);
     try {
-      // For v0.1, we'll load all segments (or a large page)
-      const data = await window.api.getSegments(activeProjectId, 0, 1000);
+      const data = await window.api.getSegments(activeFileId, 0, 1000);
       const segmentsArray = Array.isArray(data) ? data : [];
       setSegments(segmentsArray);
       if (segmentsArray.length > 0 && !activeSegmentId) {
@@ -32,7 +30,7 @@ export function useEditor({ activeProjectId, onProgressUpdate }: UseEditorProps)
     } finally {
       setLoading(false);
     }
-  }, [activeProjectId]);
+  }, [activeFileId]);
 
   useEffect(() => {
     loadSegments();

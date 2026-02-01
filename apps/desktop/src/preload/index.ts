@@ -5,12 +5,22 @@ import { electronAPI } from '@electron-toolkit/preload';
 const api = {
   // Projects
   listProjects: () => ipcRenderer.invoke('project-list'),
-  createProject: (filePath: string, srcLang: string, tgtLang: string, options: any) => 
-    ipcRenderer.invoke('project-create', filePath, srcLang, tgtLang, options),
-  getSegments: (projectId: number, offset: number, limit: number) => 
-    ipcRenderer.invoke('project-get-segments', projectId, offset, limit),
-  exportProject: (projectId: number, outputPath: string, options: any) =>
-    ipcRenderer.invoke('project-export', projectId, outputPath, options),
+  createProject: (name: string, srcLang: string, tgtLang: string) => 
+    ipcRenderer.invoke('project-create', name, srcLang, tgtLang),
+  deleteProject: (projectId: number) => ipcRenderer.invoke('project-delete', projectId),
+  getProject: (projectId: number) => ipcRenderer.invoke('project-get', projectId),
+  getProjectFiles: (projectId: number) => ipcRenderer.invoke('project-get-files', projectId),
+  getFile: (fileId: number) => ipcRenderer.invoke('file-get', fileId),
+  getFilePreview: (filePath: string) => ipcRenderer.invoke('file-get-preview', filePath),
+  deleteFile: (fileId: number) => ipcRenderer.invoke('file-delete', fileId),
+  addFileToProject: (projectId: number, filePath: string, options: any) =>
+    ipcRenderer.invoke('project-add-file', projectId, filePath, options),
+
+  // Files & Segments
+  getSegments: (fileId: number, offset: number, limit: number) => 
+    ipcRenderer.invoke('file-get-segments', fileId, offset, limit),
+  exportFile: (fileId: number, outputPath: string, options: any) =>
+    ipcRenderer.invoke('file-export', fileId, outputPath, options),
   
   // Segments
   updateSegment: (segmentId: string, targetTokens: any[], status: string) =>

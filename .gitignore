@@ -33,6 +33,9 @@ pnpm-debug.log*
 
 # Dependency directories
 node_modules/
+.electron-gyp/
+.gyp/
+.npm/
 
 # OS specific
 Thumbs.db

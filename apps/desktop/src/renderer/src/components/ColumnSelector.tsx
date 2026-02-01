@@ -1,165 +1,172 @@
 import React, { useState } from 'react';
 
 interface ColumnSelectorProps {
-  headers: string[];
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (options: { hasHeader: boolean; sourceCol: number; targetCol: number; contextCol?: number }) => void;
   previewData: any[][];
-  onConfirm: (sourceIndex: number, targetIndex: number) => void;
-  onCancel: () => void;
 }
 
-export const ColumnSelector: React.FC<ColumnSelectorProps> = ({
-  headers,
-  previewData,
-  onConfirm,
-  onCancel,
-}) => {
-  const [sourceCol, setSourceCol] = useState<number>(0);
-  const [targetCol, setTargetCol] = useState<number>(1);
+export function ColumnSelector({ isOpen, onClose, onConfirm, previewData }: ColumnSelectorProps) {
+  const [hasHeader, setHasHeader] = useState(true);
+  const [sourceCol, setSourceCol] = useState(0);
+  const [targetCol, setTargetCol] = useState(1);
+  const [contextCol, setContextCol] = useState<number | undefined>(undefined);
+
+  if (!isOpen) return null;
+
+  const maxCols = previewData.length > 0 ? previewData[0].length : 0;
+  const colIndexes = Array.from({ length: maxCols }, (_, i) => i);
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 1000,
-      }}
-    >
-      <div
-        style={{
-          backgroundColor: '#fff',
-          padding: '24px',
-          borderRadius: '8px',
-          width: '500px',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-        }}
-      >
-        <h3 style={{ marginTop: 0 }}>Select Columns</h3>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Import Configuration</h2>
+            <p className="text-sm text-gray-500 mt-1">Select the columns to import from your spreadsheet</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
 
-        <div style={{ marginBottom: '20px' }}>
-          <div style={{ marginBottom: '10px' }}>
-            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-              Source Text Column
-            </label>
-            <select
-              value={sourceCol}
-              onChange={(e) => setSourceCol(Number(e.target.value))}
-              style={{
-                width: '100%',
-                padding: '8px',
-                borderRadius: '4px',
-                border: '1px solid #d9d9d9',
-              }}
-            >
-              {headers.map((h, i) => (
-                <option key={i} value={i}>
-                  Column {String.fromCharCode(65 + i)}: {h || `(Empty)`}
-                </option>
-              ))}
-            </select>
+        <div className="flex-1 overflow-y-auto p-8">
+          <div className="grid grid-cols-3 gap-8 mb-8">
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                Source Column
+              </label>
+              <select 
+                value={sourceCol}
+                onChange={(e) => setSourceCol(parseInt(e.target.value))}
+                className="w-full p-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all"
+              >
+                {colIndexes.map(i => (
+                  <option key={i} value={i}>Column {XLSX_COL_NAME(i)}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                Target Column
+              </label>
+              <select 
+                value={targetCol}
+                onChange={(e) => setTargetCol(parseInt(e.target.value))}
+                className="w-full p-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all"
+              >
+                {colIndexes.map(i => (
+                  <option key={i} value={i}>Column {XLSX_COL_NAME(i)}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
+                Comment/Context Column
+              </label>
+              <select 
+                value={contextCol === undefined ? -1 : contextCol}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value);
+                  setContextCol(val === -1 ? undefined : val);
+                }}
+                className="w-full p-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all"
+              >
+                <option value={-1}>None (Ignore)</option>
+                {colIndexes.map(i => (
+                  <option key={i} value={i}>Column {XLSX_COL_NAME(i)}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          <div style={{ marginBottom: '10px' }}>
-            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-              Target Translation Column
+          <div className="flex items-center gap-3 mb-6 bg-blue-50/50 p-4 rounded-xl border border-blue-100/50">
+            <input 
+              type="checkbox" 
+              id="hasHeader" 
+              checked={hasHeader}
+              onChange={(e) => setHasHeader(e.target.checked)}
+              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+            />
+            <label htmlFor="hasHeader" className="text-sm font-medium text-gray-700 cursor-pointer select-none">
+              First row is a header (Skip it)
             </label>
-            <select
-              value={targetCol}
-              onChange={(e) => setTargetCol(Number(e.target.value))}
-              style={{
-                width: '100%',
-                padding: '8px',
-                borderRadius: '4px',
-                border: '1px solid #d9d9d9',
-              }}
-            >
-              {headers.map((h, i) => (
-                <option key={i} value={i}>
-                  Column {String.fromCharCode(65 + i)}: {h || `(Empty)`}
-                </option>
-              ))}
-            </select>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Preview (First 10 rows)</h3>
+            <div className="border border-gray-200 rounded-xl overflow-hidden overflow-x-auto shadow-sm">
+              <table className="w-full text-sm text-left border-collapse">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    {colIndexes.map(i => (
+                      <th key={i} className={`px-4 py-3 font-bold text-[11px] uppercase tracking-tight ${
+                        i === sourceCol ? 'text-blue-600 bg-blue-50/50' : 
+                        i === targetCol ? 'text-green-600 bg-green-50/50' :
+                        i === contextCol ? 'text-purple-600 bg-purple-50/50' :
+                        'text-gray-500'
+                      }`}>
+                        Col {XLSX_COL_NAME(i)}
+                        {i === sourceCol && <span className="block text-[9px] mt-0.5">Source</span>}
+                        {i === targetCol && <span className="block text-[9px] mt-0.5">Target</span>}
+                        {i === contextCol && <span className="block text-[9px] mt-0.5">Comment</span>}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {previewData.map((row, rowIndex) => (
+                    <tr key={rowIndex} className={`${hasHeader && rowIndex === 0 ? 'bg-gray-50/80 opacity-60 italic' : 'bg-white'}`}>
+                      {colIndexes.map(i => (
+                        <td key={i} className={`px-4 py-3 truncate max-w-[200px] text-xs ${
+                          i === sourceCol ? 'bg-blue-50/20 font-medium' : 
+                          i === targetCol ? 'bg-green-50/20' :
+                          i === contextCol ? 'bg-purple-50/20' :
+                          ''
+                        }`}>
+                          {row[i] || '-'}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
-        <div
-          style={{
-            marginBottom: '20px',
-            border: '1px solid #eee',
-            borderRadius: '4px',
-            padding: '10px',
-            backgroundColor: '#fafafa',
-          }}
-        >
-          <div style={{ fontWeight: 'bold', marginBottom: '5px', fontSize: '12px', color: '#666' }}>
-            Preview (First Row)
-          </div>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '12px', color: '#999' }}>Source</div>
-              <div
-                style={{
-                  padding: '5px',
-                  background: '#fff',
-                  border: '1px solid #eee',
-                  borderRadius: '2px',
-                  marginTop: '2px',
-                }}
-              >
-                {previewData[0] ? previewData[0][sourceCol] : ''}
-              </div>
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '12px', color: '#999' }}>Target</div>
-              <div
-                style={{
-                  padding: '5px',
-                  background: '#fff',
-                  border: '1px solid #eee',
-                  borderRadius: '2px',
-                  marginTop: '2px',
-                }}
-              >
-                {previewData[0] ? previewData[0][targetCol] : ''}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+        <div className="px-8 py-6 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
           <button
-            onClick={onCancel}
-            style={{
-              padding: '8px 16px',
-              border: '1px solid #d9d9d9',
-              borderRadius: '4px',
-              background: '#fff',
-              cursor: 'pointer',
-            }}
+            onClick={onClose}
+            className="px-6 py-2.5 text-gray-600 font-bold text-sm hover:bg-gray-200 rounded-lg transition-colors"
           >
             Cancel
           </button>
           <button
-            onClick={() => onConfirm(sourceCol, targetCol)}
-            style={{
-              padding: '8px 16px',
-              border: 'none',
-              borderRadius: '4px',
-              background: '#1890ff',
-              color: '#fff',
-              cursor: 'pointer',
-            }}
+            onClick={() => onConfirm({ hasHeader, sourceCol, targetCol, contextCol })}
+            className="px-8 py-2.5 bg-blue-600 text-white font-bold text-sm rounded-lg hover:bg-blue-700 shadow-md shadow-blue-200 transition-all hover:-translate-y-0.5"
           >
-            Confirm
+            Start Import
           </button>
         </div>
       </div>
     </div>
   );
-};
+}
+
+function XLSX_COL_NAME(n: number): string {
+  let s = "";
+  while (n >= 0) {
+    s = String.fromCharCode(n % 26 + 65) + s;
+    n = Math.floor(n / 26) - 1;
+  }
+  return s;
+}

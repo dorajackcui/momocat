@@ -23,6 +23,7 @@ export class SpreadsheetFilter {
   public async import(
     filePath: string, 
     projectId: number, 
+    fileId: number,
     options: ImportOptions
   ): Promise<Segment[]> {
     console.log(`[SpreadsheetFilter] Reading file: ${filePath}`);
@@ -59,6 +60,7 @@ export class SpreadsheetFilter {
 
       segments.push({
         segmentId: randomUUID(),
+        fileId,
         projectId,
         orderIndex: i,
         sourceTokens,
@@ -76,6 +78,17 @@ export class SpreadsheetFilter {
     }
     
     return segments;
+  }
+
+  /**
+   * Get first few rows of a spreadsheet for preview
+   */
+  public async getPreview(filePath: string, rowLimit: number = 10): Promise<any[][]> {
+    const workbook = XLSX.readFile(filePath);
+    const firstSheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[firstSheetName];
+    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, range: 0 }) as any[][];
+    return rawData.slice(0, rowLimit);
   }
 
   /**

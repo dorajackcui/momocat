@@ -7,14 +7,23 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace=apps/desktop",
-    "build": "npm run build --workspace=apps/desktop",
+    "dev": "npm run rebuild:electron && npm run dev --workspace=apps/desktop",
+    "build": "npm run rebuild:electron && npm run build --workspace=apps/desktop",
     "pack": "npm run pack --workspace=apps/desktop",
     "lint": "npm run lint --workspaces",
+    "rebuild:electron": "HOME=$(pwd) npx electron-rebuild -v 28.3.3 -f -w better-sqlite3",
+    "rebuild:test": "npm rebuild better-sqlite3",
+    "test": "npm run rebuild:test && vitest run",
+    "test:watch": "vitest",
+    "postinstall": "npm run rebuild:electron",
     "format": "prettier --write ."
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.3",
+    "@vitest/coverage-v8": "^4.0.18",
+    "electron-rebuild": "^3.2.9",
     "prettier": "^3.8.1",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^4.0.18"
   }
 }
