@@ -34,7 +34,7 @@ export function Dashboard({
       />
       
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold text-gray-800">Translation Projects</h1>
+        <h1 className="text-2xl font-bold text-gray-800">Projects</h1>
         <button
           onClick={() => setIsModalOpen(true)}
           className="px-5 py-2.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
@@ -105,7 +105,7 @@ export function Dashboard({
                   onClick={() => onOpenProject(project.id)}
                   className="w-full py-2.5 bg-gray-900 text-white rounded-lg font-bold hover:bg-gray-800 transition-colors text-sm"
                 >
-                  Open Project
+                  Open
                 </button>
               </div>
             </div>

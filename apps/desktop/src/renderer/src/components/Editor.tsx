@@ -111,7 +111,7 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
             onClick={handleExport}
             className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded-lg shadow-sm transition-all active:scale-95"
           >
-            Export Final
+            Export
           </button>
         </div>
       </header>

@@ -62,6 +62,12 @@ export const EditorRow: React.FC<EditorRowProps> = ({
     }, 0);
   };
 
+  const handleCopySource = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const text = serializeTokensToDisplayText(segment.sourceTokens);
+    onChange(segment.segmentId, text);
+  };
+
   const targetText = serializeTokensToDisplayText(segment.targetTokens);
 
   // Minimalist status bar color
@@ -78,7 +84,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
 
   return (
     <div 
-      className={`grid grid-cols-[1fr_1fr_4px] border-b border-gray-100 transition-all ${
+      className={`grid grid-cols-[1fr_32px_4px_1fr] border-b border-gray-100 transition-all ${
         isActive ? 'bg-blue-50/40' : 'hover:bg-gray-50/50'
       } ${hasError ? 'border-l-4 border-l-red-500' : hasWarning ? 'border-l-4 border-l-yellow-400' : ''}`}
       onClick={() => onActivate(segment.segmentId)}
@@ -99,6 +105,24 @@ export const EditorRow: React.FC<EditorRowProps> = ({
           ))}
         </div>
       </div>
+
+      {/* Middle Action Column */}
+      <div className="flex flex-col items-center justify-center border-r border-gray-100 py-4">
+        <button
+          onClick={handleCopySource}
+          className={`p-1.5 rounded-md hover:bg-blue-100 text-gray-400 hover:text-blue-600 transition-all ${
+            isActive ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
+          title="Copy Source to Target"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Minimalist Status Indicator Bar (Left of Translation Box) */}
+      <div className={`w-1 h-full ${statusColor}`} title={`Status: ${segment.status}`} />
       
       <div className="p-4 relative">
         <textarea
@@ -109,7 +133,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
           value={targetText}
           onChange={(e) => onChange(segment.segmentId, e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Translate..."
+          placeholder=""
         />
         
         {/* QA Issues Display */}
@@ -148,9 +172,6 @@ export const EditorRow: React.FC<EditorRowProps> = ({
           </div>
         )}
       </div>
-
-      {/* Minimalist Status Indicator Bar */}
-      <div className={`w-1 h-full ${statusColor}`} title={`Status: ${segment.status}`} />
     </div>
   );
 };

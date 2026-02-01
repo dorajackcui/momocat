@@ -224,7 +224,7 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
           </div>
         ) : activeTab === 'files' ? (
           <div className="max-w-4xl mx-auto">
-            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-6">Files in this project</h3>
+            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-6">Files</h3>
             
             {files.length === 0 ? (
               <div className="text-center py-20 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
@@ -261,7 +261,7 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
                               e.target.value = "";
                             }}
                           >
-                            <option value="">Commit to Main...</option>
+                            <option value="">Commit</option>
                             {mountedTMs.filter(tm => tm.type === 'main').map(tm => (
                               <option key={tm.id} value={tm.id}>{tm.name}</option>
                             ))}
@@ -326,7 +326,7 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
                     onChange={(e) => handleMountTM(e.target.value)}
                     value=""
                   >
-                    <option value="" disabled>+ Mount a Main TM...</option>
+                    <option value="" disabled>+ Main TM</option>
                     {allMainTMs
                       .filter(tm => !mountedTMs.find(m => m.id === tm.id))
                       .map(tm => (

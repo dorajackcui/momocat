@@ -111,7 +111,7 @@ export const TMManager: React.FC = () => {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">TM Management</h1>
-            <p className="text-sm text-gray-500 mt-1">Manage your Main Translation Memories (受控资产)</p>
+            <p className="text-sm text-gray-500 mt-1">Manage your Main TMs</p>
           </div>
           <button
             onClick={() => setShowCreate(true)}

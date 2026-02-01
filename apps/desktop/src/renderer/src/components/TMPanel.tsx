@@ -25,22 +25,22 @@ export const TMPanel: React.FC<TMPanelProps> = ({ matches, onApply }) => {
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">Translation Memory</h3>
+        {/* <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">Translation Memory</h3> */}
         <span className="text-[10px] text-gray-400">{matches.length} matches found</span>
       </div>
 
       <div className="space-y-4">
         {matches.map((match, idx) => {
           const tmLabel = match.tmType === 'working' ? 'Working TM' : `Main TM: ${match.tmName}`;
-          const similarityColor = match.similarity === 100 ? 'text-green-600 bg-green-50' : 
-                                match.similarity >= 90 ? 'text-blue-600 bg-blue-50' : 
-                                'text-orange-600 bg-orange-50';
+          const similarityColor = match.similarity === 100 ? 'text-green-600' : 
+                                match.similarity >= 90 ? 'text-blue-600' : 
+                                'text-orange-600';
 
           return (
             <div key={match.id + idx} className="group border border-gray-100 rounded-xl overflow-hidden hover:border-blue-200 hover:shadow-sm transition-all bg-white">
               <div className="px-3 py-2 bg-gray-50/50 flex items-center justify-between border-b border-gray-100">
                 <div className="flex items-center gap-2">
-                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${match.tmType === 'working' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${match.tmType === 'working' ? 'text-blue-700' : 'text-purple-700'}`}>
                     {tmLabel}
                   </span>
                 </div>
@@ -50,6 +50,12 @@ export const TMPanel: React.FC<TMPanelProps> = ({ matches, onApply }) => {
               </div>
 
               <div className="p-3 space-y-2">
+                <button
+                  onClick={() => onApply(match.targetTokens)}
+                  className="w-full mt-2 py-1.5 bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white text-[10px] font-bold rounded-lg transition-all border border-blue-100 hover:border-blue-600"
+                >
+                  Apply Match
+                </button>
                 <div className="space-y-1">
                   <div className="text-[9px] text-gray-400 uppercase font-bold tracking-tight">Source</div>
                   <div className="text-xs text-gray-600 leading-snug">{serializeTokensToDisplayText(match.sourceTokens)}</div>
@@ -59,13 +65,6 @@ export const TMPanel: React.FC<TMPanelProps> = ({ matches, onApply }) => {
                   <div className="text-[9px] text-blue-400 uppercase font-bold tracking-tight">Target</div>
                   <div className="text-xs text-gray-800 leading-snug font-medium italic">{serializeTokensToDisplayText(match.targetTokens)}</div>
                 </div>
-
-                <button
-                  onClick={() => onApply(match.targetTokens)}
-                  className="w-full mt-2 py-1.5 bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white text-[10px] font-bold rounded-lg transition-all border border-blue-100 hover:border-blue-600"
-                >
-                  Apply Match
-                </button>
               </div>
 
               <div className="px-3 py-1.5 bg-gray-50/30 flex justify-between items-center text-[9px] text-gray-400 border-t border-gray-50">

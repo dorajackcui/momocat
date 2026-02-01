@@ -70,7 +70,7 @@ function App(): JSX.Element {
           onClick={handleBackToDashboard}
         >
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">C</div>
-          <h1 className="text-xl font-bold text-gray-900 tracking-tight">Simple CAT Tool <span className="text-xs font-normal text-blue-500 ml-1">v0.2</span></h1>
+          <h1 className="text-xl font-bold text-gray-900 tracking-tight">MomoCAT<span className="text-xs font-normal text-blue-500 ml-1">v0.2</span></h1>
         </div>
         <nav className="flex gap-1">
           <button
