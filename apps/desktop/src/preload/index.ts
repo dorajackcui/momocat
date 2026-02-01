@@ -42,6 +42,8 @@ const api = {
     ipcRenderer.invoke('tm-mount', projectId, tmId, priority, permission),
   unmountTMFromProject: (projectId: number, tmId: string) => ipcRenderer.invoke('tm-unmount', projectId, tmId),
   commitToMainTM: (tmId: string, fileId: number) => ipcRenderer.invoke('tm-commit-file', tmId, fileId),
+  getTMImportPreview: (filePath: string) => ipcRenderer.invoke('tm-import-preview', filePath),
+  importTMEntries: (tmId: string, filePath: string, options: any) => ipcRenderer.invoke('tm-import-execute', tmId, filePath, options),
   
   onSegmentsUpdated: (callback: (data: any) => void) => {
     const listener = (_event: any, data: any) => callback(data);

@@ -1,6 +1,17 @@
 import { CATDatabase } from '@cat/db';
 import { SpreadsheetFilter, ImportOptions } from '../filters/SpreadsheetFilter';
-import { Project, ProjectFile, Segment, SegmentStatus, Token, validateSegmentTags } from '@cat/core';
+import { 
+  Project, 
+  ProjectFile, 
+  Segment, 
+  SegmentStatus, 
+  Token, 
+  validateSegmentTags,
+  parseDisplayTextToTokens,
+  computeTagsSignature,
+  computeMatchKey,
+  computeSrcHash
+} from '@cat/core';
 import { join, basename } from 'path';
 import { copyFileSync, existsSync, mkdirSync, rmSync, unlinkSync } from 'fs';
 import { randomUUID } from 'crypto';
@@ -173,6 +184,77 @@ export class ProjectService {
 
   public async unmountTMFromProject(projectId: number, tmId: string) {
     return this.db.unmountTMFromProject(projectId, tmId);
+  }
+
+  // TM Import Logic
+  public async getTMImportPreview(filePath: string): Promise<any[][]> {
+    const filter = new SpreadsheetFilter();
+    return filter.getPreview(filePath);
+  }
+
+  public async importTMEntries(
+    tmId: string, 
+    filePath: string, 
+    options: { sourceCol: number; targetCol: number; hasHeader: boolean; overwrite: boolean }
+  ): Promise<{ success: number; skipped: number }> {
+    const tm = this.db.getTM(tmId);
+    if (!tm) throw new Error('Target TM not found');
+
+    const filter = new SpreadsheetFilter();
+    const workbook = require('xlsx').readFile(filePath);
+    const firstSheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[firstSheetName];
+    const rawData = require('xlsx').utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+
+    const startIndex = options.hasHeader ? 1 : 0;
+    let success = 0;
+    let skipped = 0;
+
+    for (let i = startIndex; i < rawData.length; i++) {
+      const row = rawData[i];
+      if (!row) continue;
+
+      const sourceText = row[options.sourceCol] !== undefined ? String(row[options.sourceCol]).trim() : '';
+      const targetText = row[options.targetCol] !== undefined ? String(row[options.targetCol]).trim() : '';
+
+      // Filter: Skip empty rows
+      if (!sourceText || !targetText) {
+        skipped++;
+        continue;
+      }
+
+      const sourceTokens = parseDisplayTextToTokens(sourceText);
+      const targetTokens = parseDisplayTextToTokens(targetText);
+      const tagsSignature = computeTagsSignature(sourceTokens);
+      const matchKey = computeMatchKey(sourceTokens);
+      const srcHash = computeSrcHash(matchKey, tagsSignature);
+
+      // Check for duplication in this specific TM
+      const existing = this.db.findTMEntryByHash(tmId, srcHash);
+      if (existing && !options.overwrite) {
+        skipped++;
+        continue;
+      }
+
+      this.db.upsertTMEntry({
+        id: existing ? existing.id : randomUUID(),
+        tmId,
+        projectId: 0,
+        srcLang: tm.srcLang,
+        tgtLang: tm.tgtLang,
+        srcHash,
+        matchKey,
+        tagsSignature,
+        sourceTokens,
+        targetTokens,
+        usageCount: existing ? existing.usageCount + 1 : 1,
+        createdAt: existing ? existing.createdAt : new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      success++;
+    }
+
+    return { success, skipped };
   }
 
   public async commitToMainTM(tmId: string, fileId: number) {

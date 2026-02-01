@@ -172,6 +172,14 @@ app.whenReady().then(() => {
     return projectService.commitToMainTM(tmId, fileId);
   });
 
+  ipcMain.handle('tm-import-preview', async (_event, filePath: string) => {
+    return projectService.getTMImportPreview(filePath);
+  });
+
+  ipcMain.handle('tm-import-execute', async (_event, tmId: string, filePath: string, options: any) => {
+    return projectService.importTMEntries(tmId, filePath, options);
+  });
+
   // Listen for segment updates and broadcast to all windows
   projectService.onSegmentsUpdated((data) => {
     BrowserWindow.getAllWindows().forEach(win => {

@@ -28,6 +28,8 @@ declare global {
       mountTMToProject: (projectId: number, tmId: string, priority?: number, permission?: string) => Promise<void>;
       unmountTMFromProject: (projectId: number, tmId: string) => Promise<void>;
       commitToMainTM: (tmId: string, fileId: number) => Promise<number>;
+      getTMImportPreview: (filePath: string) => Promise<any[][]>;
+      importTMEntries: (tmId: string, filePath: string, options: any) => Promise<{ success: number; skipped: number }>;
 
       openFileDialog: (filters: any[]) => Promise<string | null>;
       saveFileDialog: (defaultPath: string, filters: any[]) => Promise<string | null>;

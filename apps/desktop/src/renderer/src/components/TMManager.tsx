@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { TMImportWizard } from './TMImportWizard';
 
 interface TM {
   id: string;
@@ -16,6 +17,13 @@ export const TMManager: React.FC = () => {
   const [newName, setNewName] = useState('');
   const [newSrc, setNewSrc] = useState('en-US');
   const [newTgt, setNewTgt] = useState('zh-CN');
+
+  // Import State
+  const [importingTMId, setImportingTMId] = useState<string | null>(null);
+  const [importPreview, setImportPreview] = useState<any[][]>([]);
+  const [importFilePath, setImportFilePath] = useState<string | null>(null);
+  const [isImportWizardOpen, setIsImportWizardOpen] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
 
   const loadTMs = async () => {
     setLoading(true);
@@ -56,8 +64,60 @@ export const TMManager: React.FC = () => {
     }
   };
 
+  const handleStartImport = async (tmId: string) => {
+    const filePath = await window.api.openFileDialog([
+      { name: 'Spreadsheets', extensions: ['xlsx', 'xls', 'csv'] }
+    ]);
+    if (!filePath) return;
+
+    try {
+      const preview = await window.api.getTMImportPreview(filePath);
+      setImportingTMId(tmId);
+      setImportFilePath(filePath);
+      setImportPreview(preview);
+      setIsImportWizardOpen(true);
+    } catch (e) {
+      alert('Failed to read file for preview');
+    }
+  };
+
+  const handleConfirmImport = async (options: any) => {
+    if (!importingTMId || !importFilePath) return;
+    
+    setIsImporting(true);
+    setIsImportWizardOpen(false);
+    
+    try {
+      const result = await window.api.importTMEntries(importingTMId, importFilePath, options);
+      alert(`Import completed!\nSuccess: ${result.success}\nSkipped: ${result.skipped}`);
+      loadTMs();
+    } catch (e) {
+      alert('Import failed');
+    } finally {
+      setIsImporting(false);
+      setImportingTMId(null);
+      setImportFilePath(null);
+    }
+  };
+
   return (
     <div className="flex-1 p-8 bg-gray-50 overflow-y-auto">
+      <TMImportWizard 
+        isOpen={isImportWizardOpen}
+        previewData={importPreview}
+        onClose={() => setIsImportWizardOpen(false)}
+        onConfirm={handleConfirmImport}
+      />
+
+      {isImporting && (
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-[200] flex items-center justify-center">
+          <div className="bg-white p-6 rounded-xl shadow-xl flex items-center gap-4">
+            <div className="animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+            <span className="text-sm font-bold text-gray-700">Importing TM entries, please wait...</span>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-5xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <div>
@@ -157,14 +217,26 @@ export const TMManager: React.FC = () => {
                       </span>
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleDelete(tm.id)}
-                    className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleStartImport(tm.id)}
+                      className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                      title="Import from Excel/CSV"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => handleDelete(tm.id)}
+                      className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                      title="Delete TM"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
                 <div className="flex items-center justify-between pt-4 border-t border-gray-50">
                   <div className="flex flex-col">
