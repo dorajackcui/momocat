@@ -57,7 +57,25 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
         await window.api.exportFile(fileId, outputPath);
         alert('Export successful');
       } catch (error) {
-        alert('Export failed: ' + (error instanceof Error ? error.message : String(error)));
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        
+        // Check if this is a QA error that can be forced
+        if (errorMessage.includes('Export blocked by QA errors')) {
+          const forceExport = confirm(
+            `${errorMessage}\n\nDo you want to force export despite these errors?`
+          );
+          
+          if (forceExport) {
+            try {
+              await window.api.exportFile(fileId, outputPath, undefined, true);
+              alert('Export successful (forced despite QA errors)');
+            } catch (forceError) {
+              alert('Export failed: ' + (forceError instanceof Error ? forceError.message : String(forceError)));
+            }
+          }
+        } else {
+          alert('Export failed: ' + errorMessage);
+        }
       }
     }
   };

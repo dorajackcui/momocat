@@ -14,7 +14,7 @@ declare global {
       deleteFile: (fileId: number) => Promise<void>;
       addFileToProject: (projectId: number, filePath: string, options: any) => Promise<any>;
       getSegments: (fileId: number, offset: number, limit: number) => Promise<any[]>;
-      exportFile: (fileId: number, outputPath: string, options?: any) => Promise<void>;
+      exportFile: (fileId: number, outputPath: string, options?: any, forceExport?: boolean) => Promise<void>;
       updateSegment: (segmentId: string, targetTokens: any[], status: string) => Promise<any>;
       get100Match: (projectId: number, srcHash: string) => Promise<any>;
       getMatches: (projectId: number, segment: any) => Promise<any[]>;

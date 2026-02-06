@@ -3,6 +3,7 @@ import { Dashboard } from './components/Dashboard';
 import { ProjectDetail } from './components/ProjectDetail';
 import { Editor } from './components/Editor';
 import { TMManager } from './components/TMManager';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { useProjects } from './hooks/useProjects';
 
 type View = 'dashboard' | 'projectDetail' | 'editor' | 'tms';
@@ -45,20 +46,24 @@ function App(): JSX.Element {
 
   if (currentView === 'editor' && activeFileId !== null) {
     return (
-      <Editor
-        fileId={activeFileId}
-        onBack={handleBackToProject}
-      />
+      <ErrorBoundary>
+        <Editor
+          fileId={activeFileId}
+          onBack={handleBackToProject}
+        />
+      </ErrorBoundary>
     );
   }
 
   if (currentView === 'projectDetail' && activeProjectId !== null) {
     return (
-      <ProjectDetail
-        projectId={activeProjectId}
-        onBack={handleBackToDashboard}
-        onOpenFile={handleOpenFile}
-      />
+      <ErrorBoundary>
+        <ProjectDetail
+          projectId={activeProjectId}
+          onBack={handleBackToDashboard}
+          onOpenFile={handleOpenFile}
+        />
+      </ErrorBoundary>
     );
   }
 

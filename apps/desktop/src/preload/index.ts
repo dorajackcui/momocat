@@ -19,8 +19,8 @@ const api = {
   // Files & Segments
   getSegments: (fileId: number, offset: number, limit: number) => 
     ipcRenderer.invoke('file-get-segments', fileId, offset, limit),
-  exportFile: (fileId: number, outputPath: string, options?: any) =>
-    ipcRenderer.invoke('file-export', fileId, outputPath, options),
+  exportFile: (fileId: number, outputPath: string, options?: any, forceExport?: boolean) =>
+    ipcRenderer.invoke('file-export', fileId, outputPath, options, forceExport),
   
   // Segments
   updateSegment: (segmentId: string, targetTokens: any[], status: string) =>

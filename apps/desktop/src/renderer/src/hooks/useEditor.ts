@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Segment, Token, parseDisplayTextToTokens, TMEntry } from '@cat/core';
+import { Segment, Token, parseEditorTextToTokens, TMEntry, TagValidator } from '@cat/core';
 
 interface UseEditorProps {
   activeFileId: number | null;
@@ -11,6 +11,21 @@ export function useEditor({ activeFileId }: UseEditorProps) {
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
   const [activeMatches, setActiveMatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const tagValidator = new TagValidator();
+  
+  const normalizeTokens = (tokens: any, context: string): Token[] => {
+    if (!Array.isArray(tokens)) {
+      console.warn(`[useEditor] ${context} tokens not array`, tokens);
+      return [];
+    }
+    const cleaned = tokens.filter(
+      (t) => t && typeof t.type === 'string' && typeof t.content === 'string'
+    );
+    if (cleaned.length !== tokens.length) {
+      console.warn(`[useEditor] ${context} tokens contained invalid entries`, tokens);
+    }
+    return cleaned as Token[];
+  };
 
   // Load Segments & Project Info
   const loadEditorData = useCallback(async () => {
@@ -30,7 +45,12 @@ export function useEditor({ activeFileId }: UseEditorProps) {
 
       const data = await window.api.getSegments(activeFileId, 0, 1000);
       const segmentsArray = Array.isArray(data) ? data : [];
-      setSegments(segmentsArray);
+      const normalized = segmentsArray.map((seg) => ({
+        ...seg,
+        sourceTokens: normalizeTokens(seg.sourceTokens, `segment ${seg.segmentId} source`),
+        targetTokens: normalizeTokens(seg.targetTokens, `segment ${seg.segmentId} target`),
+      }));
+      setSegments(normalized);
       if (segmentsArray.length > 0 && !activeSegmentId) {
         setActiveSegmentId(segmentsArray[0].segmentId);
       }
@@ -54,14 +74,18 @@ export function useEditor({ activeFileId }: UseEditorProps) {
           // 1. Is it the directly updated segment?
           if (seg.segmentId === data.segmentId) {
             changed = true;
-            return { ...seg, targetTokens: data.targetTokens, status: data.status };
+            return { 
+              ...seg, 
+              targetTokens: normalizeTokens(data.targetTokens, `segment ${seg.segmentId} target (update)`), 
+              status: data.status 
+            };
           }
           // 2. Is it a propagated segment?
           if (data.propagatedIds?.includes(seg.segmentId)) {
             changed = true;
             return { 
               ...seg, 
-              targetTokens: [...data.targetTokens], 
+              targetTokens: normalizeTokens(data.targetTokens, `segment ${seg.segmentId} target (propagation)`), 
               status: 'draft' as any
             };
           }
@@ -92,21 +116,33 @@ export function useEditor({ activeFileId }: UseEditorProps) {
 
   // Actions
   const handleTranslationChange = (segmentId: string, text: string) => {
-    const tokens = parseDisplayTextToTokens(text);
-    
-    setSegments(prev => prev.map(seg => {
-      if (seg.segmentId === segmentId) {
-        const updated = { 
-          ...seg, 
-          targetTokens: tokens,
-          status: (text.trim() ? 'draft' : 'new') as any
-        };
-        // Async save
-        window.api.updateSegment(segmentId, tokens, updated.status);
-        return updated;
-      }
-      return seg;
-    }));
+    try {
+      setSegments(prev => prev.map(seg => {
+        if (seg.segmentId === segmentId) {
+          const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+          const tokens = parseEditorTextToTokens(normalizedText, seg.sourceTokens);
+
+          // Validate tags and store results in segment
+          const validationResult = tagValidator.validate(seg.sourceTokens, tokens);
+          
+          const updated = { 
+            ...seg, 
+            targetTokens: tokens,
+            status: (normalizedText.trim() ? 'draft' : 'new') as any,
+            qaIssues: validationResult.issues,
+            autoFixSuggestions: validationResult.suggestions
+          };
+          // Async save
+          window.api.updateSegment(segmentId, tokens, updated.status);
+          return updated;
+        }
+        return seg;
+      }));
+    } catch (error) {
+      console.error('Error in handleTranslationChange:', error);
+      console.error('Segment ID:', segmentId);
+      console.error('Text:', text);
+    }
   };
 
   const handleApplyMatch = (tokens: Token[]) => {
@@ -114,10 +150,15 @@ export function useEditor({ activeFileId }: UseEditorProps) {
     
     setSegments(prev => prev.map(seg => {
       if (seg.segmentId === activeSegmentId) {
+        // Validate tags and store results in segment
+        const validationResult = tagValidator.validate(seg.sourceTokens, tokens);
+        
         const updated = { 
           ...seg, 
           targetTokens: tokens,
-          status: 'draft' as any
+          status: 'draft' as any,
+          qaIssues: validationResult.issues,
+          autoFixSuggestions: validationResult.suggestions
         };
         window.api.updateSegment(activeSegmentId, tokens, updated.status);
         return updated;

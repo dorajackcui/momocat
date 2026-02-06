@@ -45,4 +45,45 @@
 - **教训**：任何耗时超过 500ms 的操作都必须有视觉反馈。
 
 ---
-*更新日期：2026-02-01*
+*更新日期：2026-02-06*
+
+## 4. 编辑器白屏问题系列 (EditorRow Component)
+
+### ❌ 错误 1：函数定义顺序错误
+- **现象**：上传 Excel 后进入编辑器白屏。
+- **根因**：`restoreCursorPosition` 函数在被调用之前还没有定义（Temporal Dead Zone）。
+- **修正**：将函数定义移到所有使用它的地方之前。
+- **教训**：在 React 组件中，useCallback 定义的函数必须在使用它的其他 useCallback 之前声明。
+
+### ❌ 错误 2：索引类型混淆
+- **现象**：点击删除标签按钮时白屏。
+- **根因**：传递给 `deleteTag` 的索引类型错误：
+  - `currentTagIndex` 是标签在所有标签中的序号（0, 1, 2...）
+  - 但 `deleteTag` 需要的是 token 在整个 tokens 数组中的索引
+  - 例如：`[text, tag, text, tag]` 中第二个 tag 的 tagIndex=1，但 tokenIndex=3
+- **修正**：在 `renderTokens` 中保存实际的 token 索引 `idx`，并在 `onDelete` 中使用它。
+- **教训**：在处理过滤或映射后的数组时，要明确区分"逻辑索引"和"物理索引"。
+
+### ❌ 错误 3：选中删除时的 DOM 同步问题 ⚠️ 关键错误
+- **现象**：选中文本和 tag 一起按 Delete 键删除时白屏。
+- **错误信息**：`NotFoundError: Failed to execute 'removeChild' on 'Node': The node to be removed is not a child of this node.`
+- **根因**：React 虚拟 DOM 与实际 DOM 不同步
+  1. 用户在 contenteditable 中选中内容并按 Delete
+  2. 浏览器直接修改 DOM（删除节点）
+  3. `handleInput` 事件触发，提取新内容并更新 React 状态
+  4. React 尝试重新渲染，但 DOM 已经被浏览器改变
+  5. React 找不到要删除的节点，抛出 `removeChild` 错误
+- **修正**：
+  1. 改进 React key 策略：使用 `tag-${tagIndex}-${content}` 而不是 `tag-${tokenIndex}`
+  2. 在 `handleInput` 中保存和恢复选区
+  3. 为文本节点也使用独立的计数器生成 key
+- **教训**：
+  - **contenteditable + React 是危险组合**：浏览器和 React 都想控制 DOM
+  - **key 必须基于内容而非位置**：当数组元素改变时，位置索引会导致 React 混淆
+  - **需要错误边界**：使用 ErrorBoundary 捕获渲染错误，避免整个应用崩溃
+
+### 通用教训
+1. **索引管理**：在数组操作中，始终明确索引的含义（是过滤后的索引还是原始索引）
+2. **函数依赖**：useCallback 的依赖数组要完整，但不要包含非 memoized 的函数
+3. **错误边界**：关键的用户交互代码必须有错误处理和日志
+4. **React key**：在动态列表中，key 应该基于内容而不仅仅是位置

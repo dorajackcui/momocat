@@ -311,7 +311,7 @@ export class ProjectService {
     return confirmedSegments.length;
   }
 
-  public async exportFile(fileId: number, outputPath: string, options?: ImportOptions) {
+  public async exportFile(fileId: number, outputPath: string, options?: ImportOptions, forceExport: boolean = false) {
     const file = this.db.getFile(fileId);
     if (!file) throw new Error('File not found');
     
@@ -339,9 +339,11 @@ export class ProjectService {
       }
     }
 
-    if (errors.length > 0) {
+    if (errors.length > 0 && !forceExport) {
       const errorMsg = errors.slice(0, 5).map(e => `Row ${e.row}: ${e.message}`).join('\n');
-      throw new Error(`Export blocked by QA errors:\n${errorMsg}${errors.length > 5 ? `\n...and ${errors.length - 5} more.` : ''}`);
+      const error = new Error(`Export blocked by QA errors:\n${errorMsg}${errors.length > 5 ? `\n...and ${errors.length - 5} more.` : ''}`);
+      (error as any).qaErrors = errors; // Attach full error list for UI to display
+      throw error;
     }
 
     const storedPath = join(this.projectsDir, file.projectId.toString(), `${file.id}_${file.name}`);

@@ -131,8 +131,8 @@ app.whenReady().then(() => {
     return projectService.updateSegment(segmentId, targetTokens, status);
   });
 
-  ipcMain.handle('file-export', async (_event, fileId: number, outputPath: string, options: ImportOptions) => {
-    return projectService.exportFile(fileId, outputPath, options);
+  ipcMain.handle('file-export', async (_event, fileId: number, outputPath: string, options: ImportOptions, forceExport: boolean = false) => {
+    return projectService.exportFile(fileId, outputPath, options, forceExport);
   });
 
   ipcMain.handle('tm-get-100-match', async (_event, projectId: number, srcHash: string) => {
