@@ -12,6 +12,19 @@ export function useEditor({ activeFileId }: UseEditorProps) {
   const [activeMatches, setActiveMatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const tagValidator = new TagValidator();
+
+  const withQaData = (segment: Segment): Segment => {
+    const sourceTokens = normalizeTokens(segment.sourceTokens, `segment ${segment.segmentId} source`);
+    const targetTokens = normalizeTokens(segment.targetTokens, `segment ${segment.segmentId} target`);
+    const validationResult = tagValidator.validate(sourceTokens, targetTokens);
+    return {
+      ...segment,
+      sourceTokens,
+      targetTokens,
+      qaIssues: validationResult.issues,
+      autoFixSuggestions: validationResult.suggestions
+    };
+  };
   
   const normalizeTokens = (tokens: any, context: string): Token[] => {
     if (!Array.isArray(tokens)) {
@@ -45,11 +58,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
 
       const data = await window.api.getSegments(activeFileId, 0, 1000);
       const segmentsArray = Array.isArray(data) ? data : [];
-      const normalized = segmentsArray.map((seg) => ({
-        ...seg,
-        sourceTokens: normalizeTokens(seg.sourceTokens, `segment ${seg.segmentId} source`),
-        targetTokens: normalizeTokens(seg.targetTokens, `segment ${seg.segmentId} target`),
-      }));
+      const normalized = segmentsArray.map((seg) => withQaData(seg as Segment));
       setSegments(normalized);
       if (segmentsArray.length > 0 && !activeSegmentId) {
         setActiveSegmentId(segmentsArray[0].segmentId);
@@ -74,19 +83,27 @@ export function useEditor({ activeFileId }: UseEditorProps) {
           // 1. Is it the directly updated segment?
           if (seg.segmentId === data.segmentId) {
             changed = true;
+            const targetTokens = normalizeTokens(data.targetTokens, `segment ${seg.segmentId} target (update)`);
+            const validationResult = tagValidator.validate(seg.sourceTokens, targetTokens);
             return { 
               ...seg, 
-              targetTokens: normalizeTokens(data.targetTokens, `segment ${seg.segmentId} target (update)`), 
-              status: data.status 
+              targetTokens,
+              status: data.status,
+              qaIssues: validationResult.issues,
+              autoFixSuggestions: validationResult.suggestions
             };
           }
           // 2. Is it a propagated segment?
           if (data.propagatedIds?.includes(seg.segmentId)) {
             changed = true;
+            const targetTokens = normalizeTokens(data.targetTokens, `segment ${seg.segmentId} target (propagation)`);
+            const validationResult = tagValidator.validate(seg.sourceTokens, targetTokens);
             return { 
               ...seg, 
-              targetTokens: normalizeTokens(data.targetTokens, `segment ${seg.segmentId} target (propagation)`), 
-              status: 'draft' as any
+              targetTokens,
+              status: 'draft' as any,
+              qaIssues: validationResult.issues,
+              autoFixSuggestions: validationResult.suggestions
             };
           }
           return seg;

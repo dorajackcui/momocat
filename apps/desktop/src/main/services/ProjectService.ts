@@ -8,6 +8,7 @@ import {
   Token, 
   validateSegmentTags,
   parseDisplayTextToTokens,
+  serializeTokensToDisplayText,
   computeTagsSignature,
   computeMatchKey,
   computeSrcHash
@@ -108,6 +109,10 @@ export class ProjectService {
 
   public getProject(projectId: number) {
     return this.db.getProject(projectId);
+  }
+
+  public updateProjectPrompt(projectId: number, aiPrompt: string | null) {
+    return this.db.updateProjectPrompt(projectId, aiPrompt);
   }
 
   public async deleteProject(projectId: number) {
@@ -348,5 +353,292 @@ export class ProjectService {
 
     const storedPath = join(this.projectsDir, file.projectId.toString(), `${file.id}_${file.name}`);
     await this.filter.export(storedPath, segments, finalOptions, outputPath);
+  }
+
+  // AI Settings
+  public getAISettings(): { apiKeySet: boolean; apiKeyLast4?: string } {
+    const apiKey = this.db.getSetting('openai_api_key');
+    if (!apiKey) {
+      return { apiKeySet: false };
+    }
+    const last4 = apiKey.slice(-4);
+    return { apiKeySet: true, apiKeyLast4: last4 };
+  }
+
+  public setAIKey(apiKey: string) {
+    this.db.setSetting('openai_api_key', apiKey);
+  }
+
+  public async testAIConnection(apiKey?: string) {
+    const key = (apiKey && apiKey.trim()) || this.db.getSetting('openai_api_key');
+    if (!key) {
+      throw new Error('API key is not set');
+    }
+
+    const response = await fetch('https://api.openai.com/v1/models', {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${key}`
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Connection failed: ${response.status} ${errorText}`);
+    }
+
+    return { ok: true };
+  }
+
+  public async aiTranslateFile(
+    fileId: number,
+    options?: {
+      model?: string;
+      onProgress?: (data: { current: number; total: number; message?: string }) => void;
+    }
+  ) {
+    const file = this.db.getFile(fileId);
+    if (!file) throw new Error('File not found');
+
+    const project = this.db.getProject(file.projectId);
+    if (!project) throw new Error('Project not found');
+
+    const apiKey = this.db.getSetting('openai_api_key');
+    if (!apiKey) {
+      throw new Error('AI API key is not configured');
+    }
+
+    const model = options?.model || 'gpt-4o-mini';
+    const segments = this.db.getSegmentsPage(fileId, 0, 1000000);
+
+    const segmentsToTranslate: typeof segments = [];
+    let emptySourceStreak = 0;
+
+    for (const seg of segments) {
+      const sourceText = serializeTokensToDisplayText(seg.sourceTokens).trim();
+      if (!sourceText) {
+        emptySourceStreak += 1;
+        if (emptySourceStreak >= 3) {
+          break;
+        }
+        continue;
+      }
+
+      emptySourceStreak = 0;
+
+      if (seg.status === 'confirmed') continue;
+      const existing = serializeTokensToDisplayText(seg.targetTokens).trim();
+      if (existing.length > 0) continue;
+
+      segmentsToTranslate.push(seg);
+    }
+
+    const total = segmentsToTranslate.length;
+    let current = 0;
+    let translated = 0;
+    let skipped = segments.length - total;
+    let failed = 0;
+
+    for (const seg of segmentsToTranslate) {
+      current += 1;
+      options?.onProgress?.({
+        current,
+        total,
+        message: `Translating segment ${current} of ${total}`
+      });
+
+      const sourceText = serializeTokensToDisplayText(seg.sourceTokens);
+      const context = seg.meta?.context ? String(seg.meta.context).trim() : '';
+      try {
+        const translatedText = await this.translateWithOpenAI({
+          apiKey,
+          model,
+          projectPrompt: project.aiPrompt || '',
+          srcLang: project.srcLang,
+          tgtLang: project.tgtLang,
+          sourceText,
+          context
+        });
+
+        const targetTokens = parseDisplayTextToTokens(translatedText);
+        await this.segmentService.updateSegment(seg.segmentId, targetTokens, 'translated');
+        translated += 1;
+      } catch (error) {
+        failed += 1;
+      }
+
+      // brief pause to avoid hammering the API
+      await new Promise(resolve => setTimeout(resolve, 40));
+    }
+
+    return { translated, skipped, failed, total: segments.length };
+  }
+
+  public async aiTestTranslate(projectId: number, sourceText: string) {
+    const project = this.db.getProject(projectId);
+    if (!project) throw new Error('Project not found');
+
+    const apiKey = this.db.getSetting('openai_api_key');
+    if (!apiKey) {
+      throw new Error('AI API key is not configured');
+    }
+
+    const model = 'gpt-4o-mini';
+    const source = sourceText.trim();
+    const promptUsed = this.buildSystemPrompt(project.srcLang, project.tgtLang, project.aiPrompt || '');
+    const userMessage = [`Source (${project.srcLang}):`, source].join('\n');
+    const debug: {
+      requestId?: string;
+      status?: number;
+      endpoint?: string;
+      model?: string;
+      rawResponseText?: string;
+      responseContent?: string;
+    } = {};
+
+    try {
+      const translatedText = await this.translateWithOpenAI({
+        apiKey,
+        model,
+        projectPrompt: project.aiPrompt || '',
+        srcLang: project.srcLang,
+        tgtLang: project.tgtLang,
+        sourceText: source,
+        debug,
+        allowUnchanged: true
+      });
+
+      const unchanged = translatedText.trim() === source && project.srcLang !== project.tgtLang;
+      return {
+        ok: !unchanged,
+        error: unchanged ? `Model returned source unchanged: ${translatedText}` : undefined,
+        promptUsed,
+        userMessage,
+        translatedText,
+        requestId: debug.requestId,
+        status: debug.status,
+        endpoint: debug.endpoint,
+        model: debug.model,
+        rawResponseText: debug.rawResponseText,
+        responseContent: debug.responseContent
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        ok: false,
+        error: message,
+        promptUsed,
+        userMessage,
+        translatedText: '',
+        requestId: debug.requestId,
+        status: debug.status,
+        endpoint: debug.endpoint,
+        model: debug.model,
+        rawResponseText: debug.rawResponseText,
+        responseContent: debug.responseContent
+      };
+    }
+  }
+
+  private buildSystemPrompt(srcLang: string, tgtLang: string, projectPrompt?: string) {
+    const base = [
+      'You are a professional translator.',
+      `Translate from ${srcLang} to ${tgtLang}.`,
+      'Keep all tags, placeholders, and formatting exactly as they appear in the source.',
+      'Return only the translated text, without quotes or extra commentary.',
+      'Do not copy the source text unless it is already in the target language.'
+    ].join('\n');
+
+    const trimmed = projectPrompt?.trim();
+    if (!trimmed) return base;
+    return `${base}\n\nProject instructions:\n${trimmed}`;
+  }
+
+  private async translateWithOpenAI(params: {
+    apiKey: string;
+    model: string;
+    projectPrompt?: string;
+    srcLang: string;
+    tgtLang: string;
+    sourceText: string;
+    context?: string;
+    debug?: {
+      requestId?: string;
+      status?: number;
+      endpoint?: string;
+      model?: string;
+      rawResponseText?: string;
+      responseContent?: string;
+    };
+    allowUnchanged?: boolean;
+  }): Promise<string> {
+    const systemPrompt = this.buildSystemPrompt(params.srcLang, params.tgtLang, params.projectPrompt);
+    const userParts = [
+      `Source (${params.srcLang}):`,
+      params.sourceText
+    ];
+
+    if (params.context) {
+      userParts.push('', `Context: ${params.context}`);
+    }
+
+    const endpoint = 'https://api.openai.com/v1/chat/completions';
+    if (params.debug) {
+      params.debug.endpoint = endpoint;
+      params.debug.model = params.model;
+    }
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${params.apiKey}`
+      },
+      body: JSON.stringify({
+        model: params.model,
+        temperature: 0.2,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userParts.join('\n') }
+        ]
+      })
+    });
+
+    params.debug && (params.debug.status = response.status);
+    const requestId = response.headers.get('x-request-id') || response.headers.get('x-openai-request-id');
+    if (params.debug && requestId) params.debug.requestId = requestId;
+    const rawBody = await response.text();
+    if (params.debug) {
+      params.debug.rawResponseText = rawBody.slice(0, 4000);
+    }
+
+    if (!response.ok) {
+      throw new Error(`OpenAI request failed: ${response.status} ${rawBody}`);
+    }
+
+    let data: any;
+    try {
+      data = JSON.parse(rawBody);
+    } catch {
+      throw new Error(`OpenAI response is not valid JSON: ${rawBody}`);
+    }
+    const content = data?.choices?.[0]?.message?.content;
+    if (params.debug && typeof content === 'string') {
+      params.debug.responseContent = content;
+    }
+    if (!content || typeof content !== 'string') {
+      throw new Error('OpenAI response missing content');
+    }
+
+    const trimmed = content.trim();
+    if (!trimmed) {
+      throw new Error('OpenAI response was empty');
+    }
+
+    if (!params.allowUnchanged && trimmed === params.sourceText.trim() && params.srcLang !== params.tgtLang) {
+      throw new Error(`Model returned source unchanged: ${trimmed}`);
+    }
+
+    return trimmed;
   }
 }

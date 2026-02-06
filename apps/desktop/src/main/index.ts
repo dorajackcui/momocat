@@ -1,10 +1,13 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron';
 import { join } from 'path';
+import { existsSync, readFileSync } from 'fs';
+import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { electronApp, optimizer, is } from '@electron-toolkit/utils';
 import { CATDatabase } from '@cat/db';
 import { ProjectService } from './services/ProjectService';
 import { ImportOptions } from './filters/SpreadsheetFilter';
 import { JobManager } from './JobManager';
+import { randomUUID } from 'crypto';
 
 // Disable hardware acceleration to avoid crashes in some environments
 app.disableHardwareAcceleration();
@@ -20,6 +23,38 @@ const userDataPath = is.dev
 
 if (is.dev) {
   app.setPath('userData', userDataPath);
+}
+
+function loadProxyEnvFromFile(filePath: string) {
+  if (!existsSync(filePath)) return;
+
+  const content = readFileSync(filePath, 'utf-8');
+  content.split('\n').forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) return;
+
+    const normalized = trimmed.startsWith('export ') ? trimmed.slice(7).trim() : trimmed;
+    const index = normalized.indexOf('=');
+    if (index <= 0) return;
+
+    const key = normalized.slice(0, index).trim();
+    const value = normalized.slice(index + 1).trim();
+    if (!key) return;
+
+    process.env[key] = value;
+  });
+}
+
+function setupProxy() {
+  const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || process.env.ALL_PROXY;
+  if (!proxyUrl) return;
+  try {
+    const agent = new ProxyAgent(proxyUrl);
+    setGlobalDispatcher(agent);
+    console.log(`[Proxy] Enabled via ${proxyUrl}`);
+  } catch (error) {
+    console.error('[Proxy] Failed to initialize proxy agent:', error);
+  }
 }
 
 function createWindow(): void {
@@ -60,6 +95,8 @@ app.whenReady().then(() => {
   // DB & Services
   const dbPath = join(userDataPath, 'cat_v1.db');
   const projectsDir = join(userDataPath, 'projects');
+  const proxyEnvPath = join(userDataPath, 'proxy.env');
+  const fallbackProxyEnvPath = join(app.getAppPath(), 'proxy.env');
   
   try {
     if (!require('fs').existsSync(userDataPath)) {
@@ -71,9 +108,12 @@ app.whenReady().then(() => {
   } catch (e) {
     console.error('Failed to prepare directories:', e);
   }
-  
+
   console.log('UserData Path:', userDataPath);
   console.log('DB Path:', dbPath);
+  loadProxyEnvFromFile(proxyEnvPath);
+  loadProxyEnvFromFile(fallbackProxyEnvPath);
+  setupProxy();
   
   let db: CATDatabase;
   try {
@@ -97,6 +137,10 @@ app.whenReady().then(() => {
 
   ipcMain.handle('project-get', async (_event, projectId: number) => {
     return projectService.getProject(projectId);
+  });
+
+  ipcMain.handle('project-update-prompt', async (_event, projectId: number, aiPrompt: string | null) => {
+    return projectService.updateProjectPrompt(projectId, aiPrompt);
   });
 
   ipcMain.handle('project-delete', async (_event, projectId: number) => {
@@ -182,6 +226,62 @@ app.whenReady().then(() => {
 
   ipcMain.handle('tm-import-execute', async (_event, tmId: string, filePath: string, options: any) => {
     return projectService.importTMEntries(tmId, filePath, options);
+  });
+
+  // AI Settings & Translation
+  ipcMain.handle('ai-settings-get', async () => {
+    return projectService.getAISettings();
+  });
+
+  ipcMain.handle('ai-settings-set', async (_event, apiKey: string) => {
+    return projectService.setAIKey(apiKey);
+  });
+
+  ipcMain.handle('ai-test-connection', async (_event, apiKey?: string) => {
+    return projectService.testAIConnection(apiKey);
+  });
+
+  ipcMain.handle('ai-translate-file', async (_event, fileId: number) => {
+    const jobId = randomUUID();
+    jobManager.startJob(jobId, 'AI translation started');
+
+    projectService.aiTranslateFile(fileId, {
+      onProgress: (data) => {
+        const progress = data.total === 0 ? 100 : Math.round((data.current / data.total) * 100);
+        jobManager.updateProgress(jobId, {
+          progress,
+          message: data.message
+        });
+      }
+    }).then((result) => {
+      jobManager.updateProgress(jobId, {
+        progress: 100,
+        status: 'completed',
+        message: `AI translation completed: ${result.translated} translated, ${result.skipped} skipped, ${result.failed} failed`
+      });
+    }).catch((error) => {
+      jobManager.updateProgress(jobId, {
+        progress: 100,
+        status: 'failed',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    });
+
+    return jobId;
+  });
+
+  ipcMain.handle('ai-test-translate', async (_event, projectId: number, sourceText: string) => {
+    try {
+      return await projectService.aiTestTranslate(projectId, sourceText);
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+        promptUsed: '',
+        userMessage: sourceText ? `Source:\n${sourceText}` : '',
+        translatedText: ''
+      };
+    }
   });
 
   // Listen for progress updates and broadcast to all windows

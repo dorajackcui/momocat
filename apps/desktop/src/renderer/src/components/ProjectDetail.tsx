@@ -13,6 +13,20 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'files' | 'tm'>('files');
+  const [promptDraft, setPromptDraft] = useState('');
+  const [savedPromptValue, setSavedPromptValue] = useState('');
+  const [promptSavedAt, setPromptSavedAt] = useState<string | null>(null);
+  const [savingPrompt, setSavingPrompt] = useState(false);
+  const [testSource, setTestSource] = useState('');
+  const [testResult, setTestResult] = useState<string | null>(null);
+  const [testPromptUsed, setTestPromptUsed] = useState<string | null>(null);
+  const [testUserMessage, setTestUserMessage] = useState<string | null>(null);
+  const [testMeta, setTestMeta] = useState<string | null>(null);
+  const [testError, setTestError] = useState<string | null>(null);
+  const [testRawResponse, setTestRawResponse] = useState<string | null>(null);
+  const [showTestDetails, setShowTestDetails] = useState(false);
+  const [aiJobs, setAiJobs] = useState<Record<string, { jobId: string; fileId: number; progress: number; status: string; message?: string }>>({});
+  const [fileJobIndex, setFileJobIndex] = useState<Record<number, string>>({});
 
   // TM State
   const [mountedTMs, setMountedTMs] = useState<any[]>([]);
@@ -30,6 +44,9 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
       const f = await window.api.getProjectFiles(projectId);
       setProject(p);
       setFiles(f);
+      const promptValue = p?.aiPrompt || '';
+      setPromptDraft(promptValue);
+      setSavedPromptValue(promptValue);
 
       // Load TM info
       const mounted = await window.api.getProjectMountedTMs(projectId);
@@ -46,6 +63,25 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
   useEffect(() => {
     loadData();
   }, [projectId]);
+
+  useEffect(() => {
+    const unsubscribe = window.api.onJobProgress((progress) => {
+      setAiJobs((prev) => {
+        if (!prev[progress.jobId]) return prev;
+        return {
+          ...prev,
+          [progress.jobId]: {
+            ...prev[progress.jobId],
+            ...progress
+          }
+        };
+      });
+      if (progress.status === 'completed' || progress.status === 'failed') {
+        loadData();
+      }
+    });
+    return unsubscribe;
+  }, []);
 
   const handleMountTM = async (tmId: string) => {
     try {
@@ -164,6 +200,81 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
     }
   };
 
+  const handleSavePrompt = async () => {
+    if (!project) return;
+    const value = promptDraft.trim();
+    const savedValue = savedPromptValue.trim();
+    if (value === savedValue) {
+      return;
+    }
+    setSavingPrompt(true);
+    try {
+      await window.api.updateProjectPrompt(project.id, value.length > 0 ? value : null);
+      setProject({ ...project, aiPrompt: value.length > 0 ? value : null });
+      setSavedPromptValue(value);
+      setPromptSavedAt(new Date().toLocaleTimeString());
+    } catch (error) {
+      alert('Failed to save AI prompt');
+    } finally {
+      setSavingPrompt(false);
+    }
+  };
+
+  const handleTestPrompt = async () => {
+    if (!project) return;
+    const source = testSource.trim();
+    if (!source) {
+      alert('Please enter test source text.');
+      return;
+    }
+    try {
+      setTestError(null);
+      setTestResult(null);
+      setTestMeta(null);
+      setTestPromptUsed(null);
+      setTestUserMessage(null);
+      setTestRawResponse(null);
+      const result = await window.api.aiTestTranslate(project.id, source);
+      setTestResult(result.translatedText || null);
+      setTestPromptUsed(result.promptUsed);
+      setTestUserMessage(result.userMessage);
+      setTestError(result.error || null);
+      setTestRawResponse(result.rawResponseText || null);
+      const metaParts = [];
+      if (typeof result.status === 'number') metaParts.push(`status: ${result.status}`);
+      if (result.requestId) metaParts.push(`requestId: ${result.requestId}`);
+      if (result.model) metaParts.push(`model: ${result.model}`);
+      if (result.endpoint) metaParts.push(`endpoint: ${result.endpoint}`);
+      metaParts.push(`ok: ${result.ok ? 'true' : 'false'}`);
+      setTestMeta(metaParts.length ? metaParts.join(' • ') : null);
+      setShowTestDetails(!result.ok);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setTestError(message);
+      setShowTestDetails(true);
+    }
+  };
+
+  const normalizedPromptDraft = promptDraft.trim();
+  const normalizedSavedPrompt = savedPromptValue.trim();
+  const hasUnsavedPromptChanges = normalizedPromptDraft !== normalizedSavedPrompt;
+  const hasTestDetails = Boolean(testMeta || testUserMessage || testPromptUsed || testRawResponse);
+
+  const handleAITranslateFile = async (fileId: number, fileName: string) => {
+    if (!confirm(`Run AI translation for \"${fileName}\"? This will fill empty target segments only.`)) return;
+    try {
+      const jobId = await window.api.aiTranslateFile(fileId);
+      setAiJobs(prev => ({
+        ...prev,
+        [jobId]: { jobId, fileId, progress: 0, status: 'running', message: 'Queued' }
+      }));
+      setFileJobIndex(prev => ({ ...prev, [fileId]: jobId }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      alert(`Failed to start AI translation: ${message}`);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-white">
       <ColumnSelector 
@@ -242,6 +353,120 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
           </div>
         ) : activeTab === 'files' ? (
           <div className="max-w-4xl mx-auto">
+            <div className="mb-8 bg-gray-50 border border-gray-200 rounded-xl p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">AI Prompt</h3>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className={`text-[10px] font-bold uppercase tracking-wider ${hasUnsavedPromptChanges ? 'text-amber-600' : 'text-emerald-600'}`}>
+                      {hasUnsavedPromptChanges ? 'Unsaved Changes' : 'Saved'}
+                    </span>
+                    {promptSavedAt && !hasUnsavedPromptChanges && (
+                      <span className="text-[10px] text-gray-400">at {promptSavedAt}</span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={handleSavePrompt}
+                  disabled={savingPrompt || !hasUnsavedPromptChanges}
+                  className={`px-3 py-1.5 text-white rounded-lg text-xs font-bold disabled:opacity-50 ${
+                    hasUnsavedPromptChanges ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600'
+                  }`}
+                >
+                  {savingPrompt ? 'Saving...' : hasUnsavedPromptChanges ? 'Save Prompt' : 'Prompt Saved'}
+                </button>
+              </div>
+              <textarea
+                value={promptDraft}
+                onChange={(e) => setPromptDraft(e.target.value)}
+                rows={4}
+                placeholder="Optional. Add project-specific translation instructions (tone, terminology, style)."
+                className="w-full text-sm bg-white border border-gray-200 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="mt-2 text-[11px] text-gray-500">
+                This prompt will be appended to the default translation rules.
+              </p>
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Test Source</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={testSource}
+                    onChange={(e) => setTestSource(e.target.value)}
+                    placeholder="Enter a short sentence to test AI translation"
+                    className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    onClick={handleTestPrompt}
+                    className="px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700"
+                  >
+                    Test Prompt
+                  </button>
+                </div>
+                {testResult && (
+                  <div className="mt-2">
+                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Translated Text</div>
+                    <div className="text-xs text-gray-600 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                      {testResult}
+                    </div>
+                  </div>
+                )}
+                {testError && (
+                  <div className="mt-2">
+                    <div className="text-[10px] font-bold text-red-400 uppercase tracking-wider mb-1">Error</div>
+                    <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                      {testError}
+                    </div>
+                  </div>
+                )}
+                {hasTestDetails && (
+                  <div className="mt-2">
+                    <button
+                      onClick={() => setShowTestDetails(prev => !prev)}
+                      className="text-[10px] text-blue-600 font-bold hover:underline"
+                    >
+                      {showTestDetails ? 'Hide Test Details' : 'Show Test Details'}
+                    </button>
+                  </div>
+                )}
+                {hasTestDetails && showTestDetails && (
+                  <>
+                    {testMeta && (
+                      <div className="mt-2">
+                        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Transport</div>
+                        <div className="text-[10px] text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                          {testMeta}
+                        </div>
+                      </div>
+                    )}
+                    {testUserMessage && (
+                      <div className="mt-2">
+                        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">User Message</div>
+                        <div className="text-[10px] text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-2 whitespace-pre-wrap">
+                          {testUserMessage}
+                        </div>
+                      </div>
+                    )}
+                    {testPromptUsed && (
+                      <div className="mt-2">
+                        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">System Prompt</div>
+                        <div className="text-[10px] text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-2 whitespace-pre-wrap">
+                          {testPromptUsed}
+                        </div>
+                      </div>
+                    )}
+                    {testRawResponse && (
+                      <div className="mt-2">
+                        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Raw OpenAI Response</div>
+                        <div className="text-[10px] text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-2 whitespace-pre-wrap max-h-40 overflow-auto">
+                          {testRawResponse}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
             <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-6">Files</h3>
             
             {files.length === 0 ? (
@@ -252,6 +477,9 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
               <div className="space-y-4">
                 {files.map(file => {
                   const progress = file.totalSegments === 0 ? 0 : Math.round((file.confirmedSegments / file.totalSegments) * 100);
+                  const jobId = fileJobIndex[file.id];
+                  const job = jobId ? aiJobs[jobId] : null;
+                  const jobRunning = job && job.status === 'running';
                   return (
                     <div 
                       key={file.id}
@@ -268,6 +496,19 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
                           </div>
                           <span className="text-[10px] text-gray-400 font-medium">{progress}% ({file.confirmedSegments}/{file.totalSegments})</span>
                         </div>
+                        {job && (
+                          <div className="mt-2 w-48">
+                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full ${job.status === 'failed' ? 'bg-red-500' : 'bg-blue-500'}`}
+                                style={{ width: `${job.progress || 0}%` }}
+                              />
+                            </div>
+                            <div className="text-[10px] text-gray-400 mt-1">
+                              {job.message || (job.status === 'completed' ? 'Completed' : 'In progress')}
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         {/* Commit to Main TM Dropdown logic simplified for v0.2 */}
@@ -285,6 +526,13 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
                             ))}
                           </select>
                         )}
+                        <button
+                          onClick={() => handleAITranslateFile(file.id, file.name)}
+                          disabled={!!jobRunning}
+                          className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-bold hover:bg-emerald-100 disabled:opacity-50"
+                        >
+                          {jobRunning ? 'AI Translating...' : 'AI Translate'}
+                        </button>
                         <button 
                           onClick={() => onOpenFile(file.id)}
                           className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100"

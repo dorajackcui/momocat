@@ -3,6 +3,7 @@ import { Dashboard } from './components/Dashboard';
 import { ProjectDetail } from './components/ProjectDetail';
 import { Editor } from './components/Editor';
 import { TMManager } from './components/TMManager';
+import { SettingsModal } from './components/SettingsModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useProjects } from './hooks/useProjects';
 
@@ -12,6 +13,7 @@ function App(): JSX.Element {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [activeProjectId, setActiveProjectId] = useState<number | null>(null);
   const [activeFileId, setActiveFileId] = useState<number | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const { projects, loading, loadProjects, createProject, deleteProject } = useProjects();
 
@@ -69,6 +71,7 @@ function App(): JSX.Element {
 
   return (
     <div className="h-screen bg-gray-50 flex flex-col font-sans">
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
       <header className="px-10 py-5 bg-white border-b border-gray-200 flex justify-between items-center shadow-sm">
         <div 
           className="flex items-center gap-3 cursor-pointer" 
@@ -77,7 +80,7 @@ function App(): JSX.Element {
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">C</div>
           <h1 className="text-xl font-bold text-gray-900 tracking-tight">MomoCAT<span className="text-xs font-normal text-blue-500 ml-1">v0.2</span></h1>
         </div>
-        <nav className="flex gap-1">
+        <nav className="flex gap-2 items-center">
           <button
             onClick={() => setCurrentView('dashboard')}
             className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${
@@ -93,6 +96,14 @@ function App(): JSX.Element {
             }`}
           >
             TM Manager
+          </button>
+          <div className="h-6 w-[1px] bg-gray-200" />
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="px-3 py-2 text-sm font-bold rounded-lg text-gray-500 hover:bg-gray-100 transition-all"
+            title="AI Settings"
+          >
+            Settings
           </button>
         </nav>
       </header>

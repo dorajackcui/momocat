@@ -325,6 +325,23 @@ export class CATDatabase {
         this.db.prepare('UPDATE schema_version SET version = 6').run();
       })();
     }
+
+    if (currentVersion < 7) {
+      console.log('[DB] Upgrading schema to v7 (AI prompt + app settings)...');
+      this.db.transaction(() => {
+        this.db.exec(`
+          ALTER TABLE projects ADD COLUMN aiPrompt TEXT;
+
+          CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT,
+            updatedAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+          );
+        `);
+
+        this.db.prepare('UPDATE schema_version SET version = 7').run();
+      })();
+    }
   }
 
   // Project Repo
@@ -367,6 +384,12 @@ export class CATDatabase {
 
   public getProject(id: number): Project | undefined {
     return this.db.prepare('SELECT * FROM projects WHERE id = ?').get(id) as Project | undefined;
+  }
+
+  public updateProjectPrompt(projectId: number, aiPrompt: string | null) {
+    this.db.prepare(
+      "UPDATE projects SET aiPrompt = ?, updatedAt = (strftime('%Y-%m-%dT%H:%M:%fZ','now')) WHERE id = ?"
+    ).run(aiPrompt, projectId);
   }
 
   public deleteProject(id: number) {
@@ -531,6 +554,22 @@ export class CATDatabase {
 
   public runInTransaction(fn: () => void) {
     this.db.transaction(fn)();
+  }
+
+  // App Settings
+  public getSetting(key: string): string | undefined {
+    const row = this.db.prepare('SELECT value FROM app_settings WHERE key = ?').get(key) as { value?: string } | undefined;
+    return row?.value;
+  }
+
+  public setSetting(key: string, value: string | null) {
+    this.db.prepare(`
+      INSERT INTO app_settings (key, value)
+      VALUES (?, ?)
+      ON CONFLICT(key) DO UPDATE SET
+        value = excluded.value,
+        updatedAt = (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    `).run(key, value);
   }
 
   public upsertTMEntry(entry: TMEntry & { tmId: string }) {

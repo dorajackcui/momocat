@@ -9,6 +9,8 @@ const api = {
     ipcRenderer.invoke('project-create', name, srcLang, tgtLang),
   deleteProject: (projectId: number) => ipcRenderer.invoke('project-delete', projectId),
   getProject: (projectId: number) => ipcRenderer.invoke('project-get', projectId),
+  updateProjectPrompt: (projectId: number, aiPrompt: string | null) =>
+    ipcRenderer.invoke('project-update-prompt', projectId, aiPrompt),
   getProjectFiles: (projectId: number) => ipcRenderer.invoke('project-get-files', projectId),
   getFile: (fileId: number) => ipcRenderer.invoke('file-get', fileId),
   getFilePreview: (filePath: string) => ipcRenderer.invoke('file-get-preview', filePath),
@@ -46,6 +48,13 @@ const api = {
   commitToMainTM: (tmId: string, fileId: number) => ipcRenderer.invoke('tm-commit-file', tmId, fileId),
   getTMImportPreview: (filePath: string) => ipcRenderer.invoke('tm-import-preview', filePath),
   importTMEntries: (tmId: string, filePath: string, options: any) => ipcRenderer.invoke('tm-import-execute', tmId, filePath, options),
+
+  // AI Settings & Translation
+  getAISettings: () => ipcRenderer.invoke('ai-settings-get'),
+  setAIKey: (apiKey: string) => ipcRenderer.invoke('ai-settings-set', apiKey),
+  testAIConnection: (apiKey?: string) => ipcRenderer.invoke('ai-test-connection', apiKey),
+  aiTranslateFile: (fileId: number) => ipcRenderer.invoke('ai-translate-file', fileId),
+  aiTestTranslate: (projectId: number, sourceText: string) => ipcRenderer.invoke('ai-test-translate', projectId, sourceText),
   
   // Dialogs
   openFileDialog: (filters: any[]) => ipcRenderer.invoke('dialog-open-file', filters),

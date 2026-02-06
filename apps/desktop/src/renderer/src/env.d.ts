@@ -8,6 +8,7 @@ declare global {
       createProject: (name: string, srcLang: string, tgtLang: string) => Promise<any>;
       deleteProject: (projectId: number) => Promise<void>;
       getProject: (projectId: number) => Promise<any>;
+      updateProjectPrompt: (projectId: number, aiPrompt: string | null) => Promise<void>;
       getProjectFiles: (projectId: number) => Promise<any[]>;
       getFile: (fileId: number) => Promise<any>;
       getFilePreview: (filePath: string) => Promise<any[][]>;
@@ -32,6 +33,25 @@ declare global {
       commitToMainTM: (tmId: string, fileId: number) => Promise<number>;
       getTMImportPreview: (filePath: string) => Promise<any[][]>;
       importTMEntries: (tmId: string, filePath: string, options: any) => Promise<{ success: number; skipped: number }>;
+
+      // AI Settings & Translation
+      getAISettings: () => Promise<{ apiKeySet: boolean; apiKeyLast4?: string }>;
+      setAIKey: (apiKey: string) => Promise<void>;
+      testAIConnection: (apiKey?: string) => Promise<{ ok: boolean }>;
+      aiTranslateFile: (fileId: number) => Promise<string>;
+      aiTestTranslate: (projectId: number, sourceText: string) => Promise<{
+        ok: boolean;
+        error?: string;
+        promptUsed: string;
+        userMessage: string;
+        translatedText: string;
+        requestId?: string;
+        status?: number;
+        endpoint?: string;
+        model?: string;
+        rawResponseText?: string;
+        responseContent?: string;
+      }>;
 
       openFileDialog: (filters: any[]) => Promise<string | null>;
       saveFileDialog: (defaultPath: string, filters: any[]) => Promise<string | null>;

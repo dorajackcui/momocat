@@ -37,6 +37,7 @@
     "react-dom": "^18.2.0",
     "react-virtualized-auto-sizer": "^2.0.2",
     "react-window": "^2.2.5",
+    "undici": "^6.21.1",
     "xlsx": "^0.18.5",
     "xlsx-populate": "^1.21.0"
   },

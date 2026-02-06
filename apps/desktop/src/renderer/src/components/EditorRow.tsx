@@ -149,9 +149,17 @@ export const EditorRow: React.FC<EditorRowProps> = ({
   };
 
   const statusColor =
+    hasError ? 'bg-red-500' :
+    hasWarning ? 'bg-amber-400' :
     segment.status === 'confirmed' ? 'bg-green-500' :
     segment.status === 'draft' ? 'bg-yellow-400' :
     'bg-gray-200';
+
+  const statusTitle = hasError
+    ? `Status: ${segment.status} (QA error)`
+    : hasWarning
+      ? `Status: ${segment.status} (QA warning)`
+      : `Status: ${segment.status}`;
 
   const contextText = segment.meta?.context || '';
   const isLongContext = contextText.length > 120;
@@ -190,7 +198,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
         </button>
       </div>
 
-      <div className={`w-1 h-full ${statusColor}`} title={`Status: ${segment.status}`} />
+      <div className={`w-1 h-full ${statusColor}`} title={statusTitle} />
 
       <div className="p-4 relative">
         <textarea
