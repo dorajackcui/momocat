@@ -36,6 +36,16 @@ describe('CAT Core Tokenizer', () => {
     expect(tokens[7]).toEqual({ type: 'tag', content: '%s', meta: { id: '%s' } });
   });
 
+  it('should support custom regex patterns for tag recognition', () => {
+    const text = 'prefix @@NAME@@ suffix';
+    const tokens = parseDisplayTextToTokens(text, [/\@\@[A-Z_]+\@\@/g]);
+    expect(tokens).toEqual([
+      { type: 'text', content: 'prefix ' },
+      { type: 'tag', content: '@@NAME@@', meta: { id: '@@NAME@@' } },
+      { type: 'text', content: ' suffix' }
+    ]);
+  });
+
   it('should serialize tokens back to display text', () => {
     const tokens = [
       { type: 'text', content: 'Hello ' },
@@ -108,6 +118,15 @@ describe('Editor Tag Marker Conversion', () => {
     { type: 'tag', content: '{1}' }
   ] as any;
 
+  const sourceTokensWithDuplicate = [
+    { type: 'text', content: 'A ' },
+    { type: 'tag', content: '<b>' },
+    { type: 'text', content: 'B' },
+    { type: 'tag', content: '<b>' },
+    { type: 'text', content: ' C ' },
+    { type: 'tag', content: '{1}' }
+  ] as any;
+
   it('should format memoQ-style marker by tag type', () => {
     expect(formatTagAsMemoQMarker('<b>', 1)).toBe('{1>');
     expect(formatTagAsMemoQMarker('</b>', 2)).toBe('<2}');
@@ -141,10 +160,46 @@ describe('Editor Tag Marker Conversion', () => {
     ]);
   });
 
+  it('should assign the same marker number to duplicate tag content', () => {
+    const targetTokens = [
+      { type: 'text', content: 'Hello ' },
+      { type: 'tag', content: '<b>' },
+      { type: 'text', content: 'World' },
+      { type: 'tag', content: '<b>' }
+    ] as any;
+
+    const text = serializeTokensToEditorText(targetTokens, sourceTokensWithDuplicate);
+    expect(text).toBe('Hello {1>World{1>');
+  });
+
+  it('should parse marker numbers against unique tag contents', () => {
+    const text = 'X {1> Y {2}';
+    const tokens = parseEditorTextToTokens(text, sourceTokensWithDuplicate);
+
+    expect(tokens).toEqual([
+      { type: 'text', content: 'X ' },
+      { type: 'tag', content: '<b>', meta: { id: '<b>' } },
+      { type: 'text', content: ' Y ' },
+      { type: 'tag', content: '{1}', meta: { id: '{1}' } }
+    ]);
+  });
+
   it('should keep unknown marker index as plain text', () => {
     const text = 'Bad {999>} marker';
     const tokens = parseEditorTextToTokens(text, sourceTokens);
     expect(tokens).toEqual([{ type: 'text', content: 'Bad {999>} marker' }]);
+  });
+
+  it('should parse editor markers with custom marker regex', () => {
+    const text = 'X [[1]] Y';
+    const tokens = parseEditorTextToTokens(text, sourceTokens, {
+      editorMarkerPatterns: [{ type: 'standalone', regex: /\[\[(?<index>\d+)\]\]/g }]
+    });
+    expect(tokens).toEqual([
+      { type: 'text', content: 'X ' },
+      { type: 'tag', content: '<b>', meta: { id: '<b>' } },
+      { type: 'text', content: ' Y' }
+    ]);
   });
 });
 

@@ -52,6 +52,7 @@ const api = {
   // AI Settings & Translation
   getAISettings: () => ipcRenderer.invoke('ai-settings-get'),
   setAIKey: (apiKey: string) => ipcRenderer.invoke('ai-settings-set', apiKey),
+  clearAIKey: () => ipcRenderer.invoke('ai-settings-clear'),
   testAIConnection: (apiKey?: string) => ipcRenderer.invoke('ai-test-connection', apiKey),
   aiTranslateFile: (fileId: number) => ipcRenderer.invoke('ai-translate-file', fileId),
   aiTestTranslate: (projectId: number, sourceText: string) => ipcRenderer.invoke('ai-test-translate', projectId, sourceText),

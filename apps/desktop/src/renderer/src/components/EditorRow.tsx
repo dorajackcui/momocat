@@ -27,10 +27,15 @@ export const EditorRow: React.FC<EditorRowProps> = ({
   const hasError = qaIssues.some(issue => issue.severity === 'error');
   const hasWarning = qaIssues.some(issue => issue.severity === 'warning');
 
-  const sourceTags = useMemo(
-    () => segment.sourceTokens.filter((token): token is Token => token.type === 'tag'),
-    [segment.sourceTokens]
-  );
+  const sourceTags = useMemo(() => {
+    const seen = new Set<string>();
+    return segment.sourceTokens.filter((token): token is Token => {
+      if (token.type !== 'tag') return false;
+      if (seen.has(token.content)) return false;
+      seen.add(token.content);
+      return true;
+    });
+  }, [segment.sourceTokens]);
 
   const sourceEditorText = useMemo(
     () => serializeTokensToEditorText(segment.sourceTokens, segment.sourceTokens).replace(/\r\n/g, '\n').replace(/\r/g, '\n'),

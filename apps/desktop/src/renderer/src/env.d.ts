@@ -37,6 +37,7 @@ declare global {
       // AI Settings & Translation
       getAISettings: () => Promise<{ apiKeySet: boolean; apiKeyLast4?: string }>;
       setAIKey: (apiKey: string) => Promise<void>;
+      clearAIKey: () => Promise<void>;
       testAIConnection: (apiKey?: string) => Promise<{ ok: boolean }>;
       aiTranslateFile: (fileId: number) => Promise<string>;
       aiTestTranslate: (projectId: number, sourceText: string) => Promise<{

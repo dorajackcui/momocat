@@ -12,19 +12,6 @@ export function useEditor({ activeFileId }: UseEditorProps) {
   const [activeMatches, setActiveMatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const tagValidator = new TagValidator();
-
-  const withQaData = (segment: Segment): Segment => {
-    const sourceTokens = normalizeTokens(segment.sourceTokens, `segment ${segment.segmentId} source`);
-    const targetTokens = normalizeTokens(segment.targetTokens, `segment ${segment.segmentId} target`);
-    const validationResult = tagValidator.validate(sourceTokens, targetTokens);
-    return {
-      ...segment,
-      sourceTokens,
-      targetTokens,
-      qaIssues: validationResult.issues,
-      autoFixSuggestions: validationResult.suggestions
-    };
-  };
   
   const normalizeTokens = (tokens: any, context: string): Token[] => {
     if (!Array.isArray(tokens)) {
@@ -58,7 +45,13 @@ export function useEditor({ activeFileId }: UseEditorProps) {
 
       const data = await window.api.getSegments(activeFileId, 0, 1000);
       const segmentsArray = Array.isArray(data) ? data : [];
-      const normalized = segmentsArray.map((seg) => withQaData(seg as Segment));
+      const normalized = segmentsArray.map((seg) => ({
+        ...(seg as Segment),
+        sourceTokens: normalizeTokens((seg as Segment).sourceTokens, `segment ${(seg as Segment).segmentId} source`),
+        targetTokens: normalizeTokens((seg as Segment).targetTokens, `segment ${(seg as Segment).segmentId} target`),
+        qaIssues: undefined,
+        autoFixSuggestions: undefined
+      }));
       setSegments(normalized);
       if (segmentsArray.length > 0 && !activeSegmentId) {
         setActiveSegmentId(segmentsArray[0].segmentId);
@@ -84,26 +77,25 @@ export function useEditor({ activeFileId }: UseEditorProps) {
           if (seg.segmentId === data.segmentId) {
             changed = true;
             const targetTokens = normalizeTokens(data.targetTokens, `segment ${seg.segmentId} target (update)`);
-            const validationResult = tagValidator.validate(seg.sourceTokens, targetTokens);
+            const nextStatus = data.status as any;
             return { 
               ...seg, 
               targetTokens,
-              status: data.status,
-              qaIssues: validationResult.issues,
-              autoFixSuggestions: validationResult.suggestions
+              status: nextStatus,
+              qaIssues: nextStatus === 'confirmed' ? seg.qaIssues : undefined,
+              autoFixSuggestions: nextStatus === 'confirmed' ? seg.autoFixSuggestions : undefined
             };
           }
           // 2. Is it a propagated segment?
           if (data.propagatedIds?.includes(seg.segmentId)) {
             changed = true;
             const targetTokens = normalizeTokens(data.targetTokens, `segment ${seg.segmentId} target (propagation)`);
-            const validationResult = tagValidator.validate(seg.sourceTokens, targetTokens);
             return { 
               ...seg, 
               targetTokens,
               status: 'draft' as any,
-              qaIssues: validationResult.issues,
-              autoFixSuggestions: validationResult.suggestions
+              qaIssues: undefined,
+              autoFixSuggestions: undefined
             };
           }
           return seg;
@@ -138,16 +130,14 @@ export function useEditor({ activeFileId }: UseEditorProps) {
         if (seg.segmentId === segmentId) {
           const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
           const tokens = parseEditorTextToTokens(normalizedText, seg.sourceTokens);
-
-          // Validate tags and store results in segment
-          const validationResult = tagValidator.validate(seg.sourceTokens, tokens);
           
           const updated = { 
             ...seg, 
             targetTokens: tokens,
             status: (normalizedText.trim() ? 'draft' : 'new') as any,
-            qaIssues: validationResult.issues,
-            autoFixSuggestions: validationResult.suggestions
+            // Run QA only on confirm to avoid per-keystroke/per-segment compute cost.
+            qaIssues: undefined,
+            autoFixSuggestions: undefined
           };
           // Async save
           window.api.updateSegment(segmentId, tokens, updated.status);
@@ -167,15 +157,12 @@ export function useEditor({ activeFileId }: UseEditorProps) {
     
     setSegments(prev => prev.map(seg => {
       if (seg.segmentId === activeSegmentId) {
-        // Validate tags and store results in segment
-        const validationResult = tagValidator.validate(seg.sourceTokens, tokens);
-        
         const updated = { 
           ...seg, 
           targetTokens: tokens,
           status: 'draft' as any,
-          qaIssues: validationResult.issues,
-          autoFixSuggestions: validationResult.suggestions
+          qaIssues: undefined,
+          autoFixSuggestions: undefined
         };
         window.api.updateSegment(activeSegmentId, tokens, updated.status);
         return updated;
@@ -187,6 +174,22 @@ export function useEditor({ activeFileId }: UseEditorProps) {
   const confirmSegment = async (segmentId: string) => {
     const segment = segments.find(s => s.segmentId === segmentId);
     if (!segment) return;
+
+    const validationResult = tagValidator.validate(segment.sourceTokens, segment.targetTokens);
+    const hasBlockingErrors = validationResult.issues.some(issue => issue.severity === 'error');
+
+    setSegments(prev => prev.map(seg => {
+      if (seg.segmentId !== segmentId) return seg;
+      return {
+        ...seg,
+        qaIssues: validationResult.issues,
+        autoFixSuggestions: validationResult.suggestions
+      };
+    }));
+
+    if (hasBlockingErrors) {
+      return;
+    }
 
     // We don't need to manually update state here anymore because the listener will handle it!
     await window.api.updateSegment(segmentId, segment.targetTokens, 'confirmed');

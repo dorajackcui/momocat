@@ -8,10 +8,13 @@ import {
   Token, 
   validateSegmentTags,
   parseDisplayTextToTokens,
+  parseEditorTextToTokens,
   serializeTokensToDisplayText,
+  serializeTokensToEditorText,
   computeTagsSignature,
   computeMatchKey,
-  computeSrcHash
+  computeSrcHash,
+  TagValidator
 } from '@cat/core';
 import { join, basename } from 'path';
 import { copyFileSync, existsSync, mkdirSync, rmSync, unlinkSync } from 'fs';
@@ -25,6 +28,7 @@ export class ProjectService {
   private projectsDir: string;
   private tmService: TMService;
   private segmentService: SegmentService;
+  private tagValidator: TagValidator;
   private progressCallbacks: ((data: { type: string; current: number; total: number; message?: string }) => void)[] = [];
 
   constructor(db: CATDatabase, projectsDir: string) {
@@ -33,6 +37,7 @@ export class ProjectService {
     this.projectsDir = projectsDir;
     this.tmService = new TMService(this.db);
     this.segmentService = new SegmentService(this.db, this.tmService);
+    this.tagValidator = new TagValidator();
 
     if (!existsSync(this.projectsDir)) {
       mkdirSync(this.projectsDir, { recursive: true });
@@ -369,6 +374,10 @@ export class ProjectService {
     this.db.setSetting('openai_api_key', apiKey);
   }
 
+  public clearAIKey() {
+    this.db.setSetting('openai_api_key', null);
+  }
+
   public async testAIConnection(apiKey?: string) {
     const key = (apiKey && apiKey.trim()) || this.db.getSetting('openai_api_key');
     if (!key) {
@@ -448,19 +457,20 @@ export class ProjectService {
       });
 
       const sourceText = serializeTokensToDisplayText(seg.sourceTokens);
+      const sourceTagPreservedText = serializeTokensToEditorText(seg.sourceTokens, seg.sourceTokens);
       const context = seg.meta?.context ? String(seg.meta.context).trim() : '';
       try {
-        const translatedText = await this.translateWithOpenAI({
+        const targetTokens = await this.translateSegmentWithOpenAI({
           apiKey,
           model,
           projectPrompt: project.aiPrompt || '',
           srcLang: project.srcLang,
           tgtLang: project.tgtLang,
+          sourceTokens: seg.sourceTokens,
           sourceText,
+          sourceTagPreservedText,
           context
         });
-
-        const targetTokens = parseDisplayTextToTokens(translatedText);
         await this.segmentService.updateSegment(seg.segmentId, targetTokens, 'translated');
         translated += 1;
       } catch (error) {
@@ -544,6 +554,8 @@ export class ProjectService {
     const base = [
       'You are a professional translator.',
       `Translate from ${srcLang} to ${tgtLang}.`,
+      'The source can include protected markers such as {1>, <2}, {3}.',
+      'Never translate, remove, reorder, renumber, or rewrite protected markers.',
       'Keep all tags, placeholders, and formatting exactly as they appear in the source.',
       'Return only the translated text, without quotes or extra commentary.',
       'Do not copy the source text unless it is already in the target language.'
@@ -554,6 +566,55 @@ export class ProjectService {
     return `${base}\n\nProject instructions:\n${trimmed}`;
   }
 
+  private async translateSegmentWithOpenAI(params: {
+    apiKey: string;
+    model: string;
+    projectPrompt?: string;
+    srcLang: string;
+    tgtLang: string;
+    sourceTokens: Token[];
+    sourceText: string;
+    sourceTagPreservedText: string;
+    context?: string;
+  }): Promise<Token[]> {
+    const maxAttempts = 3;
+    let validationFeedback: string | undefined;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const translatedText = await this.translateWithOpenAI({
+        apiKey: params.apiKey,
+        model: params.model,
+        projectPrompt: params.projectPrompt,
+        srcLang: params.srcLang,
+        tgtLang: params.tgtLang,
+        sourceText: params.sourceText,
+        sourceTagPreservedText: params.sourceTagPreservedText,
+        context: params.context,
+        validationFeedback
+      });
+
+      const targetTokens = parseEditorTextToTokens(translatedText, params.sourceTokens);
+      const validationResult = this.tagValidator.validate(params.sourceTokens, targetTokens);
+      const errors = validationResult.issues.filter(issue => issue.severity === 'error');
+
+      if (errors.length === 0) {
+        return targetTokens;
+      }
+
+      if (attempt === maxAttempts) {
+        throw new Error(`Tag validation failed after ${maxAttempts} attempts: ${errors.map(e => e.message).join('; ')}`);
+      }
+
+      validationFeedback = [
+        'Previous translation was invalid.',
+        ...errors.map(e => `- ${e.message}`),
+        'Retry by preserving marker content and sequence exactly.'
+      ].join('\n');
+    }
+
+    throw new Error('Unexpected translation retry failure');
+  }
+
   private async translateWithOpenAI(params: {
     apiKey: string;
     model: string;
@@ -561,7 +622,9 @@ export class ProjectService {
     srcLang: string;
     tgtLang: string;
     sourceText: string;
+    sourceTagPreservedText?: string;
     context?: string;
+    validationFeedback?: string;
     debug?: {
       requestId?: string;
       status?: number;
@@ -573,13 +636,21 @@ export class ProjectService {
     allowUnchanged?: boolean;
   }): Promise<string> {
     const systemPrompt = this.buildSystemPrompt(params.srcLang, params.tgtLang, params.projectPrompt);
+    const hasProtectedMarkers = typeof params.sourceTagPreservedText === 'string' && params.sourceTagPreservedText.length > 0;
+    const sourcePayload = hasProtectedMarkers ? params.sourceTagPreservedText! : params.sourceText;
     const userParts = [
-      `Source (${params.srcLang}):`,
-      params.sourceText
+      hasProtectedMarkers
+        ? `Source (${params.srcLang}, protected-marker format):`
+        : `Source (${params.srcLang}):`,
+      sourcePayload
     ];
 
     if (params.context) {
       userParts.push('', `Context: ${params.context}`);
+    }
+
+    if (params.validationFeedback) {
+      userParts.push('', 'Validation feedback from previous attempt:', params.validationFeedback);
     }
 
     const endpoint = 'https://api.openai.com/v1/chat/completions';
@@ -635,7 +706,9 @@ export class ProjectService {
       throw new Error('OpenAI response was empty');
     }
 
-    if (!params.allowUnchanged && trimmed === params.sourceText.trim() && params.srcLang !== params.tgtLang) {
+    const unchangedAgainstSource = trimmed === params.sourceText.trim();
+    const unchangedAgainstPayload = trimmed === sourcePayload.trim();
+    if (!params.allowUnchanged && (unchangedAgainstSource || unchangedAgainstPayload) && params.srcLang !== params.tgtLang) {
       throw new Error(`Model returned source unchanged: ${trimmed}`);
     }
 

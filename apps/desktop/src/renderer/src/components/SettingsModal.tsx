@@ -9,6 +9,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [apiKeyHint, setApiKeyHint] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [testing, setTesting] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -71,6 +72,21 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     }
   };
 
+  const handleClear = async () => {
+    setClearing(true);
+    setStatus(null);
+    try {
+      await window.api.clearAIKey();
+      setApiKeyHint(null);
+      setApiKeyInput('');
+      setStatus('Saved API key removed.');
+    } catch (error) {
+      setStatus('Failed to remove saved API key.');
+    } finally {
+      setClearing(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -97,7 +113,16 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
             />
             {apiKeyHint && (
-              <p className="mt-2 text-[11px] text-gray-500">Saved key: {apiKeyHint}</p>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <p className="text-[11px] text-gray-500">Saved key: {apiKeyHint}</p>
+                <button
+                  onClick={handleClear}
+                  disabled={clearing || loading || testing}
+                  className="text-[11px] font-semibold text-red-600 hover:text-red-700 disabled:opacity-50 transition-colors"
+                >
+                  {clearing ? 'Removing...' : 'Delete Saved Key'}
+                </button>
+              </div>
             )}
           </div>
 
@@ -110,14 +135,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           <div className="flex gap-3 pt-2">
             <button
               onClick={handleTest}
-              disabled={testing}
+              disabled={testing || loading || clearing}
               className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 rounded-lg font-bold hover:bg-gray-50 transition-colors"
             >
               {testing ? 'Testing...' : 'Test Connection'}
             </button>
             <button
               onClick={handleSave}
-              disabled={loading}
+              disabled={loading || testing || clearing}
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-lg shadow-blue-200"
             >
               {loading ? 'Saving...' : 'Save Key'}

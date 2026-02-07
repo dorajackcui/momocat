@@ -10,6 +10,20 @@ export { TagValidator } from './TagValidator';
 
 // Export TagNavigator service
 export { TagNavigator } from './TagNavigator';
+export {
+  formatTagAsMemoQMarker,
+  serializeTokensToEditorText,
+  parseDisplayTextToTokens,
+  parseEditorTextToTokens,
+  type ParseEditorTextOptions
+} from './tag/TagCodec';
+export {
+  TAG_PATTERN_REGISTRY,
+  getDisplayTagPatterns,
+  getEditorMarkerPatterns,
+  type EditorMarkerPattern,
+  type TagPatternRegistryConfig
+} from './tag/TagPatternRegistry';
 
 export type ValidationState = 'valid' | 'error' | 'warning';
 
@@ -131,63 +145,6 @@ export function serializeTokensToDisplayText(tokens: Token[]): string {
 }
 
 /**
- * Convert one tag token into memoQ-like marker text.
- * Examples:
- * - paired start: {1>
- * - paired end: <2}
- * - standalone: {3}
- */
-export function formatTagAsMemoQMarker(tagContent: string, tagNumber: number): string {
-  const safeNumber = tagNumber > 0 ? tagNumber : 1;
-  const { type } = getTagDisplayInfo(tagContent, safeNumber - 1);
-
-  if (type === 'paired-start') {
-    return `{${safeNumber}>`;
-  }
-
-  if (type === 'paired-end') {
-    return `<${safeNumber}}`;
-  }
-
-  return `{${safeNumber}}`;
-}
-
-/**
- * Serialize tokens to editor text using memoQ-style tag markers.
- *
- * Tag numbers are based on source tag order, so copied/pasted markers
- * can be mapped back to source tags deterministically.
- */
-export function serializeTokensToEditorText(tokens: Token[], sourceTokens: Token[]): string {
-  const sourceTags = sourceTokens.filter(token => token.type === 'tag');
-  const indexQueuesByContent = new Map<string, number[]>();
-
-  sourceTags.forEach((token, index) => {
-    const tagNumber = index + 1;
-    const queue = indexQueuesByContent.get(token.content);
-    if (queue) {
-      queue.push(tagNumber);
-      return;
-    }
-    indexQueuesByContent.set(token.content, [tagNumber]);
-  });
-
-  let fallbackTagNumber = sourceTags.length + 1;
-
-  return tokens
-    .map(token => {
-      if (token.type !== 'tag') {
-        return token.content;
-      }
-
-      const queue = indexQueuesByContent.get(token.content);
-      const mappedTagNumber = queue && queue.length > 0 ? queue.shift()! : fallbackTagNumber++;
-      return formatTagAsMemoQMarker(token.content, mappedTagNumber);
-    })
-    .join('');
-}
-
-/**
  * Serialize tokens to pure text only, excluding all tags and markers.
  * Used for linguistic fuzzy matching.
  */
@@ -200,126 +157,6 @@ export function serializeTokensToTextOnly(tokens: Token[]): string {
     .trim();
 }
 
-/**
- * Extensible tokenizer for v0.1.1+: 
- * Supports configurable patterns and maintains correct inline positioning.
- */
-export function parseDisplayTextToTokens(text: string, customPatterns?: RegExp[]): Token[] {
-  // Default patterns: 
-  // 1. {1}, {tag}
-  // 2. <tag>, </tag>, <tag/>
-  // 3. %s, %d, %1$s (common printf-style)
-  //    Note: Space flag is excluded to prevent matching "% e" as a tag
-  //    Valid flags: - # + 0 (but not space)
-  const patterns = customPatterns || [
-    /\{[^{}]+\}/g,
-    /<[^>]+>/g,
-    /%(?:\d+\$)?[-#+0]*\d*(?:\.\d+)?[hlLzjt]*[diuoxXfFeEgGaAcspn%]/g
-  ];
-
-  const tokens: Token[] = [];
-  let lastIndex = 0;
-
-  // Combine all patterns into one global regex to find matches in order
-  const combinedRegex = new RegExp(patterns.map(p => `(${p.source})`).join('|'), 'g');
-  
-  let match;
-  while ((match = combinedRegex.exec(text)) !== null) {
-    // Add text before the match
-    if (match.index > lastIndex) {
-      tokens.push({
-        type: 'text',
-        content: text.substring(lastIndex, match.index)
-      });
-    }
-
-    // The match itself is a tag
-    tokens.push({
-      type: 'tag',
-      content: match[0],
-      meta: { id: match[0] }
-    });
-
-    lastIndex = combinedRegex.lastIndex;
-  }
-
-  // Add remaining text
-  if (lastIndex < text.length) {
-    tokens.push({
-      type: 'text',
-      content: text.substring(lastIndex)
-    });
-  }
-
-  return tokens.length > 0 ? tokens : [{ type: 'text', content: text }];
-}
-
-/**
- * Parse editor text that may include memoQ-like markers.
- *
- * Supported marker forms:
- * - {1>   paired opening marker
- * - <2}   paired closing marker
- * - {3}   standalone marker
- */
-export function parseEditorTextToTokens(text: string, sourceTokens: Token[]): Token[] {
-  const sourceTags = sourceTokens.filter(token => token.type === 'tag');
-  const tokens: Token[] = [];
-  let lastIndex = 0;
-
-  const markerOrTagRegex = /(?:\{(\d+)>|<(\d+)\}|\{(\d+)\})|(\{[^{}]+\}|<[^>]+>|%(?:\d+\$)?[-#+0]*\d*(?:\.\d+)?[hlLzjt]*[diuoxXfFeEgGaAcspn%])/g;
-
-  const pushText = (value: string) => {
-    if (!value) return;
-    const lastToken = tokens[tokens.length - 1];
-    if (lastToken && lastToken.type === 'text') {
-      lastToken.content += value;
-      return;
-    }
-    tokens.push({ type: 'text', content: value });
-  };
-
-  let match: RegExpExecArray | null;
-  while ((match = markerOrTagRegex.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      pushText(text.substring(lastIndex, match.index));
-    }
-
-    const markerIndexStr = match[1] || match[2] || match[3];
-    if (markerIndexStr) {
-      const markerIndex = Number.parseInt(markerIndexStr, 10) - 1;
-      const mappedTag = sourceTags[markerIndex];
-
-      if (mappedTag) {
-        tokens.push({
-          type: 'tag',
-          content: mappedTag.content,
-          meta: { id: mappedTag.content }
-        });
-      } else {
-        // Unknown marker index stays plain text instead of becoming an invalid tag token.
-        pushText(match[0]);
-      }
-    } else {
-      const rawTag = match[4];
-      if (rawTag) {
-        tokens.push({
-          type: 'tag',
-          content: rawTag,
-          meta: { id: rawTag }
-        });
-      }
-    }
-
-    lastIndex = markerOrTagRegex.lastIndex;
-  }
-
-  if (lastIndex < text.length) {
-    pushText(text.substring(lastIndex));
-  }
-
-  return tokens.length > 0 ? tokens : [{ type: 'text', content: text }];
-}
 
 /**
  * Compute a stable signature for tags to ensure consistency during translation.

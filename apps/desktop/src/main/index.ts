@@ -237,6 +237,10 @@ app.whenReady().then(() => {
     return projectService.setAIKey(apiKey);
   });
 
+  ipcMain.handle('ai-settings-clear', async () => {
+    return projectService.clearAIKey();
+  });
+
   ipcMain.handle('ai-test-connection', async (_event, apiKey?: string) => {
     return projectService.testAIConnection(apiKey);
   });
