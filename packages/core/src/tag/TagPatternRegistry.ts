@@ -47,21 +47,29 @@ const ensureGlobalRegex = (regex: RegExp): RegExp => {
   return new RegExp(regex.source, flags);
 };
 
+const DEFAULT_DISPLAY_TAG_PATTERNS = TAG_PATTERN_REGISTRY.displayTagPatterns.map(ensureGlobalRegex);
+const DEFAULT_EDITOR_MARKER_PATTERNS = TAG_PATTERN_REGISTRY.editorMarkerPatterns.map(pattern => ({
+  ...pattern,
+  regex: ensureGlobalRegex(pattern.regex)
+}));
+
 export const getDisplayTagPatterns = (customPatterns?: RegExp[]): RegExp[] => {
   const patterns = customPatterns && customPatterns.length > 0
     ? customPatterns
-    : TAG_PATTERN_REGISTRY.displayTagPatterns;
+    : DEFAULT_DISPLAY_TAG_PATTERNS;
+  if (patterns === DEFAULT_DISPLAY_TAG_PATTERNS) return patterns;
   return patterns.map(ensureGlobalRegex);
 };
 
 export const getEditorMarkerPatterns = (customPatterns?: EditorMarkerPattern[]): EditorMarkerPattern[] => {
   const patterns = customPatterns && customPatterns.length > 0
     ? customPatterns
-    : TAG_PATTERN_REGISTRY.editorMarkerPatterns;
+    : DEFAULT_EDITOR_MARKER_PATTERNS;
+
+  if (patterns === DEFAULT_EDITOR_MARKER_PATTERNS) return patterns;
 
   return patterns.map(pattern => ({
     ...pattern,
     regex: ensureGlobalRegex(pattern.regex)
   }));
 };
-

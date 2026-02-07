@@ -4,11 +4,69 @@ import { randomUUID } from 'crypto';
 
 export class CATDatabase {
   private db: Database.Database;
+  private stmtUpsertTMEntry!: Database.Statement;
+  private stmtInsertTMEntryIfAbsentBySrcHash!: Database.Statement;
+  private stmtUpsertTMEntryBySrcHash!: Database.Statement;
+  private stmtDeleteTMFtsByEntryId!: Database.Statement;
+  private stmtInsertTMFts!: Database.Statement;
+  private stmtFindTMEntryByHash!: Database.Statement;
+  private stmtFindTMEntryMetaByHash!: Database.Statement;
 
   constructor(dbPath: string) {
     this.db = new Database(dbPath);
     this.db.pragma('foreign_keys = ON');
+    this.db.pragma('journal_mode = WAL');
+    this.db.pragma('synchronous = NORMAL');
+    this.db.pragma('temp_store = MEMORY');
     this.init();
+    this.prepareStatements();
+  }
+
+  private prepareStatements() {
+    this.stmtUpsertTMEntry = this.db.prepare(`
+      INSERT INTO tm_entries (
+        id, tmId, srcHash, matchKey, tagsSignature,
+        sourceTokensJson, targetTokensJson, originSegmentId, usageCount
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        targetTokensJson = excluded.targetTokensJson,
+        updatedAt = (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        usageCount = usageCount + 1
+    `);
+
+    this.stmtInsertTMEntryIfAbsentBySrcHash = this.db.prepare(`
+      INSERT INTO tm_entries (
+        id, tmId, srcHash, matchKey, tagsSignature,
+        sourceTokensJson, targetTokensJson, originSegmentId, usageCount
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(tmId, srcHash) DO NOTHING
+      RETURNING id
+    `);
+
+    this.stmtUpsertTMEntryBySrcHash = this.db.prepare(`
+      INSERT INTO tm_entries (
+        id, tmId, srcHash, matchKey, tagsSignature,
+        sourceTokensJson, targetTokensJson, originSegmentId, usageCount
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(tmId, srcHash) DO UPDATE SET
+        matchKey = excluded.matchKey,
+        tagsSignature = excluded.tagsSignature,
+        sourceTokensJson = excluded.sourceTokensJson,
+        targetTokensJson = excluded.targetTokensJson,
+        originSegmentId = excluded.originSegmentId,
+        updatedAt = (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        usageCount = tm_entries.usageCount + 1
+      RETURNING id
+    `);
+
+    this.stmtDeleteTMFtsByEntryId = this.db.prepare('DELETE FROM tm_fts WHERE tmEntryId = ?');
+    this.stmtInsertTMFts = this.db.prepare(
+      'INSERT INTO tm_fts (tmId, srcText, tgtText, tmEntryId) VALUES (?, ?, ?, ?)'
+    );
+    this.stmtFindTMEntryByHash = this.db.prepare('SELECT * FROM tm_entries WHERE tmId = ? AND srcHash = ?');
+    this.stmtFindTMEntryMetaByHash = this.db.prepare(
+      'SELECT id, usageCount, createdAt FROM tm_entries WHERE tmId = ? AND srcHash = ?'
+    );
   }
 
   private init() {
@@ -342,6 +400,34 @@ export class CATDatabase {
         this.db.prepare('UPDATE schema_version SET version = 7').run();
       })();
     }
+
+    if (currentVersion < 8) {
+      console.log('[DB] Upgrading schema to v8 (TM unique srcHash per TM)...');
+      this.db.transaction(() => {
+        // Keep the newest row per (tmId, srcHash) before applying unique constraint.
+        this.db.exec(`
+          DELETE FROM tm_entries
+          WHERE id IN (
+            SELECT older.id
+            FROM tm_entries older
+            JOIN tm_entries newer
+              ON older.tmId = newer.tmId
+             AND older.srcHash = newer.srcHash
+             AND (
+               older.updatedAt < newer.updatedAt
+               OR (older.updatedAt = newer.updatedAt AND older.id < newer.id)
+             )
+          );
+        `);
+
+        this.db.exec(`
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_tm_entries_tm_srcHash_unique
+          ON tm_entries(tmId, srcHash);
+        `);
+
+        this.db.prepare('UPDATE schema_version SET version = 8').run();
+      })();
+    }
   }
 
   // Project Repo
@@ -573,16 +659,7 @@ export class CATDatabase {
   }
 
   public upsertTMEntry(entry: TMEntry & { tmId: string }) {
-    this.db.prepare(`
-      INSERT INTO tm_entries (
-        id, tmId, srcHash, matchKey, tagsSignature,
-        sourceTokensJson, targetTokensJson, originSegmentId, usageCount
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        targetTokensJson = excluded.targetTokensJson,
-        updatedAt = (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-        usageCount = usageCount + 1
-    `).run(
+    this.stmtUpsertTMEntry.run(
       entry.id,
       entry.tmId,
       entry.srcHash,
@@ -598,14 +675,57 @@ export class CATDatabase {
     const srcText = entry.sourceTokens.map(t => t.content).join('');
     const tgtText = entry.targetTokens.map(t => t.content).join('');
     
-    this.db.prepare('DELETE FROM tm_fts WHERE tmEntryId = ?').run(entry.id);
-    this.db.prepare('INSERT INTO tm_fts (tmId, srcText, tgtText, tmEntryId) VALUES (?, ?, ?, ?)')
-      .run(entry.tmId, srcText, tgtText, entry.id);
+    this.stmtDeleteTMFtsByEntryId.run(entry.id);
+    this.stmtInsertTMFts.run(entry.tmId, srcText, tgtText, entry.id);
+  }
+
+  public insertTMEntryIfAbsentBySrcHash(entry: TMEntry & { tmId: string }): string | undefined {
+    const row = this.stmtInsertTMEntryIfAbsentBySrcHash.get(
+      entry.id,
+      entry.tmId,
+      entry.srcHash,
+      entry.matchKey,
+      entry.tagsSignature,
+      JSON.stringify(entry.sourceTokens),
+      JSON.stringify(entry.targetTokens),
+      entry.originSegmentId,
+      entry.usageCount
+    ) as { id: string } | undefined;
+
+    return row?.id;
+  }
+
+  public upsertTMEntryBySrcHash(entry: TMEntry & { tmId: string }): string {
+    const row = this.stmtUpsertTMEntryBySrcHash.get(
+      entry.id,
+      entry.tmId,
+      entry.srcHash,
+      entry.matchKey,
+      entry.tagsSignature,
+      JSON.stringify(entry.sourceTokens),
+      JSON.stringify(entry.targetTokens),
+      entry.originSegmentId,
+      entry.usageCount
+    ) as { id: string } | undefined;
+
+    if (!row?.id) {
+      throw new Error('Failed to upsert TM entry by srcHash');
+    }
+
+    return row.id;
+  }
+
+  public insertTMFts(tmId: string, srcText: string, tgtText: string, tmEntryId: string) {
+    this.stmtInsertTMFts.run(tmId, srcText, tgtText, tmEntryId);
+  }
+
+  public replaceTMFts(tmId: string, srcText: string, tgtText: string, tmEntryId: string) {
+    this.stmtDeleteTMFtsByEntryId.run(tmEntryId);
+    this.stmtInsertTMFts.run(tmId, srcText, tgtText, tmEntryId);
   }
 
   public findTMEntryByHash(tmId: string, srcHash: string): TMEntry | undefined {
-    const row = this.db.prepare('SELECT * FROM tm_entries WHERE tmId = ? AND srcHash = ?')
-      .get(tmId, srcHash) as any;
+    const row = this.stmtFindTMEntryByHash.get(tmId, srcHash) as any;
     
     if (!row) return undefined;
     
@@ -614,6 +734,16 @@ export class CATDatabase {
       sourceTokens: JSON.parse(row.sourceTokensJson),
       targetTokens: JSON.parse(row.targetTokensJson)
     };
+  }
+
+  public findTMEntryMetaByHash(
+    tmId: string,
+    srcHash: string
+  ): { id: string; usageCount: number; createdAt: string } | undefined {
+    const row = this.stmtFindTMEntryMetaByHash.get(tmId, srcHash) as
+      | { id: string; usageCount: number; createdAt: string }
+      | undefined;
+    return row;
   }
 
   public getProjectMountedTMs(projectId: number) {
@@ -693,5 +823,9 @@ export class CATDatabase {
 
   public getTM(tmId: string): any | undefined {
     return this.db.prepare('SELECT * FROM tms WHERE id = ?').get(tmId);
+  }
+
+  public close() {
+    this.db.close();
   }
 }

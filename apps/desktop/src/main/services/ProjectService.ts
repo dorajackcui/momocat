@@ -19,6 +19,7 @@ import {
 import { join, basename } from 'path';
 import { copyFileSync, existsSync, mkdirSync, rmSync, unlinkSync } from 'fs';
 import { randomUUID } from 'crypto';
+import { Worker } from 'worker_threads';
 import { TMService } from './TMService';
 import { SegmentService } from './SegmentService';
 
@@ -26,15 +27,17 @@ export class ProjectService {
   private db: CATDatabase;
   private filter: SpreadsheetFilter;
   private projectsDir: string;
+  private dbPath: string;
   private tmService: TMService;
   private segmentService: SegmentService;
   private tagValidator: TagValidator;
   private progressCallbacks: ((data: { type: string; current: number; total: number; message?: string }) => void)[] = [];
 
-  constructor(db: CATDatabase, projectsDir: string) {
+  constructor(db: CATDatabase, projectsDir: string, dbPath: string) {
     this.db = db;
     this.filter = new SpreadsheetFilter();
     this.projectsDir = projectsDir;
+    this.dbPath = dbPath;
     this.tmService = new TMService(this.db);
     this.segmentService = new SegmentService(this.db, this.tmService);
     this.tagValidator = new TagValidator();
@@ -223,8 +226,85 @@ export class ProjectService {
     filePath: string, 
     options: { sourceCol: number; targetCol: number; hasHeader: boolean; overwrite: boolean }
   ): Promise<{ success: number; skipped: number }> {
+    try {
+      return await this.importTMEntriesInWorker(tmId, filePath, options);
+    } catch (error) {
+      console.error('[ProjectService] TM import worker failed, falling back to main thread:', error);
+      return this.importTMEntriesInMainThread(tmId, filePath, options);
+    }
+  }
+
+  private async importTMEntriesInWorker(
+    tmId: string,
+    filePath: string,
+    options: { sourceCol: number; targetCol: number; hasHeader: boolean; overwrite: boolean }
+  ): Promise<{ success: number; skipped: number }> {
+    const workerPath = join(__dirname, 'tmImportWorker.js');
+
+    return new Promise((resolve, reject) => {
+      const worker = new Worker(workerPath, {
+        workerData: {
+          dbPath: this.dbPath,
+          tmId,
+          filePath,
+          options
+        }
+      });
+      let settled = false;
+
+      const fail = (error: unknown) => {
+        if (settled) return;
+        settled = true;
+        reject(error instanceof Error ? error : new Error(String(error)));
+      };
+
+      worker.on('message', (message: any) => {
+        if (!message || typeof message !== 'object') return;
+
+        if (message.type === 'progress') {
+          this.emitProgress(
+            'tm-import',
+            Number(message.current) || 0,
+            Number(message.total) || 0,
+            typeof message.message === 'string' ? message.message : undefined
+          );
+          return;
+        }
+
+        if (message.type === 'done') {
+          if (settled) return;
+          settled = true;
+          resolve(message.result ?? { success: 0, skipped: 0 });
+          return;
+        }
+
+        if (message.type === 'error') {
+          fail(new Error(message.error || 'TM import worker failed'));
+        }
+      });
+
+      worker.on('error', fail);
+      worker.on('exit', (code) => {
+        if (settled) return;
+        if (code === 0) {
+          fail(new Error('TM import worker exited without returning result'));
+          return;
+        }
+        fail(new Error(`TM import worker exited with code ${code}`));
+      });
+    });
+  }
+
+  private async importTMEntriesInMainThread(
+    tmId: string, 
+    filePath: string, 
+    options: { sourceCol: number; targetCol: number; hasHeader: boolean; overwrite: boolean }
+  ): Promise<{ success: number; skipped: number }> {
     const tm = this.db.getTM(tmId);
     if (!tm) throw new Error('Target TM not found');
+
+    // Surface immediate feedback before heavy XLSX parsing starts.
+    this.emitProgress('tm-import', 0, 1, 'Reading spreadsheet...');
 
     const workbook = require('xlsx').readFile(filePath);
     const firstSheetName = workbook.SheetNames[0];
@@ -232,12 +312,20 @@ export class ProjectService {
     const rawData = require('xlsx').utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
 
     const startIndex = options.hasHeader ? 1 : 0;
-    const totalRows = rawData.length - startIndex;
+    const totalRows = Math.max(rawData.length - startIndex, 0);
     let success = 0;
     let skipped = 0;
 
-    // Process in chunks to allow progress reporting and avoid blocking the UI
-    const CHUNK_SIZE = 500;
+    if (totalRows === 0) {
+      return { success, skipped };
+    }
+
+    // Keep chunks moderate to balance throughput and UI responsiveness.
+    const CHUNK_SIZE = totalRows >= 100000 ? 1500 : 800;
+
+    // Emit immediately so UI switches to progress mode right away.
+    this.emitProgress('tm-import', 0, totalRows, 'Preparing import...');
+
     for (let i = startIndex; i < rawData.length; i += CHUNK_SIZE) {
       const end = Math.min(i + CHUNK_SIZE, rawData.length);
       
@@ -260,14 +348,9 @@ export class ProjectService {
           const matchKey = computeMatchKey(sourceTokens);
           const srcHash = computeSrcHash(matchKey, tagsSignature);
 
-          const existing = this.db.findTMEntryByHash(tmId, srcHash);
-          if (existing && !options.overwrite) {
-            skipped++;
-            continue;
-          }
-
-          this.db.upsertTMEntry({
-            id: existing ? existing.id : randomUUID(),
+          const now = new Date().toISOString();
+          const entryBase = {
+            id: randomUUID(),
             tmId,
             projectId: 0,
             srcLang: tm.srcLang,
@@ -277,17 +360,35 @@ export class ProjectService {
             tagsSignature,
             sourceTokens,
             targetTokens,
-            usageCount: existing ? existing.usageCount + 1 : 1,
-            createdAt: existing ? existing.createdAt : new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          });
+            usageCount: 1,
+            createdAt: now,
+            updatedAt: now
+          };
+
+          if (options.overwrite) {
+            const entryId = this.db.upsertTMEntryBySrcHash(entryBase);
+            this.db.replaceTMFts(tmId, sourceText, targetText, entryId);
+            success++;
+            continue;
+          }
+
+          const insertedId = this.db.insertTMEntryIfAbsentBySrcHash(entryBase);
+          if (!insertedId) {
+            skipped++;
+            continue;
+          }
+
+          this.db.insertTMFts(tmId, sourceText, targetText, insertedId);
           success++;
         }
       });
 
-      this.emitProgress('tm-import', end - startIndex, totalRows, `Imported ${end - startIndex} of ${totalRows} rows...`);
-      // Small delay to let the event loop breathe and allow IPC messages to be sent
-      await new Promise(resolve => setTimeout(resolve, 10));
+      const processedRows = end - startIndex;
+      // Emit once per chunk for responsive progress feedback with low overhead.
+      this.emitProgress('tm-import', processedRows, totalRows, `Imported ${processedRows} of ${totalRows} rows...`);
+
+      // Yield every chunk so UI and IPC stay responsive.
+      await new Promise<void>(resolve => setImmediate(resolve));
     }
 
     return { success, skipped };

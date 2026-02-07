@@ -123,7 +123,7 @@ app.whenReady().then(() => {
     // Fallback to in-memory for dev if needed, or just exit
     throw err;
   }
-  const projectService = new ProjectService(db, projectsDir);
+  const projectService = new ProjectService(db, projectsDir, dbPath);
   const jobManager = new JobManager();
 
   // IPC: Project Management

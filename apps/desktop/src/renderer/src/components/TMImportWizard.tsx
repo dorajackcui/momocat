@@ -34,7 +34,9 @@ export function TMImportWizard({ isOpen, onClose, onConfirm, previewData }: TMIm
   const colIndexes = Array.from({ length: maxCols }, (_, i) => i);
 
   if (progress) {
-    const percent = Math.round((progress.current / progress.total) * 100);
+    const hasKnownTotal = progress.total > 0;
+    const safeTotal = hasKnownTotal ? progress.total : 1;
+    const percent = hasKnownTotal ? Math.round((progress.current / safeTotal) * 100) : 0;
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] backdrop-blur-sm">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center animate-in fade-in zoom-in duration-200">
@@ -55,7 +57,7 @@ export function TMImportWizard({ isOpen, onClose, onConfirm, previewData }: TMIm
               </div>
               <div className="text-right">
                 <span className="text-xs font-semibold inline-block text-blue-600">
-                  {percent}%
+                  {hasKnownTotal ? `${percent}%` : 'Preparing'}
                 </span>
               </div>
             </div>
@@ -66,7 +68,9 @@ export function TMImportWizard({ isOpen, onClose, onConfirm, previewData }: TMIm
               />
             </div>
             <p className="text-[10px] text-gray-400 font-medium">
-              {progress.current.toLocaleString()} / {progress.total.toLocaleString()} rows processed
+              {hasKnownTotal
+                ? `${progress.current.toLocaleString()} / ${progress.total.toLocaleString()} rows processed`
+                : 'Initializing import...'}
             </p>
           </div>
         </div>
@@ -200,7 +204,10 @@ export function TMImportWizard({ isOpen, onClose, onConfirm, previewData }: TMIm
             Cancel
           </button>
           <button
-            onClick={() => onConfirm({ hasHeader, sourceCol, targetCol, overwrite })}
+            onClick={() => {
+              setProgress({ current: 0, total: 0, message: 'Starting import...' });
+              onConfirm({ hasHeader, sourceCol, targetCol, overwrite });
+            }}
             className="px-8 py-2.5 bg-blue-600 text-white font-bold text-sm rounded-lg hover:bg-blue-700 shadow-md shadow-blue-200 transition-all hover:-translate-y-0.5"
           >
             Start Import

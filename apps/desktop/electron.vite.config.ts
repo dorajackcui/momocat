@@ -10,6 +10,14 @@ export default defineConfig({
         '@cat/db': resolve('../../packages/db/src'),
       },
     },
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve('src/main/index.ts'),
+          tmImportWorker: resolve('src/main/tmImportWorker.ts')
+        }
+      }
+    },
     plugins: [externalizeDepsPlugin({ exclude: ['@cat/core', '@cat/db'] })],
   },
   preload: {

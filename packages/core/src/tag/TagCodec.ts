@@ -106,6 +106,15 @@ export function serializeTokensToEditorText(tokens: Token[], sourceTokens: Token
 }
 
 export function parseDisplayTextToTokens(text: string, customPatterns?: RegExp[]): Token[] {
+  if (!text) {
+    return [{ type: 'text', content: text }];
+  }
+
+  // Fast path for common plain-text rows.
+  if (!/[<{%]/.test(text)) {
+    return [{ type: 'text', content: text }];
+  }
+
   const patterns = getDisplayTagPatterns(customPatterns);
   const tokens: Token[] = [];
   let cursor = 0;
