@@ -4,6 +4,7 @@ import { TagInsertionUI } from './TagInsertionUI';
 
 interface EditorRowProps {
   segment: Segment;
+  rowNumber: number;
   isActive: boolean;
   onActivate: (id: string) => void;
   onChange: (id: string, value: string) => void;
@@ -12,6 +13,7 @@ interface EditorRowProps {
 
 export const EditorRow: React.FC<EditorRowProps> = ({
   segment,
+  rowNumber,
   isActive,
   onActivate,
   onChange,
@@ -180,6 +182,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
       onClick={() => onActivate(segment.segmentId)}
     >
       <div className="p-4 border-r border-gray-100">
+        <div className="mb-2 text-[10px] font-bold text-gray-400">{rowNumber}</div>
         <textarea
           ref={sourceTextareaRef}
           value={sourceEditorText}

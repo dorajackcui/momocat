@@ -31,6 +31,10 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
   // TM State
   const [mountedTMs, setMountedTMs] = useState<any[]>([]);
   const [allMainTMs, setAllMainTMs] = useState<any[]>([]);
+  const [commitModalFile, setCommitModalFile] = useState<ProjectFile | null>(null);
+  const [commitTmId, setCommitTmId] = useState('');
+  const [matchModalFile, setMatchModalFile] = useState<ProjectFile | null>(null);
+  const [matchTmId, setMatchTmId] = useState('');
 
   // Column Selector State
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
@@ -108,6 +112,48 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
       loadData();
     } catch (e) {
       alert('Failed to commit segments');
+    }
+  };
+
+  const openCommitModal = (file: ProjectFile) => {
+    const mountedMainTMs = mountedTMs.filter(tm => tm.type === 'main');
+    if (mountedMainTMs.length === 0) {
+      alert('No mounted Main TM found. Please mount a Main TM first.');
+      return;
+    }
+    setCommitModalFile(file);
+    setCommitTmId(mountedMainTMs[0].id);
+  };
+
+  const confirmCommitModal = async () => {
+    if (!commitModalFile || !commitTmId) return;
+    await handleCommitFileToMainTM(commitModalFile.id, commitTmId);
+    setCommitModalFile(null);
+    setCommitTmId('');
+  };
+
+  const openMatchModal = (file: ProjectFile) => {
+    if (mountedTMs.length === 0) {
+      alert('No mounted TM found. Please mount a TM first.');
+      return;
+    }
+    setMatchModalFile(file);
+    setMatchTmId(mountedTMs[0].id);
+  };
+
+  const confirmMatchModal = async () => {
+    if (!matchModalFile || !matchTmId) return;
+    try {
+      const result = await window.api.matchFileWithTM(matchModalFile.id, matchTmId);
+      alert(
+        `TM batch matching completed.\nTotal: ${result.total}\nMatched: ${result.matched}\nApplied: ${result.applied}\nSkipped: ${result.skipped}`
+      );
+      await loadData();
+    } catch (error) {
+      alert('TM matching failed.');
+    } finally {
+      setMatchModalFile(null);
+      setMatchTmId('');
     }
   };
 
@@ -283,6 +329,91 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
         onConfirm={handleConfirmImport}
         previewData={previewData}
       />
+      {commitModalFile && (
+        <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center">
+          <div className="w-full max-w-md bg-white rounded-xl border border-gray-200 shadow-2xl p-6">
+            <h3 className="text-base font-bold text-gray-900">Commit File To Main TM</h3>
+            <p className="mt-1 text-xs text-gray-500">
+              Select a Main TM for file: <span className="font-semibold">{commitModalFile.name}</span>
+            </p>
+            <div className="mt-4">
+              <select
+                value={commitTmId}
+                onChange={(e) => setCommitTmId(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm outline-none"
+              >
+                {mountedTMs.filter(tm => tm.type === 'main').map(tm => (
+                  <option key={tm.id} value={tm.id}>
+                    {tm.name} ({tm.srcLang}→{tm.tgtLang})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setCommitModalFile(null);
+                  setCommitTmId('');
+                }}
+                className="px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmCommitModal}
+                disabled={!commitTmId}
+                className="px-4 py-2 text-sm font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-lg disabled:opacity-50"
+              >
+                Commit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {matchModalFile && (
+        <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center">
+          <div className="w-full max-w-md bg-white rounded-xl border border-gray-200 shadow-2xl p-6">
+            <h3 className="text-base font-bold text-gray-900">Batch Match Segments (100%)</h3>
+            <p className="mt-1 text-xs text-gray-500">
+              Select TM for file: <span className="font-semibold">{matchModalFile.name}</span>
+            </p>
+            <div className="mt-4">
+              <select
+                value={matchTmId}
+                onChange={(e) => setMatchTmId(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm outline-none"
+              >
+                {mountedTMs.map(tm => (
+                  <option key={tm.id} value={tm.id}>
+                    {tm.name} ({tm.type})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="mt-2 text-[11px] text-gray-400">
+              Current behavior only applies exact 100% matches, skips already confirmed segments, and sets applied matches to confirmed.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setMatchModalFile(null);
+                  setMatchTmId('');
+                }}
+                className="px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmMatchModal}
+                disabled={!matchTmId}
+                className="px-4 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50"
+              >
+                Run Match
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Sub-header / Breadcrumbs */}
       <div className="px-10 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -511,21 +642,18 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
                         )}
                       </div>
                       <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {/* Commit to Main TM Dropdown logic simplified for v0.2 */}
-                        {mountedTMs.filter(tm => tm.type === 'main').length > 0 && (
-                          <select 
-                            className="px-2 py-1.5 bg-purple-50 text-purple-600 rounded-lg text-[10px] font-bold border-none outline-none cursor-pointer"
-                            onChange={(e) => {
-                              if (e.target.value) handleCommitFileToMainTM(file.id, e.target.value);
-                              e.target.value = "";
-                            }}
-                          >
-                            <option value="">Commit</option>
-                            {mountedTMs.filter(tm => tm.type === 'main').map(tm => (
-                              <option key={tm.id} value={tm.id}>{tm.name}</option>
-                            ))}
-                          </select>
-                        )}
+                        <button
+                          onClick={() => openCommitModal(file)}
+                          className="px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg text-xs font-bold hover:bg-purple-100"
+                        >
+                          Commit
+                        </button>
+                        <button
+                          onClick={() => openMatchModal(file)}
+                          className="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold hover:bg-indigo-100"
+                        >
+                          TM Match
+                        </button>
                         <button
                           onClick={() => handleAITranslateFile(file.id, file.name)}
                           disabled={!!jobRunning}

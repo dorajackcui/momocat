@@ -49,13 +49,13 @@ export class TMService {
       usageCount: 1
     };
 
-    // Check if entry exists in THIS TM
-    const existing = this.db.findTMEntryByHash(workingTM.id, segment.srcHash);
-    if (existing) {
-      entry.id = existing.id;
-    }
-
-    this.db.upsertTMEntry(entry);
+    const entryId = this.db.upsertTMEntryBySrcHash(entry);
+    this.db.replaceTMFts(
+      workingTM.id,
+      serializeTokensToDisplayText(segment.sourceTokens),
+      serializeTokensToDisplayText(segment.targetTokens),
+      entryId
+    );
   }
 
   /**

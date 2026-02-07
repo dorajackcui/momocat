@@ -31,6 +31,7 @@ declare global {
       mountTMToProject: (projectId: number, tmId: string, priority?: number, permission?: string) => Promise<void>;
       unmountTMFromProject: (projectId: number, tmId: string) => Promise<void>;
       commitToMainTM: (tmId: string, fileId: number) => Promise<number>;
+      matchFileWithTM: (fileId: number, tmId: string) => Promise<{ total: number; matched: number; applied: number; skipped: number }>;
       getTMImportPreview: (filePath: string) => Promise<any[][]>;
       importTMEntries: (tmId: string, filePath: string, options: any) => Promise<{ success: number; skipped: number }>;
 

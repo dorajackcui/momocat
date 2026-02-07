@@ -4,7 +4,6 @@ import { EditorRow } from './EditorRow';
 import { useEditor } from '../hooks/useEditor';
 import { TMPanel } from './TMPanel';
 import { ConcordancePanel } from './ConcordancePanel';
-import { ProgressBar } from './ProgressBar';
 
 interface EditorProps {
   fileId: number;
@@ -27,6 +26,9 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
     handleApplyMatch,
     projectId
   } = useEditor({ activeFileId: fileId });
+
+  const totalSegments = segments.length;
+  const confirmedSegments = segments.filter((s) => s.status === 'confirmed').length;
 
   useEffect(() => {
     const loadInfo = async () => {
@@ -120,8 +122,8 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3">
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Progress</span>
-            <div className="w-40">
-              <ProgressBar segments={segments} compact />
+            <div className="px-2.5 py-1 bg-gray-100 rounded-md text-[11px] font-bold text-gray-700">
+              {confirmedSegments}/{totalSegments}
             </div>
           </div>
           <div className="h-4 w-[1px] bg-gray-200" />
@@ -144,10 +146,11 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
               <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2 border-l border-gray-200">Target Translation</div>
             </div>
             
-            {segments.map((segment) => (
+            {segments.map((segment, index) => (
               <EditorRow
                 key={segment.segmentId}
                 segment={segment}
+                rowNumber={segment.meta?.rowRef || index + 1}
                 isActive={segment.segmentId === activeSegmentId}
                 onActivate={setActiveSegmentId}
                 onChange={handleTranslationChange}

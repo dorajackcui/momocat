@@ -402,7 +402,7 @@ export class ProjectService {
     const confirmedSegments = segments.filter(s => s.status === 'confirmed');
     
     for (const seg of confirmedSegments) {
-      this.db.upsertTMEntry({
+      const entryId = this.db.upsertTMEntryBySrcHash({
         id: randomUUID(),
         tmId,
         projectId: 0, // Not strictly used in v5 schema for lookups
@@ -418,8 +418,52 @@ export class ProjectService {
         updatedAt: new Date().toISOString(),
         usageCount: 1
       });
+      this.db.replaceTMFts(
+        tmId,
+        serializeTokensToDisplayText(seg.sourceTokens),
+        serializeTokensToDisplayText(seg.targetTokens),
+        entryId
+      );
     }
     return confirmedSegments.length;
+  }
+
+  public async batchMatchFileWithTM(
+    fileId: number,
+    tmId: string
+  ): Promise<{ total: number; matched: number; applied: number; skipped: number }> {
+    const file = this.db.getFile(fileId);
+    if (!file) throw new Error('File not found');
+
+    const tm = this.db.getTM(tmId);
+    if (!tm) throw new Error('TM not found');
+
+    const segments = this.db.getSegmentsPage(fileId, 0, 1000000);
+    let matched = 0;
+    let applied = 0;
+    let skipped = 0;
+
+    for (const seg of segments) {
+      const match = this.db.findTMEntryByHash(tmId, seg.srcHash);
+      if (!match) continue;
+
+      matched += 1;
+
+      if (seg.status === 'confirmed') {
+        skipped += 1;
+        continue;
+      }
+
+      this.db.updateSegmentTarget(seg.segmentId, match.targetTokens, 'confirmed');
+      applied += 1;
+    }
+
+    return {
+      total: segments.length,
+      matched,
+      applied,
+      skipped
+    };
   }
 
   public async exportFile(fileId: number, outputPath: string, options?: ImportOptions, forceExport: boolean = false) {

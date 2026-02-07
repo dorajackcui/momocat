@@ -220,6 +220,10 @@ app.whenReady().then(() => {
     return projectService.commitToMainTM(tmId, fileId);
   });
 
+  ipcMain.handle('tm-match-file', async (_event, fileId: number, tmId: string) => {
+    return projectService.batchMatchFileWithTM(fileId, tmId);
+  });
+
   ipcMain.handle('tm-import-preview', async (_event, filePath: string) => {
     return projectService.getTMImportPreview(filePath);
   });

@@ -46,6 +46,7 @@ const api = {
     ipcRenderer.invoke('tm-mount', projectId, tmId, priority, permission),
   unmountTMFromProject: (projectId: number, tmId: string) => ipcRenderer.invoke('tm-unmount', projectId, tmId),
   commitToMainTM: (tmId: string, fileId: number) => ipcRenderer.invoke('tm-commit-file', tmId, fileId),
+  matchFileWithTM: (fileId: number, tmId: string) => ipcRenderer.invoke('tm-match-file', fileId, tmId),
   getTMImportPreview: (filePath: string) => ipcRenderer.invoke('tm-import-preview', filePath),
   importTMEntries: (tmId: string, filePath: string, options: any) => ipcRenderer.invoke('tm-import-execute', tmId, filePath, options),
 

@@ -6,6 +6,7 @@ interface UseEditorProps {
 }
 
 export function useEditor({ activeFileId }: UseEditorProps) {
+  const SEGMENT_PAGE_SIZE = 1000;
   const [segments, setSegments] = useState<Segment[]>([]);
   const [projectId, setProjectId] = useState<number | null>(null);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
@@ -43,8 +44,17 @@ export function useEditor({ activeFileId }: UseEditorProps) {
         setProjectId(file.projectId);
       }
 
-      const data = await window.api.getSegments(activeFileId, 0, 1000);
-      const segmentsArray = Array.isArray(data) ? data : [];
+      const segmentsArray: Segment[] = [];
+      let offset = 0;
+      while (true) {
+        const page = await window.api.getSegments(activeFileId, offset, SEGMENT_PAGE_SIZE);
+        const pageArray = Array.isArray(page) ? (page as Segment[]) : [];
+        if (pageArray.length === 0) break;
+        segmentsArray.push(...pageArray);
+        if (pageArray.length < SEGMENT_PAGE_SIZE) break;
+        offset += SEGMENT_PAGE_SIZE;
+      }
+
       const normalized = segmentsArray.map((seg) => ({
         ...(seg as Segment),
         sourceTokens: normalizeTokens((seg as Segment).sourceTokens, `segment ${(seg as Segment).segmentId} source`),
@@ -53,9 +63,10 @@ export function useEditor({ activeFileId }: UseEditorProps) {
         autoFixSuggestions: undefined
       }));
       setSegments(normalized);
-      if (segmentsArray.length > 0 && !activeSegmentId) {
-        setActiveSegmentId(segmentsArray[0].segmentId);
-      }
+      setActiveSegmentId((prev) => {
+        if (prev && normalized.some((seg) => seg.segmentId === prev)) return prev;
+        return normalized.length > 0 ? normalized[0].segmentId : null;
+      });
     } catch (error) {
       console.error('Failed to load editor data:', error);
     } finally {
