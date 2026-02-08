@@ -9,6 +9,7 @@ declare global {
       deleteProject: (projectId: number) => Promise<void>;
       getProject: (projectId: number) => Promise<any>;
       updateProjectPrompt: (projectId: number, aiPrompt: string | null) => Promise<void>;
+      updateProjectAISettings: (projectId: number, aiPrompt: string | null, aiTemperature: number | null) => Promise<void>;
       getProjectFiles: (projectId: number) => Promise<any[]>;
       getFile: (fileId: number) => Promise<any>;
       getFilePreview: (filePath: string) => Promise<any[][]>;

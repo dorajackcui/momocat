@@ -11,13 +11,17 @@ export function CreateProjectModal({ isOpen, onClose, onConfirm, loading }: Crea
   const [name, setName] = useState('');
   const [srcLang, setSrcLang] = useState('en-US');
   const [tgtLang, setTgtLang] = useState('zh-CN');
+  const languageSuggestions = ['en-US', 'zh-CN', 'ja-JP', 'ko-KR', 'fr-FR', 'de-DE', 'es-ES', 'ru-RU'];
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim()) {
-      onConfirm(name.trim(), srcLang, tgtLang);
+    const trimmedName = name.trim();
+    const trimmedSrcLang = srcLang.trim();
+    const trimmedTgtLang = tgtLang.trim();
+    if (trimmedName && trimmedSrcLang && trimmedTgtLang) {
+      onConfirm(trimmedName, trimmedSrcLang, trimmedTgtLang);
     }
   };
 
@@ -53,29 +57,35 @@ export function CreateProjectModal({ isOpen, onClose, onConfirm, loading }: Crea
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Source Language</label>
-              <select
+              <input
+                type="text"
+                list="project-language-suggestions"
                 value={srcLang}
                 onChange={(e) => setSrcLang(e.target.value)}
-                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all appearance-none"
-              >
-                <option value="en-US">English (US)</option>
-                <option value="zh-CN">Chinese (Simplified)</option>
-                <option value="ja-JP">Japanese</option>
-              </select>
+                placeholder="e.g. en-US"
+                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                required
+              />
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Target Language</label>
-              <select
+              <input
+                type="text"
+                list="project-language-suggestions"
                 value={tgtLang}
                 onChange={(e) => setTgtLang(e.target.value)}
-                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all appearance-none"
-              >
-                <option value="zh-CN">Chinese (Simplified)</option>
-                <option value="en-US">English (US)</option>
-                <option value="ja-JP">Japanese</option>
-              </select>
+                placeholder="e.g. zh-CN"
+                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                required
+              />
             </div>
           </div>
+
+          <datalist id="project-language-suggestions">
+            {languageSuggestions.map(code => (
+              <option key={code} value={code} />
+            ))}
+          </datalist>
 
           <div className="pt-4 flex gap-3">
             <button
@@ -87,7 +97,7 @@ export function CreateProjectModal({ isOpen, onClose, onConfirm, loading }: Crea
             </button>
             <button
               type="submit"
-              disabled={loading || !name.trim()}
+              disabled={loading || !name.trim() || !srcLang.trim() || !tgtLang.trim()}
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-lg shadow-blue-200"
             >
               {loading ? 'Creating...' : 'Create Project'}

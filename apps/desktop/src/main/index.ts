@@ -143,6 +143,13 @@ app.whenReady().then(() => {
     return projectService.updateProjectPrompt(projectId, aiPrompt);
   });
 
+  ipcMain.handle(
+    'project-update-ai-settings',
+    async (_event, projectId: number, aiPrompt: string | null, aiTemperature: number | null) => {
+      return projectService.updateProjectAISettings(projectId, aiPrompt, aiTemperature);
+    }
+  );
+
   ipcMain.handle('project-delete', async (_event, projectId: number) => {
     return projectService.deleteProject(projectId);
   });

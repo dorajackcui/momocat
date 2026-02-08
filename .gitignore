@@ -6,6 +6,7 @@ packages/*/dist/
 apps/desktop/out/
 apps/desktop/dist/
 release/
+apps/desktop/dist
 
 # Local App Data & Database
 .cat_data/

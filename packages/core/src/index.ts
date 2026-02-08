@@ -133,6 +133,7 @@ export interface Project {
   srcLang: string;
   tgtLang: string;
   aiPrompt?: string | null;
+  aiTemperature?: number | null;
   createdAt: string;
   updatedAt: string;
 }

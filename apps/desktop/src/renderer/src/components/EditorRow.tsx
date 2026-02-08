@@ -181,8 +181,9 @@ export const EditorRow: React.FC<EditorRowProps> = ({
       } ${hasError ? 'border-l-4 border-l-red-500' : hasWarning ? 'border-l-4 border-l-yellow-400' : ''}`}
       onClick={() => onActivate(segment.segmentId)}
     >
+
       <div className="p-4 border-r border-gray-100">
-        <div className="mb-2 text-[10px] font-bold text-gray-400">{rowNumber}</div>
+        <div className="mb-2 text-[10px] text-gray-400">{rowNumber}</div>
         <textarea
           ref={sourceTextareaRef}
           value={sourceEditorText}

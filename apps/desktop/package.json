@@ -18,12 +18,43 @@
     "productName": "Simple CAT Tool",
     "mac": {
       "target": "dmg",
+      "identity": null,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist"
     },
     "files": [
       "out/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../../node_modules/better-sqlite3",
+        "to": "node_modules/better-sqlite3",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../../node_modules/bindings",
+        "to": "node_modules/bindings",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../../node_modules/file-uri-to-path",
+        "to": "node_modules/file-uri-to-path",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../../node_modules/@electron-toolkit/preload",
+        "to": "node_modules/@electron-toolkit/preload",
+        "filter": [
+          "**/*"
+        ]
+      }
     ]
   },
   "dependencies": {

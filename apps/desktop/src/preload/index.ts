@@ -1,5 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { electronAPI } from '@electron-toolkit/preload';
+
+const electronAPI = {
+  versions: process.versions,
+  platform: process.platform
+};
 
 // Typed IPC Contract
 const api = {
@@ -11,6 +15,8 @@ const api = {
   getProject: (projectId: number) => ipcRenderer.invoke('project-get', projectId),
   updateProjectPrompt: (projectId: number, aiPrompt: string | null) =>
     ipcRenderer.invoke('project-update-prompt', projectId, aiPrompt),
+  updateProjectAISettings: (projectId: number, aiPrompt: string | null, aiTemperature: number | null) =>
+    ipcRenderer.invoke('project-update-ai-settings', projectId, aiPrompt, aiTemperature),
   getProjectFiles: (projectId: number) => ipcRenderer.invoke('project-get-files', projectId),
   getFile: (fileId: number) => ipcRenderer.invoke('file-get', fileId),
   getFilePreview: (filePath: string) => ipcRenderer.invoke('file-get-preview', filePath),

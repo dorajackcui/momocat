@@ -33,6 +33,15 @@ describe('CATDatabase', () => {
     expect(names).toContain('P2');
   });
 
+  it('should update project AI settings', () => {
+    const projectId = db.createProject('AI Settings Project', 'en-US', 'zh-CN');
+    db.updateProjectAISettings(projectId, 'Keep product names untranslated.', 0.7);
+
+    const project = db.getProject(projectId);
+    expect(project?.aiPrompt).toBe('Keep product names untranslated.');
+    expect(project?.aiTemperature).toBe(0.7);
+  });
+
   it('should handle cascading delete (Project -> Files -> Segments)', () => {
     // 1. Create Project
     const projectId = db.createProject('Delete Me', 'en', 'zh');

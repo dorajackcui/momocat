@@ -8,6 +8,24 @@ interface ProjectDetailProps {
   onOpenFile: (fileId: number) => void;
 }
 
+const DEFAULT_AI_TEMPERATURE = 0.2;
+
+function normalizeTemperatureValue(value: number): number {
+  return Math.max(0, Math.min(2, Number(value.toFixed(2))));
+}
+
+function formatTemperature(value: number): string {
+  return normalizeTemperatureValue(value).toString();
+}
+
+function parseTemperatureInput(input: string): number | null {
+  const trimmed = input.trim();
+  if (trimmed.length === 0) return null;
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed)) return null;
+  return normalizeTemperatureValue(parsed);
+}
+
 export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailProps) {
   const [project, setProject] = useState<Project | null>(null);
   const [files, setFiles] = useState<ProjectFile[]>([]);
@@ -15,6 +33,8 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
   const [activeTab, setActiveTab] = useState<'files' | 'tm'>('files');
   const [promptDraft, setPromptDraft] = useState('');
   const [savedPromptValue, setSavedPromptValue] = useState('');
+  const [temperatureDraft, setTemperatureDraft] = useState(formatTemperature(DEFAULT_AI_TEMPERATURE));
+  const [savedTemperatureValue, setSavedTemperatureValue] = useState(formatTemperature(DEFAULT_AI_TEMPERATURE));
   const [promptSavedAt, setPromptSavedAt] = useState<string | null>(null);
   const [savingPrompt, setSavingPrompt] = useState(false);
   const [testSource, setTestSource] = useState('');
@@ -49,8 +69,14 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
       setProject(p);
       setFiles(f);
       const promptValue = p?.aiPrompt || '';
+      const temperatureValue =
+        typeof p?.aiTemperature === 'number' && Number.isFinite(p.aiTemperature)
+          ? formatTemperature(p.aiTemperature)
+          : formatTemperature(DEFAULT_AI_TEMPERATURE);
       setPromptDraft(promptValue);
       setSavedPromptValue(promptValue);
+      setTemperatureDraft(temperatureValue);
+      setSavedTemperatureValue(temperatureValue);
 
       // Load TM info
       const mounted = await window.api.getProjectMountedTMs(projectId);
@@ -248,19 +274,36 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
 
   const handleSavePrompt = async () => {
     if (!project) return;
-    const value = promptDraft.trim();
-    const savedValue = savedPromptValue.trim();
-    if (value === savedValue) {
+    const normalizedPrompt = promptDraft.trim();
+    const normalizedSavedPrompt = savedPromptValue.trim();
+    const parsedTemperature = parseTemperatureInput(temperatureDraft);
+    const savedTemperature = parseTemperatureInput(savedTemperatureValue);
+
+    if (parsedTemperature === null) {
+      alert('Temperature must be a number between 0 and 2.');
       return;
     }
+
+    if (
+      normalizedPrompt === normalizedSavedPrompt
+      && savedTemperature !== null
+      && parsedTemperature === savedTemperature
+    ) {
+      return;
+    }
+
     setSavingPrompt(true);
     try {
-      await window.api.updateProjectPrompt(project.id, value.length > 0 ? value : null);
-      setProject({ ...project, aiPrompt: value.length > 0 ? value : null });
-      setSavedPromptValue(value);
+      const promptValue = normalizedPrompt.length > 0 ? normalizedPrompt : null;
+      await window.api.updateProjectAISettings(project.id, promptValue, parsedTemperature);
+      setProject({ ...project, aiPrompt: promptValue, aiTemperature: parsedTemperature });
+      setSavedPromptValue(normalizedPrompt);
+      const normalizedTemperature = formatTemperature(parsedTemperature);
+      setTemperatureDraft(normalizedTemperature);
+      setSavedTemperatureValue(normalizedTemperature);
       setPromptSavedAt(new Date().toLocaleTimeString());
     } catch (error) {
-      alert('Failed to save AI prompt');
+      alert('Failed to save AI settings');
     } finally {
       setSavingPrompt(false);
     }
@@ -303,7 +346,11 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
 
   const normalizedPromptDraft = promptDraft.trim();
   const normalizedSavedPrompt = savedPromptValue.trim();
-  const hasUnsavedPromptChanges = normalizedPromptDraft !== normalizedSavedPrompt;
+  const normalizedTemperatureDraft = parseTemperatureInput(temperatureDraft);
+  const normalizedSavedTemperature = parseTemperatureInput(savedTemperatureValue);
+  const hasUnsavedTemperatureChanges = normalizedTemperatureDraft !== normalizedSavedTemperature;
+  const hasInvalidTemperature = normalizedTemperatureDraft === null;
+  const hasUnsavedPromptChanges = normalizedPromptDraft !== normalizedSavedPrompt || hasUnsavedTemperatureChanges;
   const hasTestDetails = Boolean(testMeta || testUserMessage || testPromptUsed || testRawResponse);
 
   const handleAITranslateFile = async (fileId: number, fileName: string) => {
@@ -487,7 +534,7 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
             <div className="mb-8 bg-gray-50 border border-gray-200 rounded-xl p-5">
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">AI Prompt</h3>
+                  <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">AI Settings</h3>
                   <div className="mt-1 flex items-center gap-2">
                     <span className={`text-[10px] font-bold uppercase tracking-wider ${hasUnsavedPromptChanges ? 'text-amber-600' : 'text-emerald-600'}`}>
                       {hasUnsavedPromptChanges ? 'Unsaved Changes' : 'Saved'}
@@ -499,13 +546,36 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
                 </div>
                 <button
                   onClick={handleSavePrompt}
-                  disabled={savingPrompt || !hasUnsavedPromptChanges}
+                  disabled={savingPrompt || !hasUnsavedPromptChanges || hasInvalidTemperature}
                   className={`px-3 py-1.5 text-white rounded-lg text-xs font-bold disabled:opacity-50 ${
                     hasUnsavedPromptChanges ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600'
                   }`}
                 >
-                  {savingPrompt ? 'Saving...' : hasUnsavedPromptChanges ? 'Save Prompt' : 'Prompt Saved'}
+                  {savingPrompt ? 'Saving...' : hasUnsavedPromptChanges ? 'Save AI Settings' : 'AI Settings Saved'}
                 </button>
+              </div>
+              <div className="mb-3">
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Temperature</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={2}
+                  step={0.1}
+                  value={temperatureDraft}
+                  onChange={(e) => setTemperatureDraft(e.target.value)}
+                  placeholder="0.2"
+                  className={`w-40 text-sm bg-white border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 ${
+                    hasInvalidTemperature ? 'border-red-300 focus:ring-red-500' : 'border-gray-200 focus:ring-blue-500'
+                  }`}
+                />
+                <p className="mt-1 text-[11px] text-gray-500">
+                  Range `0` to `2`. Lower is more deterministic. Default is `0.2`.
+                </p>
+                {hasInvalidTemperature && (
+                  <p className="mt-1 text-[11px] text-red-500">
+                    Please enter a valid number from `0` to `2`.
+                  </p>
+                )}
               </div>
               <textarea
                 value={promptDraft}

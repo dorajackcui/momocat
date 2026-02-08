@@ -7,6 +7,7 @@ import {
   computeSrcHash
 } from '@cat/core';
 import { randomUUID } from 'crypto';
+import { readFileSync } from 'fs';
 import * as XLSX from 'xlsx';
 
 interface TMImportOptions {
@@ -48,7 +49,7 @@ const run = async () => {
     }
 
     emitProgress(0, 1, 'Reading spreadsheet...');
-    const workbook = XLSX.readFile(input.filePath);
+    const workbook = XLSX.read(readFileSync(input.filePath), { type: 'buffer' });
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
     const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];

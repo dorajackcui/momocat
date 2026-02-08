@@ -428,6 +428,22 @@ export class CATDatabase {
         this.db.prepare('UPDATE schema_version SET version = 8').run();
       })();
     }
+
+    if (currentVersion < 9) {
+      console.log('[DB] Upgrading schema to v9 (Project AI temperature)...');
+      this.db.transaction(() => {
+        const columns = this.db.prepare('PRAGMA table_info(projects)').all() as Array<{ name: string }>;
+        const hasAiTemperature = columns.some(column => column.name === 'aiTemperature');
+
+        if (!hasAiTemperature) {
+          this.db.exec(`
+            ALTER TABLE projects ADD COLUMN aiTemperature REAL;
+          `);
+        }
+
+        this.db.prepare('UPDATE schema_version SET version = 9').run();
+      })();
+    }
   }
 
   // Project Repo
@@ -476,6 +492,12 @@ export class CATDatabase {
     this.db.prepare(
       "UPDATE projects SET aiPrompt = ?, updatedAt = (strftime('%Y-%m-%dT%H:%M:%fZ','now')) WHERE id = ?"
     ).run(aiPrompt, projectId);
+  }
+
+  public updateProjectAISettings(projectId: number, aiPrompt: string | null, aiTemperature: number | null) {
+    this.db.prepare(
+      "UPDATE projects SET aiPrompt = ?, aiTemperature = ?, updatedAt = (strftime('%Y-%m-%dT%H:%M:%fZ','now')) WHERE id = ?"
+    ).run(aiPrompt, aiTemperature, projectId);
   }
 
   public deleteProject(id: number) {

@@ -12,13 +12,13 @@ export default defineConfig({
     },
     build: {
       rollupOptions: {
+        external: ['better-sqlite3'],
         input: {
           index: resolve('src/main/index.ts'),
           tmImportWorker: resolve('src/main/tmImportWorker.ts')
         }
       }
-    },
-    plugins: [externalizeDepsPlugin({ exclude: ['@cat/core', '@cat/db'] })],
+    }
   },
   preload: {
     plugins: [externalizeDepsPlugin({ exclude: ['@cat/core'] })],

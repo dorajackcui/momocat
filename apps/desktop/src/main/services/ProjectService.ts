@@ -17,9 +17,10 @@ import {
   TagValidator
 } from '@cat/core';
 import { join, basename } from 'path';
-import { copyFileSync, existsSync, mkdirSync, rmSync, unlinkSync } from 'fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, unlinkSync } from 'fs';
 import { randomUUID } from 'crypto';
 import { Worker } from 'worker_threads';
+import * as XLSX from 'xlsx';
 import { TMService } from './TMService';
 import { SegmentService } from './SegmentService';
 
@@ -121,6 +122,10 @@ export class ProjectService {
 
   public updateProjectPrompt(projectId: number, aiPrompt: string | null) {
     return this.db.updateProjectPrompt(projectId, aiPrompt);
+  }
+
+  public updateProjectAISettings(projectId: number, aiPrompt: string | null, aiTemperature: number | null) {
+    return this.db.updateProjectAISettings(projectId, aiPrompt, aiTemperature);
   }
 
   public async deleteProject(projectId: number) {
@@ -306,10 +311,10 @@ export class ProjectService {
     // Surface immediate feedback before heavy XLSX parsing starts.
     this.emitProgress('tm-import', 0, 1, 'Reading spreadsheet...');
 
-    const workbook = require('xlsx').readFile(filePath);
+    const workbook = XLSX.read(readFileSync(filePath), { type: 'buffer' });
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
-    const rawData = require('xlsx').utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
 
     const startIndex = options.hasHeader ? 1 : 0;
     const totalRows = Math.max(rawData.length - startIndex, 0);
@@ -563,6 +568,7 @@ export class ProjectService {
     }
 
     const model = options?.model || 'gpt-4o-mini';
+    const temperature = this.resolveTemperature(project.aiTemperature);
     const segments = this.db.getSegmentsPage(fileId, 0, 1000000);
 
     const segmentsToTranslate: typeof segments = [];
@@ -609,6 +615,7 @@ export class ProjectService {
           apiKey,
           model,
           projectPrompt: project.aiPrompt || '',
+          temperature,
           srcLang: project.srcLang,
           tgtLang: project.tgtLang,
           sourceTokens: seg.sourceTokens,
@@ -639,6 +646,7 @@ export class ProjectService {
     }
 
     const model = 'gpt-4o-mini';
+    const temperature = this.resolveTemperature(project.aiTemperature);
     const source = sourceText.trim();
     const promptUsed = this.buildSystemPrompt(project.srcLang, project.tgtLang, project.aiPrompt || '');
     const userMessage = [`Source (${project.srcLang}):`, source].join('\n');
@@ -656,6 +664,7 @@ export class ProjectService {
         apiKey,
         model,
         projectPrompt: project.aiPrompt || '',
+        temperature,
         srcLang: project.srcLang,
         tgtLang: project.tgtLang,
         sourceText: source,
@@ -697,7 +706,7 @@ export class ProjectService {
 
   private buildSystemPrompt(srcLang: string, tgtLang: string, projectPrompt?: string) {
     const base = [
-      'You are a professional translator.',
+      
       `Translate from ${srcLang} to ${tgtLang}.`,
       'The source can include protected markers such as {1>, <2}, {3}.',
       'Never translate, remove, reorder, renumber, or rewrite protected markers.',
@@ -707,14 +716,15 @@ export class ProjectService {
     ].join('\n');
 
     const trimmed = projectPrompt?.trim();
-    if (!trimmed) return base;
-    return `${base}\n\nProject instructions:\n${trimmed}`;
+    if (!trimmed) return `You are a professional translator.\n${base}`;
+    return `${trimmed}\n${base}`;
   }
 
   private async translateSegmentWithOpenAI(params: {
     apiKey: string;
     model: string;
     projectPrompt?: string;
+    temperature?: number;
     srcLang: string;
     tgtLang: string;
     sourceTokens: Token[];
@@ -730,6 +740,7 @@ export class ProjectService {
         apiKey: params.apiKey,
         model: params.model,
         projectPrompt: params.projectPrompt,
+        temperature: params.temperature,
         srcLang: params.srcLang,
         tgtLang: params.tgtLang,
         sourceText: params.sourceText,
@@ -764,6 +775,7 @@ export class ProjectService {
     apiKey: string;
     model: string;
     projectPrompt?: string;
+    temperature?: number;
     srcLang: string;
     tgtLang: string;
     sourceText: string;
@@ -812,7 +824,7 @@ export class ProjectService {
       },
       body: JSON.stringify({
         model: params.model,
-        temperature: 0.2,
+        temperature: this.resolveTemperature(params.temperature),
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userParts.join('\n') }
@@ -858,5 +870,13 @@ export class ProjectService {
     }
 
     return trimmed;
+  }
+
+  private resolveTemperature(value: number | null | undefined): number {
+    if (typeof value !== 'number' || Number.isNaN(value)) {
+      return 0.2;
+    }
+
+    return Math.max(0, Math.min(2, value));
   }
 }
