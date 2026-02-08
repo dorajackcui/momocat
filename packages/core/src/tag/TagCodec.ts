@@ -22,7 +22,8 @@ const pushTextToken = (tokens: Token[], value: string): void => {
 };
 
 const detectTagType = (tagContent: string): TagType => {
-  if (/^<\/[^>]+>$/.test(tagContent)) return 'paired-end';
+  // Allow nameless closing tags like </> as paired-end markers.
+  if (/^<\/[^>]*>$/.test(tagContent)) return 'paired-end';
   if (/^<([^/>]+)>$/.test(tagContent)) return 'paired-start';
   return 'standalone';
 };

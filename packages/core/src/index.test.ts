@@ -130,6 +130,7 @@ describe('Editor Tag Marker Conversion', () => {
   it('should format memoQ-style marker by tag type', () => {
     expect(formatTagAsMemoQMarker('<b>', 1)).toBe('{1>');
     expect(formatTagAsMemoQMarker('</b>', 2)).toBe('<2}');
+    expect(formatTagAsMemoQMarker('</>', 2)).toBe('<2}');
     expect(formatTagAsMemoQMarker('{1}', 3)).toBe('{3}');
   });
 
@@ -144,6 +145,23 @@ describe('Editor Tag Marker Conversion', () => {
 
     const text = serializeTokensToEditorText(targetTokens, sourceTokens);
     expect(text).toBe('Hello {1>World<2}!');
+  });
+
+  it('should serialize nameless closing tags as paired-end markers', () => {
+    const sourceWithNamelessClosingTag = [
+      { type: 'tag', content: '<Yellow>' },
+      { type: 'text', content: '化万相' },
+      { type: 'tag', content: '</>' }
+    ] as any;
+
+    const targetTokens = [
+      { type: 'tag', content: '<Yellow>' },
+      { type: 'text', content: 'Wanxiang' },
+      { type: 'tag', content: '</>' }
+    ] as any;
+
+    const text = serializeTokensToEditorText(targetTokens, sourceWithNamelessClosingTag);
+    expect(text).toBe('{1>Wanxiang<2}');
   });
 
   it('should parse memoQ-style markers back to source tags', () => {
