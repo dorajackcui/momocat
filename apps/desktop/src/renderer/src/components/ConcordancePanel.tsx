@@ -1,28 +1,63 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { TMEntry, serializeTokensToDisplayText } from '@cat/core';
 
 interface ConcordancePanelProps {
   projectId: number;
+  focusSignal?: number;
+  externalQuery?: string;
+  searchSignal?: number;
 }
 
-export const ConcordancePanel: React.FC<ConcordancePanelProps> = ({ projectId }) => {
+export const ConcordancePanel: React.FC<ConcordancePanelProps> = ({
+  projectId,
+  focusSignal = 0,
+  externalQuery = '',
+  searchSignal = 0
+}) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<TMEntry[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const runSearch = useCallback(
+    async (rawQuery: string) => {
+      const trimmedQuery = rawQuery.trim();
+      if (!trimmedQuery) {
+        setResults([]);
+        return;
+      }
+
+      setIsSearching(true);
+      try {
+        const data = await window.api.searchConcordance(projectId, trimmedQuery);
+        setResults(data);
+      } catch (error) {
+        console.error('Search failed:', error);
+      } finally {
+        setIsSearching(false);
+      }
+    },
+    [projectId]
+  );
+
+  useEffect(() => {
+    if (!inputRef.current) return;
+    inputRef.current.focus();
+    inputRef.current.select();
+  }, [focusSignal]);
+
+  useEffect(() => {
+    if (searchSignal <= 0) return;
+    const trimmedQuery = externalQuery.trim();
+    if (!trimmedQuery) return;
+
+    setQuery(trimmedQuery);
+    void runSearch(trimmedQuery);
+  }, [externalQuery, runSearch, searchSignal]);
 
   const handleSearch = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!query.trim()) return;
-
-    setIsSearching(true);
-    try {
-      const data = await window.api.searchConcordance(projectId, query);
-      setResults(data);
-    } catch (error) {
-      console.error('Search failed:', error);
-    } finally {
-      setIsSearching(false);
-    }
+    await runSearch(query);
   };
 
   return (
@@ -31,6 +66,7 @@ export const ConcordancePanel: React.FC<ConcordancePanelProps> = ({ projectId })
         <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Concordance Search</h3>
         <form onSubmit={handleSearch} className="relative">
           <input
+            ref={inputRef}
             type="text"
             className="w-full pl-8 pr-3 py-1.5 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-100 outline-none transition-all"
             placeholder="Search TM..."

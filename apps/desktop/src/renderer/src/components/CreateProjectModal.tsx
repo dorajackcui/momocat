@@ -7,11 +7,24 @@ interface CreateProjectModalProps {
   loading: boolean;
 }
 
+const LANGUAGE_OPTIONS = [
+  { label: 'Chinese (zh-CN)', value: 'zh-CN' },
+  { label: 'English (en-US)', value: 'en-US' },
+  { label: 'Japanese (ja-JP)', value: 'ja-JP' },
+  { label: 'Korean (ko-KR)', value: 'ko-KR' },
+  { label: 'German (de-DE)', value: 'de-DE' },
+  { label: 'French (fr-FR)', value: 'fr-FR' },
+  { label: 'Spanish (es-ES)', value: 'es-ES' },
+  { label: 'Italian (it-IT)', value: 'it-IT' },
+  { label: 'Portuguese (pt-PT)', value: 'pt-PT' },
+  { label: 'Thai (th-TH)', value: 'th-TH' },
+  { label: 'Bahasa Indonesia (id-ID)', value: 'id-ID' }
+] as const;
+
 export function CreateProjectModal({ isOpen, onClose, onConfirm, loading }: CreateProjectModalProps) {
   const [name, setName] = useState('');
-  const [srcLang, setSrcLang] = useState('en-US');
-  const [tgtLang, setTgtLang] = useState('zh-CN');
-  const languageSuggestions = ['en-US', 'zh-CN', 'ja-JP', 'ko-KR', 'fr-FR', 'de-DE', 'es-ES', 'ru-RU'];
+  const [srcLang, setSrcLang] = useState('zh-CN');
+  const [tgtLang, setTgtLang] = useState('en-US');
 
   if (!isOpen) return null;
 
@@ -57,35 +70,35 @@ export function CreateProjectModal({ isOpen, onClose, onConfirm, loading }: Crea
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Source Language</label>
-              <input
-                type="text"
-                list="project-language-suggestions"
+              <select
                 value={srcLang}
                 onChange={(e) => setSrcLang(e.target.value)}
-                placeholder="e.g. en-US"
                 className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                 required
-              />
+              >
+                {LANGUAGE_OPTIONS.map((language) => (
+                  <option key={language.value} value={language.value}>
+                    {language.label}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Target Language</label>
-              <input
-                type="text"
-                list="project-language-suggestions"
+              <select
                 value={tgtLang}
                 onChange={(e) => setTgtLang(e.target.value)}
-                placeholder="e.g. zh-CN"
                 className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                 required
-              />
+              >
+                {LANGUAGE_OPTIONS.map((language) => (
+                  <option key={language.value} value={language.value}>
+                    {language.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
-
-          <datalist id="project-language-suggestions">
-            {languageSuggestions.map(code => (
-              <option key={code} value={code} />
-            ))}
-          </datalist>
 
           <div className="pt-4 flex gap-3">
             <button

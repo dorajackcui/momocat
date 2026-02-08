@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Project, ProjectFile } from '@cat/core';
 import { EditorRow } from './EditorRow';
 import { useEditor } from '../hooks/useEditor';
@@ -12,8 +12,16 @@ interface EditorProps {
 
 export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
   const [activeTab, setActiveTab] = useState<'tm' | 'concordance'>('tm');
+  const [concordanceFocusSignal, setConcordanceFocusSignal] = useState(0);
+  const [concordanceSearchSignal, setConcordanceSearchSignal] = useState(0);
+  const [concordanceQuery, setConcordanceQuery] = useState('');
   const [file, setFile] = useState<ProjectFile | null>(null);
   const [project, setProject] = useState<Project | null>(null);
+  const [sidebarWidth, setSidebarWidth] = useState(320);
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const layoutRef = useRef<HTMLDivElement>(null);
+
+  const SIDEBAR_MIN_WIDTH = 220;
 
   const { 
     segments, 
@@ -45,6 +53,80 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
     };
     loadInfo();
   }, [fileId]);
+
+  useEffect(() => {
+    const getSelectedTextForConcordance = (): string => {
+      const activeElement = document.activeElement;
+      if (activeElement instanceof HTMLTextAreaElement || activeElement instanceof HTMLInputElement) {
+        const start = activeElement.selectionStart ?? 0;
+        const end = activeElement.selectionEnd ?? 0;
+        if (end > start) {
+          return activeElement.value.slice(start, end).replace(/\s+/g, ' ').trim();
+        }
+      }
+
+      const fallbackSelection = window.getSelection()?.toString() ?? '';
+      return fallbackSelection.replace(/\s+/g, ' ').trim();
+    };
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'k') return;
+      e.preventDefault();
+      const selectedText = getSelectedTextForConcordance();
+      setActiveTab('concordance');
+      setConcordanceFocusSignal((value) => value + 1);
+      if (selectedText) {
+        setConcordanceQuery(selectedText);
+        setConcordanceSearchSignal((value) => value + 1);
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
+
+  useEffect(() => {
+    if (!isResizingSidebar) return;
+
+    const onMouseMove = (event: MouseEvent) => {
+      const layoutRect = layoutRef.current?.getBoundingClientRect();
+      if (!layoutRect) return;
+
+      const maxWidth = Math.max(SIDEBAR_MIN_WIDTH, Math.floor(layoutRect.width / 3));
+      const nextWidth = layoutRect.right - event.clientX;
+      const clampedWidth = Math.max(SIDEBAR_MIN_WIDTH, Math.min(nextWidth, maxWidth));
+      setSidebarWidth(clampedWidth);
+    };
+
+    const onMouseUp = () => {
+      setIsResizingSidebar(false);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizingSidebar]);
+
+  useEffect(() => {
+    const clampSidebarByViewport = () => {
+      const layoutWidth = layoutRef.current?.clientWidth;
+      if (!layoutWidth) return;
+      const maxWidth = Math.max(SIDEBAR_MIN_WIDTH, Math.floor(layoutWidth / 3));
+      setSidebarWidth((prev) => Math.max(SIDEBAR_MIN_WIDTH, Math.min(prev, maxWidth)));
+    };
+
+    clampSidebarByViewport();
+    window.addEventListener('resize', clampSidebarByViewport);
+    return () => window.removeEventListener('resize', clampSidebarByViewport);
+  }, []);
 
   const handleExport = async () => {
     if (!file) return;
@@ -136,7 +218,7 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
         </div>
       </header>
 
-      <div className="flex-1 flex min-h-0">
+      <div ref={layoutRef} className="flex-1 flex min-h-0">
         {/* Main Editor Area */}
         <div className="flex-1 overflow-y-auto bg-white custom-scrollbar">
           <div className="min-w-[800px]">
@@ -163,7 +245,22 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
         </div>
 
         {/* Right Sidebar */}
-        <div className="w-80 border-l border-gray-200 bg-gray-50/50 flex flex-col hidden lg:flex">
+        <div
+          className="border-l border-gray-200 bg-gray-50/50 flex-col hidden lg:flex relative"
+          style={{ width: `${sidebarWidth}px` }}
+        >
+          <button
+            type="button"
+            aria-label="Resize sidebar"
+            onMouseDown={(event) => {
+              event.preventDefault();
+              setIsResizingSidebar(true);
+            }}
+            className="absolute -left-1 top-0 h-full w-2 cursor-col-resize group z-20"
+          >
+            <span className="absolute left-1/2 -translate-x-1/2 h-full w-[2px] bg-transparent group-hover:bg-blue-300 transition-colors" />
+          </button>
+
           {/* Tabs */}
           <div className="flex border-b border-gray-200 bg-white">
             <button
@@ -176,6 +273,7 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
             </button>
             <button
               onClick={() => setActiveTab('concordance')}
+              title="Concordance (Ctrl/Cmd+K)"
               className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider transition-colors ${
                 activeTab === 'concordance' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-400 hover:text-gray-600'
               }`}
@@ -189,7 +287,12 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
             {activeTab === 'tm' ? (
               <TMPanel matches={activeMatches} onApply={handleApplyMatch} />
             ) : (
-              <ConcordancePanel projectId={projectId || 0} />
+              <ConcordancePanel
+                projectId={projectId || 0}
+                focusSignal={concordanceFocusSignal}
+                externalQuery={concordanceQuery}
+                searchSignal={concordanceSearchSignal}
+              />
             )}
           </div>
         </div>
