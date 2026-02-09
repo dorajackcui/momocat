@@ -30,7 +30,7 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
   const [project, setProject] = useState<Project | null>(null);
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'files' | 'tm'>('files');
+  const [activeTab, setActiveTab] = useState<'files' | 'tm' | 'tb'>('files');
   const [promptDraft, setPromptDraft] = useState('');
   const [savedPromptValue, setSavedPromptValue] = useState('');
   const [temperatureDraft, setTemperatureDraft] = useState(formatTemperature(DEFAULT_AI_TEMPERATURE));
@@ -51,6 +51,8 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
   // TM State
   const [mountedTMs, setMountedTMs] = useState<any[]>([]);
   const [allMainTMs, setAllMainTMs] = useState<any[]>([]);
+  const [mountedTBs, setMountedTBs] = useState<any[]>([]);
+  const [allTBs, setAllTBs] = useState<any[]>([]);
   const [commitModalFile, setCommitModalFile] = useState<ProjectFile | null>(null);
   const [commitTmId, setCommitTmId] = useState('');
   const [matchModalFile, setMatchModalFile] = useState<ProjectFile | null>(null);
@@ -81,8 +83,12 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
       // Load TM info
       const mounted = await window.api.getProjectMountedTMs(projectId);
       const allMain = await window.api.listTMs('main');
+      const mountedTB = await window.api.getProjectMountedTBs(projectId);
+      const allTB = await window.api.listTBs();
       setMountedTMs(mounted);
       setAllMainTMs(allMain);
+      setMountedTBs(mountedTB);
+      setAllTBs(allTB);
     } catch (error) {
       console.error('Failed to load project details:', error);
     } finally {
@@ -128,6 +134,24 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
       loadData();
     } catch (e) {
       alert('Failed to unmount TM');
+    }
+  };
+
+  const handleMountTB = async (tbId: string) => {
+    try {
+      await window.api.mountTBToProject(projectId, tbId);
+      loadData();
+    } catch (error) {
+      alert('Failed to mount term base');
+    }
+  };
+
+  const handleUnmountTB = async (tbId: string) => {
+    try {
+      await window.api.unmountTBFromProject(projectId, tbId);
+      loadData();
+    } catch (error) {
+      alert('Failed to unmount term base');
     }
   };
 
@@ -502,6 +526,14 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
             >
               Translation Memory
             </button>
+            <button
+              onClick={() => setActiveTab('tb')}
+              className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
+                activeTab === 'tb' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Term Bases
+            </button>
           </div>
 
           <div className="h-6 w-[1px] bg-gray-200" />
@@ -759,7 +791,7 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
               </div>
             )}
           </div>
-        ) : (
+        ) : activeTab === 'tm' ? (
           <div className="max-w-4xl mx-auto space-y-8">
             {/* Working TM Section */}
             <div>
@@ -827,6 +859,67 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
                         </div>
                         <button 
                           onClick={() => handleUnmountTM(tm.id)}
+                          className="p-1.5 text-gray-300 hover:text-red-500 transition-colors"
+                          title="Unmount from Project"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="max-w-4xl mx-auto space-y-8">
+            <div>
+              <div className="flex justify-between items-end mb-4">
+                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider">Mounted Term Bases</h3>
+                <div className="flex items-center gap-2">
+                  <select
+                    className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium outline-none"
+                    onChange={(e) => handleMountTB(e.target.value)}
+                    value=""
+                  >
+                    <option value="" disabled>+ Term Base</option>
+                    {allTBs
+                      .filter(tb => !mountedTBs.find(m => m.id === tb.id))
+                      .map(tb => (
+                        <option key={tb.id} value={tb.id}>{tb.name} ({tb.srcLang}→{tb.tgtLang})</option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+
+              {mountedTBs.length === 0 ? (
+                <div className="bg-gray-50 rounded-xl border border-dashed border-gray-200 p-8 text-center">
+                  <p className="text-xs text-gray-400">No term base mounted to this project yet.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3">
+                  {mountedTBs.map(tb => (
+                    <div key={tb.id} className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-600">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21H5a2 2 0 01-2-2V7a2 2 0 012-2h5l2-2h7a2 2 0 012 2v14a2 2 0 01-2 2z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-gray-800">{tb.name}</h4>
+                          <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">{tb.srcLang} → {tb.tgtLang}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-6">
+                        <div className="text-right">
+                          <span className="block text-sm font-bold text-gray-700">{tb.stats?.entryCount || 0}</span>
+                          <span className="text-[9px] font-bold text-gray-400 uppercase">Terms</span>
+                        </div>
+                        <button
+                          onClick={() => handleUnmountTB(tb.id)}
                           className="p-1.5 text-gray-300 hover:text-red-500 transition-colors"
                           title="Unmount from Project"
                         >

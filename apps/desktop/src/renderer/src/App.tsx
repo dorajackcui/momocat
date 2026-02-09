@@ -3,11 +3,12 @@ import { Dashboard } from './components/Dashboard';
 import { ProjectDetail } from './components/ProjectDetail';
 import { Editor } from './components/Editor';
 import { TMManager } from './components/TMManager';
+import { TBManager } from './components/TBManager';
 import { SettingsModal } from './components/SettingsModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useProjects } from './hooks/useProjects';
 
-type View = 'dashboard' | 'projectDetail' | 'editor' | 'tms';
+type View = 'dashboard' | 'projectDetail' | 'editor' | 'tms' | 'tbs';
 
 function App(): JSX.Element {
   const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -87,7 +88,7 @@ function App(): JSX.Element {
               currentView === 'dashboard' ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-100'
             }`}
           >
-            Dashboard
+            Projects
           </button>
           <button
             onClick={() => setCurrentView('tms')}
@@ -95,7 +96,15 @@ function App(): JSX.Element {
               currentView === 'tms' ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-100'
             }`}
           >
-            TM Manager
+            TM
+          </button>
+          <button
+            onClick={() => setCurrentView('tbs')}
+            className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${
+              currentView === 'tbs' ? 'bg-emerald-50 text-emerald-600' : 'text-gray-500 hover:bg-gray-100'
+            }`}
+          >
+            TB
           </button>
           <div className="h-6 w-[1px] bg-gray-200" />
           <button
@@ -117,8 +126,10 @@ function App(): JSX.Element {
             onCreateProject={handleCreateProject}
             onDeleteProject={deleteProject}
           />
-        ) : (
+        ) : currentView === 'tms' ? (
           <TMManager />
+        ) : (
+          <TBManager />
         )}
       </main>
 

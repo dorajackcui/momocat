@@ -115,6 +115,33 @@ export interface TMEntry {
   usageCount: number;
 }
 
+export interface TermBase {
+  id: string;
+  name: string;
+  srcLang: string;
+  tgtLang: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TBEntry {
+  id: string;
+  tbId: string;
+  srcTerm: string;
+  tgtTerm: string;
+  srcNorm: string;
+  note?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  usageCount: number;
+}
+
+export interface TBMatch extends TBEntry {
+  tbName: string;
+  priority: number;
+  positions: Array<{ start: number; end: number }>;
+}
+
 export interface ProjectFile {
   id: number;
   uuid: string;

@@ -23,6 +23,7 @@ import { Worker } from 'worker_threads';
 import * as XLSX from 'xlsx';
 import { TMService } from './TMService';
 import { SegmentService } from './SegmentService';
+import { TBService } from './TBService';
 
 export class ProjectService {
   private db: CATDatabase;
@@ -30,6 +31,7 @@ export class ProjectService {
   private projectsDir: string;
   private dbPath: string;
   private tmService: TMService;
+  private tbService: TBService;
   private segmentService: SegmentService;
   private tagValidator: TagValidator;
   private progressCallbacks: ((data: { type: string; current: number; total: number; message?: string }) => void)[] = [];
@@ -40,6 +42,7 @@ export class ProjectService {
     this.projectsDir = projectsDir;
     this.dbPath = dbPath;
     this.tmService = new TMService(this.db);
+    this.tbService = new TBService(this.db);
     this.segmentService = new SegmentService(this.db, this.tmService);
     this.tagValidator = new TagValidator();
 
@@ -187,6 +190,10 @@ export class ProjectService {
     return this.tmService.findMatches(projectId, segment);
   }
 
+  public async findTermMatches(projectId: number, segment: Segment) {
+    return this.tbService.findMatches(projectId, segment);
+  }
+
   public async searchConcordance(projectId: number, query: string) {
     return this.db.searchConcordance(projectId, query);
   }
@@ -209,7 +216,11 @@ export class ProjectService {
   }
 
   public async getProjectMountedTMs(projectId: number) {
-    return this.db.getProjectMountedTMs(projectId);
+    const mounted = this.db.getProjectMountedTMs(projectId);
+    return mounted.map(tm => ({
+      ...tm,
+      entryCount: this.db.getTMStats(tm.id).entryCount
+    }));
   }
 
   public async mountTMToProject(projectId: number, tmId: string, priority?: number, permission?: string) {
@@ -218,6 +229,39 @@ export class ProjectService {
 
   public async unmountTMFromProject(projectId: number, tmId: string) {
     return this.db.unmountTMFromProject(projectId, tmId);
+  }
+
+  // TB Management
+  public async listTBs() {
+    const tbs = this.db.listTermBases();
+    return tbs.map(tb => ({
+      ...tb,
+      stats: this.db.getTermBaseStats(tb.id)
+    }));
+  }
+
+  public async createTB(name: string, srcLang: string, tgtLang: string) {
+    return this.db.createTermBase(name, srcLang, tgtLang);
+  }
+
+  public async deleteTB(tbId: string) {
+    return this.db.deleteTermBase(tbId);
+  }
+
+  public async getProjectMountedTBs(projectId: number) {
+    const mounted = this.db.getProjectMountedTermBases(projectId);
+    return mounted.map(tb => ({
+      ...tb,
+      stats: this.db.getTermBaseStats(tb.id)
+    }));
+  }
+
+  public async mountTBToProject(projectId: number, tbId: string, priority?: number) {
+    return this.db.mountTermBaseToProject(projectId, tbId, priority);
+  }
+
+  public async unmountTBFromProject(projectId: number, tbId: string) {
+    return this.db.unmountTermBaseFromProject(projectId, tbId);
   }
 
   // TM Import Logic
@@ -393,6 +437,91 @@ export class ProjectService {
       this.emitProgress('tm-import', processedRows, totalRows, `Imported ${processedRows} of ${totalRows} rows...`);
 
       // Yield every chunk so UI and IPC stay responsive.
+      await new Promise<void>(resolve => setImmediate(resolve));
+    }
+
+    return { success, skipped };
+  }
+
+  // TB Import Logic
+  public async getTBImportPreview(filePath: string): Promise<any[][]> {
+    const filter = new SpreadsheetFilter();
+    return filter.getPreview(filePath);
+  }
+
+  public async importTBEntries(
+    tbId: string,
+    filePath: string,
+    options: { sourceCol: number; targetCol: number; noteCol?: number; hasHeader: boolean; overwrite: boolean }
+  ): Promise<{ success: number; skipped: number }> {
+    const tb = this.db.getTermBase(tbId);
+    if (!tb) throw new Error('Target TB not found');
+
+    this.emitProgress('tb-import', 0, 1, 'Reading spreadsheet...');
+
+    const workbook = XLSX.read(readFileSync(filePath), { type: 'buffer' });
+    const firstSheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[firstSheetName];
+    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+
+    const startIndex = options.hasHeader ? 1 : 0;
+    const totalRows = Math.max(rawData.length - startIndex, 0);
+    let success = 0;
+    let skipped = 0;
+
+    if (totalRows === 0) {
+      return { success, skipped };
+    }
+
+    const CHUNK_SIZE = totalRows >= 100000 ? 1500 : 800;
+    this.emitProgress('tb-import', 0, totalRows, 'Preparing import...');
+
+    for (let i = startIndex; i < rawData.length; i += CHUNK_SIZE) {
+      const end = Math.min(i + CHUNK_SIZE, rawData.length);
+
+      this.db.runInTransaction(() => {
+        for (let j = i; j < end; j++) {
+          const row = rawData[j];
+          if (!row) continue;
+
+          const srcTerm = row[options.sourceCol] !== undefined ? String(row[options.sourceCol]).trim() : '';
+          const tgtTerm = row[options.targetCol] !== undefined ? String(row[options.targetCol]).trim() : '';
+          const note =
+            options.noteCol !== undefined && row[options.noteCol] !== undefined
+              ? String(row[options.noteCol]).trim()
+              : null;
+
+          if (!srcTerm || !tgtTerm) {
+            skipped += 1;
+            continue;
+          }
+
+          const entryBase = {
+            id: randomUUID(),
+            tbId,
+            srcTerm,
+            tgtTerm,
+            note
+          };
+
+          if (options.overwrite) {
+            this.db.upsertTBEntryBySrcTerm(entryBase);
+            success += 1;
+            continue;
+          }
+
+          const insertedId = this.db.insertTBEntryIfAbsentBySrcTerm(entryBase);
+          if (!insertedId) {
+            skipped += 1;
+            continue;
+          }
+
+          success += 1;
+        }
+      });
+
+      const processedRows = end - startIndex;
+      this.emitProgress('tb-import', processedRows, totalRows, `Imported ${processedRows} of ${totalRows} rows...`);
       await new Promise<void>(resolve => setImmediate(resolve));
     }
 

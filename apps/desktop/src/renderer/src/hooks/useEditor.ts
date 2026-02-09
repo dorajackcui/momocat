@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Segment, Token, parseEditorTextToTokens, TMEntry, TagValidator } from '@cat/core';
+import { Segment, Token, parseEditorTextToTokens, serializeTokensToEditorText, TagValidator } from '@cat/core';
 
 interface UseEditorProps {
   activeFileId: number | null;
@@ -11,6 +11,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
   const [projectId, setProjectId] = useState<number | null>(null);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
   const [activeMatches, setActiveMatches] = useState<any[]>([]);
+  const [activeTerms, setActiveTerms] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const tagValidator = new TagValidator();
   
@@ -134,6 +135,22 @@ export function useEditor({ activeFileId }: UseEditorProps) {
     loadMatch();
   }, [activeSegmentId, segments, projectId]);
 
+  // Load TB matches for active segment
+  useEffect(() => {
+    const loadTerms = async () => {
+      if (!activeSegmentId || projectId === null) {
+        setActiveTerms([]);
+        return;
+      }
+      const segment = segments.find(s => s.segmentId === activeSegmentId);
+      if (segment) {
+        const terms = await window.api.getTermMatches(projectId, segment);
+        setActiveTerms(terms || []);
+      }
+    };
+    loadTerms();
+  }, [activeSegmentId, segments, projectId]);
+
   // Actions
   const handleTranslationChange = (segmentId: string, text: string) => {
     try {
@@ -182,6 +199,38 @@ export function useEditor({ activeFileId }: UseEditorProps) {
     }));
   };
 
+  const shouldInsertSpace = (current: string, term: string): boolean => {
+    const left = current.slice(-1);
+    const right = term.slice(0, 1);
+    if (!left || !right) return false;
+    return /[A-Za-z0-9]$/.test(left) && /^[A-Za-z0-9]/.test(right);
+  };
+
+  const handleApplyTerm = (term: string) => {
+    if (!activeSegmentId) return;
+
+    setSegments(prev => prev.map(seg => {
+      if (seg.segmentId !== activeSegmentId) return seg;
+
+      const currentText = serializeTokensToEditorText(seg.targetTokens, seg.sourceTokens)
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n');
+      const spacer = shouldInsertSpace(currentText, term) ? ' ' : '';
+      const nextText = `${currentText}${spacer}${term}`;
+      const nextTokens = parseEditorTextToTokens(nextText, seg.sourceTokens);
+      const nextStatus = nextText.trim() ? 'draft' : 'new';
+
+      window.api.updateSegment(activeSegmentId, nextTokens, nextStatus);
+      return {
+        ...seg,
+        targetTokens: nextTokens,
+        status: nextStatus as any,
+        qaIssues: undefined,
+        autoFixSuggestions: undefined
+      };
+    }));
+  };
+
   const confirmSegment = async (segmentId: string) => {
     const segment = segments.find(s => s.segmentId === segmentId);
     if (!segment) return;
@@ -219,11 +268,13 @@ export function useEditor({ activeFileId }: UseEditorProps) {
     projectId,
     activeSegmentId,
     activeMatches,
+    activeTerms,
     setActiveSegmentId,
     loading,
     handleTranslationChange,
     confirmSegment,
     handleApplyMatch,
+    handleApplyTerm,
     getActiveSegment,
   };
 }

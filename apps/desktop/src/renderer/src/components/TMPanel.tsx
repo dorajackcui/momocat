@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { TMEntry, serializeTokensToDisplayText } from '@cat/core';
+import { TBMatch, TMEntry, serializeTokensToDisplayText } from '@cat/core';
 
-interface TMMatch extends TMEntry {
+export interface TMMatch extends TMEntry {
   similarity: number;
   tmName: string;
   tmType: 'working' | 'main';
@@ -9,10 +9,16 @@ interface TMMatch extends TMEntry {
 
 interface TMPanelProps {
   matches: TMMatch[];
+  termMatches: TBMatch[];
   onApply: (tokens: any[]) => void;
+  onApplyTerm: (term: string) => void;
 }
 
-export const TMPanel: React.FC<TMPanelProps> = ({ matches, onApply }) => {
+type CombinedMatch =
+  | { kind: 'tm'; rank: number; id: string; sourceText: string; targetText: string; payload: TMMatch }
+  | { kind: 'tb'; rank: number; id: string; sourceText: string; targetText: string; payload: TBMatch };
+
+export const TMPanel: React.FC<TMPanelProps> = ({ matches, termMatches, onApply, onApplyTerm }) => {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const truncate = (text: string, limit: number) => {
@@ -24,45 +30,80 @@ export const TMPanel: React.FC<TMPanelProps> = ({ matches, onApply }) => {
     setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  if (!matches || matches.length === 0) {
+  const combined: CombinedMatch[] = [
+    ...(matches || []).map((match, idx) => ({
+      kind: 'tm' as const,
+      rank: match.similarity,
+      id: `tm-${match.id}-${idx}`,
+      sourceText: serializeTokensToDisplayText(match.sourceTokens),
+      targetText: serializeTokensToDisplayText(match.targetTokens),
+      payload: match
+    })),
+    ...(termMatches || []).map((match, idx) => ({
+      kind: 'tb' as const,
+      rank: 99,
+      id: `tb-${match.id}-${idx}`,
+      sourceText: match.srcTerm,
+      targetText: match.tgtTerm,
+      payload: match
+    }))
+  ].sort((a, b) => {
+    if (b.rank !== a.rank) return b.rank - a.rank;
+    if (a.kind !== b.kind) return a.kind === 'tm' ? -1 : 1;
+    return 0;
+  });
+
+  if (combined.length === 0) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-gray-400 p-6 text-center">
         <div className="mb-2 text-2xl">🔍</div>
-        <p className="text-xs">No translation memory matches found for the current segment.</p>
+        <p className="text-xs">No TM/TB matches found for the current segment.</p>
       </div>
     );
   }
 
   return (
     <div className="h-full flex flex-col">
-      <div className="px-2 py-2 border-b border-gray-100">
-        <span className="text-[10px] text-gray-400">{matches.length} matches found</span>
-      </div>
+      {/* <div className="px-2 py-2 border-b border-gray-100">
+        <span className="text-[10px] text-gray-400">{combined.length} matches found</span>
+      </div> */}
 
       <div className="flex-1 overflow-y-auto">
-        {matches.map((match, idx) => {
-          const tmLabel = match.tmType === 'working' ? 'Working TM' : `Main TM: ${match.tmName}`;
-          const scoreBg =
-            match.similarity >= 95 ? 'bg-emerald-600' :
-            match.similarity >= 85 ? 'bg-blue-600' :
-            'bg-amber-600';
-          const key = `${match.id}-${idx}`;
-          const sourceText = serializeTokensToDisplayText(match.sourceTokens);
-          const targetText = serializeTokensToDisplayText(match.targetTokens);
+        {combined.map((item) => {
+          const isTM = item.kind === 'tm';
+          const match = item.payload;
+          const tmLabel = isTM
+            ? (match.tmType === 'working' ? 'Working TM' : `Main TM: ${match.tmName}`)
+            : `Term Base: ${match.tbName}`;
+          const scoreBg = isTM
+            ? (match.similarity >= 95 ? 'bg-emerald-600' : match.similarity >= 85 ? 'bg-blue-600' : 'bg-amber-600')
+            : 'bg-yellow-600';
+          const scoreText = isTM ? String(match.similarity) : 'TB';
+          const key = item.id;
+          const sourceText = item.sourceText;
+          const targetText = item.targetText;
           const isExpanded = !!expanded[key];
           const hasLongSource = sourceText.length > 180;
           const hasLongTarget = targetText.length > 180;
 
           return (
-            <div key={match.id + idx} className="border-b border-gray-100 last:border-b-0">
+            <div key={key} className="border-b border-gray-100 last:border-b-0">
               <div className="px-2 py-1 flex items-center justify-between text-[9px] text-gray-400 bg-gray-50/40">
                 <span className="truncate">{tmLabel}</span>
-                <span>Used {match.usageCount} · {new Date(match.updatedAt).toLocaleDateString()}</span>
+                <span>
+                  {isTM && ` · ${new Date(match.updatedAt).toLocaleDateString()}`}
+                </span>
               </div>
 
               <div
                 className="group grid grid-cols-[1fr_20px_1fr] items-stretch cursor-pointer hover:bg-blue-50/30 transition-colors"
-                onDoubleClick={() => onApply(match.targetTokens)}
+                onDoubleClick={() => {
+                  if (isTM) {
+                    onApply((match as TMMatch).targetTokens);
+                  } else {
+                    onApplyTerm((match as TBMatch).tgtTerm);
+                  }
+                }}
                 title="Double click to apply match"
               >
                 <div className="px-2 py-2 border-r border-gray-100 text-xs text-gray-600 leading-snug">
@@ -81,7 +122,7 @@ export const TMPanel: React.FC<TMPanelProps> = ({ matches, onApply }) => {
                 </div>
 
                 <div className={`${scoreBg} text-white flex items-center justify-center px-[1px]`}>
-                  <span className="text-[8px] font-bold leading-none whitespace-nowrap">{match.similarity}</span>
+                  <span className="text-[8px] font-bold leading-none whitespace-nowrap">{scoreText}</span>
                 </div>
 
                 <div className="px-2 py-2 border-l border-gray-100 text-xs text-gray-800 leading-snug">

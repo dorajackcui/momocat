@@ -41,6 +41,8 @@ const api = {
     ipcRenderer.invoke('tm-get-matches', projectId, segment),
   searchConcordance: (projectId: number, query: string) =>
     ipcRenderer.invoke('tm-concordance', projectId, query),
+  getTermMatches: (projectId: number, segment: any) =>
+    ipcRenderer.invoke('tb-get-matches', projectId, segment),
   
   // TM Management
   listTMs: (type?: 'working' | 'main') => ipcRenderer.invoke('tm-list', type),
@@ -55,6 +57,18 @@ const api = {
   matchFileWithTM: (fileId: number, tmId: string) => ipcRenderer.invoke('tm-match-file', fileId, tmId),
   getTMImportPreview: (filePath: string) => ipcRenderer.invoke('tm-import-preview', filePath),
   importTMEntries: (tmId: string, filePath: string, options: any) => ipcRenderer.invoke('tm-import-execute', tmId, filePath, options),
+
+  // TB Management
+  listTBs: () => ipcRenderer.invoke('tb-list'),
+  createTB: (name: string, srcLang: string, tgtLang: string) =>
+    ipcRenderer.invoke('tb-create', name, srcLang, tgtLang),
+  deleteTB: (tbId: string) => ipcRenderer.invoke('tb-delete', tbId),
+  getProjectMountedTBs: (projectId: number) => ipcRenderer.invoke('tb-project-mounted', projectId),
+  mountTBToProject: (projectId: number, tbId: string, priority?: number) =>
+    ipcRenderer.invoke('tb-mount', projectId, tbId, priority),
+  unmountTBFromProject: (projectId: number, tbId: string) => ipcRenderer.invoke('tb-unmount', projectId, tbId),
+  getTBImportPreview: (filePath: string) => ipcRenderer.invoke('tb-import-preview', filePath),
+  importTBEntries: (tbId: string, filePath: string, options: any) => ipcRenderer.invoke('tb-import-execute', tbId, filePath, options),
 
   // AI Settings & Translation
   getAISettings: () => ipcRenderer.invoke('ai-settings-get'),

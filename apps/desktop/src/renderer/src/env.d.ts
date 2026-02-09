@@ -21,6 +21,7 @@ declare global {
       get100Match: (projectId: number, srcHash: string) => Promise<any>;
       getMatches: (projectId: number, segment: any) => Promise<any[]>;
       searchConcordance: (projectId: number, query: string) => Promise<any[]>;
+      getTermMatches: (projectId: number, segment: any) => Promise<any[]>;
       onSegmentsUpdated: (callback: (data: any) => void) => () => void;
       onProgress: (callback: (data: any) => void) => () => void;
       
@@ -35,6 +36,20 @@ declare global {
       matchFileWithTM: (fileId: number, tmId: string) => Promise<{ total: number; matched: number; applied: number; skipped: number }>;
       getTMImportPreview: (filePath: string) => Promise<any[][]>;
       importTMEntries: (tmId: string, filePath: string, options: any) => Promise<{ success: number; skipped: number }>;
+
+      // TB Management
+      listTBs: () => Promise<any[]>;
+      createTB: (name: string, srcLang: string, tgtLang: string) => Promise<string>;
+      deleteTB: (tbId: string) => Promise<void>;
+      getProjectMountedTBs: (projectId: number) => Promise<any[]>;
+      mountTBToProject: (projectId: number, tbId: string, priority?: number) => Promise<void>;
+      unmountTBFromProject: (projectId: number, tbId: string) => Promise<void>;
+      getTBImportPreview: (filePath: string) => Promise<any[][]>;
+      importTBEntries: (
+        tbId: string,
+        filePath: string,
+        options: { hasHeader: boolean; sourceCol: number; targetCol: number; noteCol?: number; overwrite: boolean }
+      ) => Promise<{ success: number; skipped: number }>;
 
       // AI Settings & Translation
       getAISettings: () => Promise<{ apiKeySet: boolean; apiKeyLast4?: string }>;

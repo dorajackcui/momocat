@@ -27,11 +27,13 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
     segments, 
     activeSegmentId, 
     activeMatches,
+    activeTerms,
     loading, 
     setActiveSegmentId, 
     handleTranslationChange,
     confirmSegment,
     handleApplyMatch,
+    handleApplyTerm,
     projectId
   } = useEditor({ activeFileId: fileId });
 
@@ -269,7 +271,7 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
                 activeTab === 'tm' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-400 hover:text-gray-600'
               }`}
             >
-              TM Match
+              CAT
             </button>
             <button
               onClick={() => setActiveTab('concordance')}
@@ -285,7 +287,12 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
           {/* Panel Content */}
           <div className="flex-1 overflow-y-auto">
             {activeTab === 'tm' ? (
-              <TMPanel matches={activeMatches} onApply={handleApplyMatch} />
+              <TMPanel
+                matches={activeMatches}
+                termMatches={activeTerms}
+                onApply={handleApplyMatch}
+                onApplyTerm={handleApplyTerm}
+              />
             ) : (
               <ConcordancePanel
                 projectId={projectId || 0}

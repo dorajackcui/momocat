@@ -198,6 +198,10 @@ app.whenReady().then(() => {
     return projectService.searchConcordance(projectId, query);
   });
 
+  ipcMain.handle('tb-get-matches', async (_event, projectId: number, segment: any) => {
+    return projectService.findTermMatches(projectId, segment);
+  });
+
   // TM Management IPCs
   ipcMain.handle('tm-list', async (_event, type?: 'working' | 'main') => {
     return projectService.listTMs(type);
@@ -237,6 +241,39 @@ app.whenReady().then(() => {
 
   ipcMain.handle('tm-import-execute', async (_event, tmId: string, filePath: string, options: any) => {
     return projectService.importTMEntries(tmId, filePath, options);
+  });
+
+  // TB Management IPCs
+  ipcMain.handle('tb-list', async () => {
+    return projectService.listTBs();
+  });
+
+  ipcMain.handle('tb-create', async (_event, name: string, srcLang: string, tgtLang: string) => {
+    return projectService.createTB(name, srcLang, tgtLang);
+  });
+
+  ipcMain.handle('tb-delete', async (_event, tbId: string) => {
+    return projectService.deleteTB(tbId);
+  });
+
+  ipcMain.handle('tb-project-mounted', async (_event, projectId: number) => {
+    return projectService.getProjectMountedTBs(projectId);
+  });
+
+  ipcMain.handle('tb-mount', async (_event, projectId: number, tbId: string, priority?: number) => {
+    return projectService.mountTBToProject(projectId, tbId, priority);
+  });
+
+  ipcMain.handle('tb-unmount', async (_event, projectId: number, tbId: string) => {
+    return projectService.unmountTBFromProject(projectId, tbId);
+  });
+
+  ipcMain.handle('tb-import-preview', async (_event, filePath: string) => {
+    return projectService.getTBImportPreview(filePath);
+  });
+
+  ipcMain.handle('tb-import-execute', async (_event, tbId: string, filePath: string, options: any) => {
+    return projectService.importTBEntries(tbId, filePath, options);
   });
 
   // AI Settings & Translation

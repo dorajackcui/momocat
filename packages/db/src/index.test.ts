@@ -189,4 +189,51 @@ describe('CATDatabase', () => {
       expect(allResults[0].srcHash).toBe('h2');
     });
   });
+
+  describe('Term Base System (v10)', () => {
+    it('should create and mount term base to project', () => {
+      const projectId = db.createProject('TB Project', 'en', 'zh');
+      const tbId = db.createTermBase('Product Terms', 'en', 'zh');
+
+      db.mountTermBaseToProject(projectId, tbId, 5);
+
+      const mounted = db.getProjectMountedTermBases(projectId);
+      expect(mounted).toHaveLength(1);
+      expect(mounted[0].id).toBe(tbId);
+      expect(mounted[0].name).toBe('Product Terms');
+    });
+
+    it('should insert and upsert term entries by normalized source term', () => {
+      const tbId = db.createTermBase('Glossary', 'en', 'zh');
+
+      const firstInsert = db.insertTBEntryIfAbsentBySrcTerm({
+        id: 'tb-e1',
+        tbId,
+        srcTerm: 'Power Supply',
+        tgtTerm: '电源'
+      });
+      expect(firstInsert).toBe('tb-e1');
+
+      const duplicateInsert = db.insertTBEntryIfAbsentBySrcTerm({
+        id: 'tb-e2',
+        tbId,
+        srcTerm: ' power   supply ',
+        tgtTerm: '供电'
+      });
+      expect(duplicateInsert).toBeUndefined();
+
+      const upserted = db.upsertTBEntryBySrcTerm({
+        id: 'tb-e3',
+        tbId,
+        srcTerm: 'Power Supply',
+        tgtTerm: '供电模块'
+      });
+      expect(upserted).toBe('tb-e1');
+
+      const entries = db.listTBEntries(tbId, 20, 0);
+      expect(entries).toHaveLength(1);
+      expect(entries[0].srcNorm).toBe('power supply');
+      expect(entries[0].tgtTerm).toBe('供电模块');
+    });
+  });
 });
