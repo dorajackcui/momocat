@@ -10,6 +10,7 @@
 - ✅ **模糊匹配**：70-99% 相似度匹配（Levenshtein 算法）
 - ✅ **Concordance 搜索**：FTS5 全文索引语境检索
 - ✅ **TB 术语库系统**：项目级挂载、术语导入、编辑器实时术语命中
+- ✅ **CAT 混合候选面板**：TM/TB 同列展示，双击直接应用
 - ✅ **QA 验证**：Tag 完整性检查
 - ✅ **自动传播**：重复句自动填充（带撤销）
 - ✅ **虚拟滚动**：支持 10,000+ 段落流畅编辑
@@ -19,6 +20,13 @@
 - ✅ 多文件项目支持
 - ✅ 导入/导出（CSV/XLSX，支持列选择器）
 - ✅ TM 导入向导
+- ✅ TB 导入向导
+
+## 项目进度
+
+- ✅ **v0.2 已完成**：多 TM、Concordance、标签安全编辑、基础 QA、自动传播
+- 🚧 **v0.3 进行中**：术语库（TB）主链路已落地（数据层 / IPC / 管理页 / 编辑器命中）
+- 🧭 **下一步重点**：批量 QA、预翻译策略增强、更多自动化工作流
 
 ## 快速开始
 
@@ -43,16 +51,31 @@ npm run build
 
 ```
 simple-cat-tool/
-├── apps/desktop/          # Electron 主应用
-│   ├── src/main/         # 主进程（服务层）
-│   ├── src/preload/      # 预加载脚本（IPC 桥接）
-│   └── src/renderer/     # 渲染进程（UI 层）
+├── apps/desktop/                         # Electron 主应用
+│   ├── src/main/                         # 主进程（服务层）
+│   │   ├── services/
+│   │   │   ├── ProjectService.ts         # 项目编排（文件、导入导出、TM/TB 管理、AI）
+│   │   │   ├── SegmentService.ts         # 段落更新、确认、传播
+│   │   │   ├── TMService.ts              # TM 入库与匹配
+│   │   │   └── TBService.ts              # TB 术语匹配
+│   │   ├── filters/                      # 文件过滤与解析（CSV/XLSX）
+│   │   ├── tmImportWorker.ts             # TM 导入 Worker
+│   │   └── index.ts                      # IPC 注册与应用启动
+│   ├── src/preload/                      # IPC 桥接（window.api）
+│   └── src/renderer/src/                 # 前端 UI
+│       ├── components/
+│       │   ├── Editor.tsx                # 双栏编辑器 + 右侧 CAT/TM/TB/Concordance 面板
+│       │   ├── ProjectDetail.tsx         # 项目详情（文件、TM 挂载、TB 挂载）
+│       │   ├── TMManager.tsx             # 全局 TM 资产管理
+│       │   └── TBManager.tsx             # 全局 TB 资产管理
+│       └── hooks/
+│           └── useEditor.ts              # 编辑状态、TM/TB 命中、段落更新
 ├── packages/
-│   ├── core/             # 核心业务逻辑
-│   └── db/               # 数据库层（SQLite）
-├── out/                  # 编译输出目录
-├── projects/             # 用户项目数据目录
-└── DOCS/                 # 架构与开发文档
+│   ├── core/                             # 核心类型与算法（Token/Tag/TM/TB）
+│   └── db/                               # SQLite 数据层（迁移 + 仓储）
+├── DOCS/                                 # 架构与开发文档
+├── out/                                  # 编译输出目录
+└── .cat_data/                            # 本地运行数据（DB、项目文件缓存）
 ```
 
 详细说明请查看 [项目结构文档](DOCS/PROJECT_STRUCTURE.md)。
@@ -70,9 +93,10 @@ simple-cat-tool/
 
 ## 当前版本
 
-**v0.2** - 专业能力门槛 ✅
+**v0.3（进行中）**
 
-下一步：v0.3 - 效率飞跃（预翻译、术语库、批量 QA）
+已完成：术语库（TB）核心链路与 CAT 面板集成  
+进行中：批量 QA 与预翻译效率能力
 
 ## License
 
