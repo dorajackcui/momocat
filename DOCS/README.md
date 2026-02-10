@@ -6,8 +6,12 @@
 
 ## 当前有效（Active）
 
+- `DOCS/PROJECT_MAP_QUICKSTART.md`
+  - 新人/回坑快速定位地图（按任务找文件 + 真实调用链路）
 - `DOCS/REFACTOR_PROGRESS_TRACKER_2026-02-10.md`
   - 改造总看板（优先级、待办、DoD、风险、每日进度）
+- `DOCS/REMEDIATION_PLAN_2026-02-10.md`
+  - 本轮 review 整改清单（按 P1/P2/P3 的执行步骤与验收标准）
 - `DOCS/ROADMAP.md`
   - 中短期路线图（与当前改造状态同步）
 - `DOCS/PROJECT_STRUCTURE.md`
@@ -30,7 +34,8 @@
 
 ## 使用建议
 
-1. 日常开发优先看 `REFACTOR_PROGRESS_TRACKER_2026-02-10.md`。
-2. 实现前看 `DEVELOPMENT_GUIDE.md`，避免新增技术债。
-3. 结构或边界有疑问时看 `PROJECT_STRUCTURE.md` + `DATABASE_SCHEMA.md`。
-4. 每次里程碑推进后同步更新 Tracker 和 Roadmap。
+1. 新人或回坑先看 `PROJECT_MAP_QUICKSTART.md`，先建立方向感再进代码。
+2. 日常开发优先看 `REFACTOR_PROGRESS_TRACKER_2026-02-10.md`。
+3. 实现前看 `DEVELOPMENT_GUIDE.md`，避免新增技术债。
+4. 结构或边界有疑问时看 `PROJECT_STRUCTURE.md` + `DATABASE_SCHEMA.md`。
+5. 每次里程碑推进后同步更新 Tracker 和 Roadmap。
