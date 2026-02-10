@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiClient } from '../services/apiClient';
 
 interface TMImportWizardProps {
   isOpen: boolean;
@@ -16,7 +17,7 @@ export function TMImportWizard({ isOpen, onClose, onConfirm, previewData }: TMIm
 
   useEffect(() => {
     if (isOpen) {
-      const unsubscribe = window.api.onProgress((data: any) => {
+      const unsubscribe = apiClient.onProgress((data: any) => {
         if (data.type === 'tm-import') {
           setProgress({ current: data.current, total: data.total, message: data.message });
         }

@@ -1,4 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { IpcRendererEvent } from 'electron';
+import type { DesktopApi } from '../shared/ipc';
 
 const electronAPI = {
   versions: process.versions,
@@ -6,7 +8,7 @@ const electronAPI = {
 };
 
 // Typed IPC Contract
-const api = {
+const api: DesktopApi = {
   // Projects
   listProjects: () => ipcRenderer.invoke('project-list'),
   createProject: (name: string, srcLang: string, tgtLang: string) => 
@@ -21,27 +23,27 @@ const api = {
   getFile: (fileId: number) => ipcRenderer.invoke('file-get', fileId),
   getFilePreview: (filePath: string) => ipcRenderer.invoke('file-get-preview', filePath),
   deleteFile: (fileId: number) => ipcRenderer.invoke('file-delete', fileId),
-  addFileToProject: (projectId: number, filePath: string, options: any) =>
+  addFileToProject: (projectId, filePath, options) =>
     ipcRenderer.invoke('project-add-file', projectId, filePath, options),
 
   // Files & Segments
   getSegments: (fileId: number, offset: number, limit: number) => 
     ipcRenderer.invoke('file-get-segments', fileId, offset, limit),
-  exportFile: (fileId: number, outputPath: string, options?: any, forceExport?: boolean) =>
+  exportFile: (fileId, outputPath, options, forceExport) =>
     ipcRenderer.invoke('file-export', fileId, outputPath, options, forceExport),
   
   // Segments
-  updateSegment: (segmentId: string, targetTokens: any[], status: string) =>
+  updateSegment: (segmentId, targetTokens, status) =>
     ipcRenderer.invoke('segment-update', segmentId, targetTokens, status),
   
   // TM & Search
   get100Match: (projectId: number, srcHash: string) =>
     ipcRenderer.invoke('tm-get-100-match', projectId, srcHash),
-  getMatches: (projectId: number, segment: any) =>
+  getMatches: (projectId, segment) =>
     ipcRenderer.invoke('tm-get-matches', projectId, segment),
   searchConcordance: (projectId: number, query: string) =>
     ipcRenderer.invoke('tm-concordance', projectId, query),
-  getTermMatches: (projectId: number, segment: any) =>
+  getTermMatches: (projectId, segment) =>
     ipcRenderer.invoke('tb-get-matches', projectId, segment),
   
   // TM Management
@@ -56,7 +58,7 @@ const api = {
   commitToMainTM: (tmId: string, fileId: number) => ipcRenderer.invoke('tm-commit-file', tmId, fileId),
   matchFileWithTM: (fileId: number, tmId: string) => ipcRenderer.invoke('tm-match-file', fileId, tmId),
   getTMImportPreview: (filePath: string) => ipcRenderer.invoke('tm-import-preview', filePath),
-  importTMEntries: (tmId: string, filePath: string, options: any) => ipcRenderer.invoke('tm-import-execute', tmId, filePath, options),
+  importTMEntries: (tmId, filePath, options) => ipcRenderer.invoke('tm-import-execute', tmId, filePath, options),
 
   // TB Management
   listTBs: () => ipcRenderer.invoke('tb-list'),
@@ -68,7 +70,7 @@ const api = {
     ipcRenderer.invoke('tb-mount', projectId, tbId, priority),
   unmountTBFromProject: (projectId: number, tbId: string) => ipcRenderer.invoke('tb-unmount', projectId, tbId),
   getTBImportPreview: (filePath: string) => ipcRenderer.invoke('tb-import-preview', filePath),
-  importTBEntries: (tbId: string, filePath: string, options: any) => ipcRenderer.invoke('tb-import-execute', tbId, filePath, options),
+  importTBEntries: (tbId, filePath, options) => ipcRenderer.invoke('tb-import-execute', tbId, filePath, options),
 
   // AI Settings & Translation
   getAISettings: () => ipcRenderer.invoke('ai-settings-get'),
@@ -79,22 +81,22 @@ const api = {
   aiTestTranslate: (projectId: number, sourceText: string) => ipcRenderer.invoke('ai-test-translate', projectId, sourceText),
   
   // Dialogs
-  openFileDialog: (filters: any[]) => ipcRenderer.invoke('dialog-open-file', filters),
-  saveFileDialog: (defaultPath: string, filters: any[]) => ipcRenderer.invoke('dialog-save-file', defaultPath, filters),
+  openFileDialog: (filters) => ipcRenderer.invoke('dialog-open-file', filters),
+  saveFileDialog: (defaultPath, filters) => ipcRenderer.invoke('dialog-save-file', defaultPath, filters),
 
   // Events
-  onSegmentsUpdated: (callback: (data: any) => void) => {
-    const listener = (_event: any, data: any) => callback(data);
+  onSegmentsUpdated: (callback) => {
+    const listener = (_event: IpcRendererEvent, data: Parameters<typeof callback>[0]) => callback(data);
     ipcRenderer.on('segments-updated', listener);
     return () => ipcRenderer.removeListener('segments-updated', listener);
   },
-  onProgress: (callback: (data: any) => void) => {
-    const listener = (_event: any, data: any) => callback(data);
+  onProgress: (callback) => {
+    const listener = (_event: IpcRendererEvent, data: Parameters<typeof callback>[0]) => callback(data);
     ipcRenderer.on('app-progress', listener);
     return () => ipcRenderer.removeListener('app-progress', listener);
   },
-  onJobProgress: (callback: (progress: any) => void) => {
-    const listener = (_event: any, progress: any) => callback(progress);
+  onJobProgress: (callback) => {
+    const listener = (_event: IpcRendererEvent, progress: Parameters<typeof callback>[0]) => callback(progress);
     ipcRenderer.on('job-progress', listener);
     return () => ipcRenderer.removeListener('job-progress', listener);
   }

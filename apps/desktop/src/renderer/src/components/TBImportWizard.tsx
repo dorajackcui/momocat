@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { apiClient } from '../services/apiClient';
 
 interface TBImportWizardProps {
   isOpen: boolean;
@@ -23,7 +24,7 @@ export function TBImportWizard({ isOpen, onClose, onConfirm, previewData }: TBIm
 
   useEffect(() => {
     if (isOpen) {
-      const unsubscribe = window.api.onProgress((data: any) => {
+      const unsubscribe = apiClient.onProgress((data: any) => {
         if (data.type === 'tb-import') {
           setProgress({ current: data.current, total: data.total, message: data.message });
         }

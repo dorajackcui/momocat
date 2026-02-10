@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Segment, Token, parseEditorTextToTokens, serializeTokensToEditorText, TagValidator } from '@cat/core';
+import { apiClient } from '../services/apiClient';
 
 interface UseEditorProps {
   activeFileId: number | null;
@@ -40,7 +41,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
     setLoading(true);
     try {
       // Get file to find projectId
-      const file = await window.api.getFile(activeFileId);
+      const file = await apiClient.getFile(activeFileId);
       if (file) {
         setProjectId(file.projectId);
       }
@@ -48,7 +49,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
       const segmentsArray: Segment[] = [];
       let offset = 0;
       while (true) {
-        const page = await window.api.getSegments(activeFileId, offset, SEGMENT_PAGE_SIZE);
+        const page = await apiClient.getSegments(activeFileId, offset, SEGMENT_PAGE_SIZE);
         const pageArray = Array.isArray(page) ? (page as Segment[]) : [];
         if (pageArray.length === 0) break;
         segmentsArray.push(...pageArray);
@@ -81,7 +82,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
 
   // Listen for real-time updates from backend (Propagation, etc.)
   useEffect(() => {
-    const unsubscribe = window.api.onSegmentsUpdated((data: any) => {
+    const unsubscribe = apiClient.onSegmentsUpdated((data: any) => {
       setSegments(prev => {
         let changed = false;
         const newSegments = prev.map(seg => {
@@ -128,7 +129,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
       }
       const segment = segments.find(s => s.segmentId === activeSegmentId);
       if (segment) {
-        const matches = await window.api.getMatches(projectId, segment); 
+        const matches = await apiClient.getMatches(projectId, segment); 
         setActiveMatches(matches || []);
       }
     };
@@ -144,7 +145,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
       }
       const segment = segments.find(s => s.segmentId === activeSegmentId);
       if (segment) {
-        const terms = await window.api.getTermMatches(projectId, segment);
+        const terms = await apiClient.getTermMatches(projectId, segment);
         setActiveTerms(terms || []);
       }
     };
@@ -168,7 +169,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
             autoFixSuggestions: undefined
           };
           // Async save
-          window.api.updateSegment(segmentId, tokens, updated.status);
+          apiClient.updateSegment(segmentId, tokens, updated.status);
           return updated;
         }
         return seg;
@@ -192,7 +193,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
           qaIssues: undefined,
           autoFixSuggestions: undefined
         };
-        window.api.updateSegment(activeSegmentId, tokens, updated.status);
+        apiClient.updateSegment(activeSegmentId, tokens, updated.status);
         return updated;
       }
       return seg;
@@ -220,7 +221,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
       const nextTokens = parseEditorTextToTokens(nextText, seg.sourceTokens);
       const nextStatus = nextText.trim() ? 'draft' : 'new';
 
-      window.api.updateSegment(activeSegmentId, nextTokens, nextStatus);
+      apiClient.updateSegment(activeSegmentId, nextTokens, nextStatus);
       return {
         ...seg,
         targetTokens: nextTokens,
@@ -252,7 +253,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
     }
 
     // We don't need to manually update state here anymore because the listener will handle it!
-    await window.api.updateSegment(segmentId, segment.targetTokens, 'confirmed');
+    await apiClient.updateSegment(segmentId, segment.targetTokens, 'confirmed');
     
     // Jump to next
     const currentIndex = segments.findIndex(s => s.segmentId === segmentId);

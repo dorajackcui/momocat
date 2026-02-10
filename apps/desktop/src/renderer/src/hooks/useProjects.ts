@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Project } from '@cat/core';
+import { apiClient } from '../services/apiClient';
 
 export interface ProjectWithStats extends Project {
   progress: number;
@@ -11,11 +12,8 @@ export function useProjects() {
   const [loading, setLoading] = useState(false);
 
   const loadProjects = useCallback(async () => {
-    if (!window.api) {
-      return;
-    }
     try {
-      const list = await window.api.listProjects();
+      const list = await apiClient.listProjects();
       setProjects(list);
     } catch (error) {
       console.error('Failed to load projects:', error);
@@ -28,14 +26,10 @@ export function useProjects() {
 
   const createProject = async (name: string, srcLang: string, tgtLang: string) => {
     console.log('[useProjects] createProject triggered:', name);
-    if (!window.api) {
-      alert('Desktop API not found.');
-      return null;
-    }
 
     setLoading(true);
     try {
-      const newProject = await window.api.createProject(name, srcLang, tgtLang);
+      const newProject = await apiClient.createProject(name, srcLang, tgtLang);
       await loadProjects();
       return newProject;
     } catch (error) {
@@ -48,12 +42,11 @@ export function useProjects() {
   };
 
   const deleteProject = async (projectId: number) => {
-    if (!window.api) return;
     if (!confirm('Are you sure you want to delete this project? This will remove all files and translations.')) return;
 
     setLoading(true);
     try {
-      await window.api.deleteProject(projectId);
+      await apiClient.deleteProject(projectId);
       await loadProjects();
     } catch (error) {
       console.error('Failed to delete project:', error);

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TMImportWizard } from './TMImportWizard';
+import { apiClient } from '../services/apiClient';
 
 interface TM {
   id: string;
@@ -27,7 +28,7 @@ export const TMManager: React.FC = () => {
   const loadTMs = async () => {
     setLoading(true);
     try {
-      const data = await window.api.listTMs('main');
+      const data = await apiClient.listTMs('main');
       setTMs(data);
     } catch (e) {
       console.error('Failed to load TMs', e);
@@ -44,7 +45,7 @@ export const TMManager: React.FC = () => {
     e.preventDefault();
     if (!newName) return;
     try {
-      await window.api.createTM(newName, newSrc, newTgt, 'main');
+      await apiClient.createTM(newName, newSrc, newTgt, 'main');
       setNewName('');
       setShowCreate(false);
       loadTMs();
@@ -56,7 +57,7 @@ export const TMManager: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this Main TM? All data inside will be lost.')) return;
     try {
-      await window.api.deleteTM(id);
+      await apiClient.deleteTM(id);
       loadTMs();
     } catch (e) {
       alert('Failed to delete TM');
@@ -64,13 +65,13 @@ export const TMManager: React.FC = () => {
   };
 
   const handleStartImport = async (tmId: string) => {
-    const filePath = await window.api.openFileDialog([
+    const filePath = await apiClient.openFileDialog([
       { name: 'Spreadsheets', extensions: ['xlsx', 'xls', 'csv'] }
     ]);
     if (!filePath) return;
 
     try {
-      const preview = await window.api.getTMImportPreview(filePath);
+      const preview = await apiClient.getTMImportPreview(filePath);
       setImportingTMId(tmId);
       setImportFilePath(filePath);
       setImportPreview(preview);
@@ -85,7 +86,7 @@ export const TMManager: React.FC = () => {
     
     // Don't close wizard yet, it will show progress
     try {
-      const result = await window.api.importTMEntries(importingTMId, importFilePath, options);
+      const result = await apiClient.importTMEntries(importingTMId, importFilePath, options);
       setIsImportWizardOpen(false); // Close it after done
       alert(`Import completed!\nSuccess: ${result.success}\nSkipped: ${result.skipped}`);
       loadTMs();

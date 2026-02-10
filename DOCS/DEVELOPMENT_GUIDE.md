@@ -1,27 +1,60 @@
-# Simple CAT Tool 开发规范指南 (专业演进版)
+# 开发指南（更新于 2026-02-10）
 
-## 1. 核心开发原则 (Golden Rules)
-*   **Token-Aware Logic**: 禁止在业务逻辑中将 Segment 视为纯字符串。必须处理 `Token[]` 序列。
-*   **Reversible Filters**: 任何导入过滤器必须考虑导出时的保真度。优先实现 XLIFF 1.2 过滤器。
-*   **Worker for Heavy Lifting**: 凡是可能导致 UI 掉帧（超过 16ms）的操作，必须放入 Worker 线程。
-*   **Database is Truth**: SQLite 数据库是唯一可信的数据源，JSON 快照仅作为前端渲染缓存。
+本指南面向当前改造阶段，目标是：
 
-## 2. 目录结构规范
-*   `src/main/services/`: 核心业务逻辑（Project, Segment, TM, TB）。
-*   `src/main/filters/`: 文件导入导出解析器。
-*   `src/workers/`: 密集计算任务处理。
-*   `src/renderer/src/components/editor/`: Token-aware 编辑器相关组件。
+1. 保证正确性（避免半状态）
+2. 推进解耦（可替换 TM/TB/AI/DB）
+3. 收紧类型边界（减少 `any`）
 
-## 3. 数据模型规范
-*   **UUID**: 所有 Segment 使用 UUID 标识。
-*   **Hashing**: 使用归一化后的文本生成 Hash，用于重复句识别与传播。
+## 1. 关键原则
 
-## 4. 样式与 UI
-*   使用 **Tailwind CSS** 进行样式开发。
-*   编辑器必须实现 **Tag 胶囊化展示**，禁止用户部分删除 Tag 内容。
+- **Correctness First**：先保证事务与异常补偿，再做结构美化。
+- **Ports First**：主流程优先依赖 `ports.ts` 抽象，不直接依赖具体基础设施实现。
+- **Typed Contract First**：renderer 与 main 的边界通过 shared IPC 类型约束。
+- **Small Safe Steps**：每次改动优先小步可验证，附带测试。
 
-## 5. 新功能开发流程
-1.  **Schema First**: 在 `types.ts` 中定义或更新数据模型。
-2.  **Worker/Service Logic**: 实现后端 Service 或 Worker 逻辑。
-3.  **IPC Contract**: 定义强类型的 IPC 接口。
-4.  **Hook & UI**: 封装 Hook 并开发前端 UI。
+## 2. 分层约定
+
+### 2.1 主进程
+
+- `services/modules/*`：按业务能力拆分模块（文件、TM、TB、AI）
+- `services/adapters/*`：基础设施适配层（当前为 SQLite）
+- `services/ports.ts`：模块依赖的抽象端口（逐步去 `any`）
+- `ProjectService`：应用层编排入口，避免再次变成“超级类”
+
+### 2.2 渲染层
+
+- 页面容器负责编排，复杂业务放入 hooks
+- 统一通过 `apiClient` 调主进程，不在组件中直接访问 `window.api`
+- 领域拆分优先：`files/tm/tb/ai`
+
+### 2.3 共享契约
+
+- IPC 请求/响应类型统一定义在 `apps/desktop/src/shared/ipc.ts`
+- preload 与 renderer 必须复用同一套类型，不允许重复定义
+
+## 3. 正确性要求
+
+1. 段落确认链路（状态更新 + TM + 传播）必须保持事务一致性。
+2. 批量操作必须明确失败语义（全量原子 or 部分成功+明细）。
+3. 导入链路必须有补偿逻辑，且 cleanup 失败要可观测。
+
+## 4. 测试要求
+
+### 必做
+
+- 每次改动至少覆盖一个“成功路径”与一个“失败路径”。
+- 涉及事务/补偿的改动必须新增回滚场景测试。
+
+### 推荐命令
+
+```bash
+npx tsc -p apps/desktop/tsconfig.json --noEmit
+npx vitest run
+```
+
+## 5. 文档维护约定
+
+1. 改造进度统一记录在 `DOCS/REFACTOR_PROGRESS_TRACKER_2026-02-10.md`。
+2. 路线调整同步更新 `DOCS/ROADMAP.md`。
+3. 历史排障文档放入 `DOCS/archive/`，不作为当前规范。

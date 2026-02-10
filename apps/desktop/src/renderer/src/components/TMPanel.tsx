@@ -72,13 +72,15 @@ export const TMPanel: React.FC<TMPanelProps> = ({ matches, termMatches, onApply,
         {combined.map((item) => {
           const isTM = item.kind === 'tm';
           const match = item.payload;
+          const tmMatch = isTM ? (match as TMMatch) : null;
+          const tbMatch = !isTM ? (match as TBMatch) : null;
           const tmLabel = isTM
-            ? (match.tmType === 'working' ? 'Working TM' : `Main TM: ${match.tmName}`)
-            : `Term Base: ${match.tbName}`;
+            ? (tmMatch!.tmType === 'working' ? 'Working TM' : `Main TM: ${tmMatch!.tmName}`)
+            : `Term Base: ${tbMatch!.tbName}`;
           const scoreBg = isTM
-            ? (match.similarity >= 95 ? 'bg-emerald-600' : match.similarity >= 85 ? 'bg-blue-600' : 'bg-amber-600')
+            ? (tmMatch!.similarity >= 95 ? 'bg-emerald-600' : tmMatch!.similarity >= 85 ? 'bg-blue-600' : 'bg-amber-600')
             : 'bg-yellow-600';
-          const scoreText = isTM ? String(match.similarity) : 'TB';
+          const scoreText = isTM ? String(tmMatch!.similarity) : 'TB';
           const key = item.id;
           const sourceText = item.sourceText;
           const targetText = item.targetText;
@@ -90,18 +92,16 @@ export const TMPanel: React.FC<TMPanelProps> = ({ matches, termMatches, onApply,
             <div key={key} className="border-b border-gray-100 last:border-b-0">
               <div className="px-2 py-1 flex items-center justify-between text-[9px] text-gray-400 bg-gray-50/40">
                 <span className="truncate">{tmLabel}</span>
-                <span>
-                  {isTM && ` · ${new Date(match.updatedAt).toLocaleDateString()}`}
-                </span>
+                <span>{isTM && ` · ${new Date(tmMatch!.updatedAt).toLocaleDateString()}`}</span>
               </div>
 
               <div
                 className="group grid grid-cols-[1fr_20px_1fr] items-stretch cursor-pointer hover:bg-blue-50/30 transition-colors"
                 onDoubleClick={() => {
                   if (isTM) {
-                    onApply((match as TMMatch).targetTokens);
+                    onApply(tmMatch!.targetTokens);
                   } else {
-                    onApplyTerm((match as TBMatch).tgtTerm);
+                    onApplyTerm(tbMatch!.tgtTerm);
                   }
                 }}
                 title="Double click to apply match"

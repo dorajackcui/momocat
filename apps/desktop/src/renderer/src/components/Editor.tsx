@@ -4,6 +4,7 @@ import { EditorRow } from './EditorRow';
 import { useEditor } from '../hooks/useEditor';
 import { TMPanel } from './TMPanel';
 import { ConcordancePanel } from './ConcordancePanel';
+import { apiClient } from '../services/apiClient';
 
 interface EditorProps {
   fileId: number;
@@ -43,11 +44,11 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
   useEffect(() => {
     const loadInfo = async () => {
       try {
-        const f = await window.api.getFile(fileId);
+        const f = await apiClient.getFile(fileId);
         if (f) {
           setFile(f);
-          const p = await window.api.getProject(f.projectId);
-          setProject(p);
+          const p = await apiClient.getProject(f.projectId);
+          setProject(p ?? null);
         }
       } catch (e) {
         console.error('Failed to load file info', e);
@@ -134,13 +135,13 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
     if (!file) return;
     
     const defaultPath = file.name.replace(/(\.xlsx|\.csv)$/i, '_translated$1');
-    const outputPath = await window.api.saveFileDialog(defaultPath, [
+    const outputPath = await apiClient.saveFileDialog(defaultPath, [
       { name: 'Spreadsheets', extensions: ['xlsx', 'csv'] }
     ]);
 
     if (outputPath) {
       try {
-        await window.api.exportFile(fileId, outputPath);
+        await apiClient.exportFile(fileId, outputPath);
         alert('Export successful');
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -153,7 +154,7 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
           
           if (forceExport) {
             try {
-              await window.api.exportFile(fileId, outputPath, undefined, true);
+              await apiClient.exportFile(fileId, outputPath, undefined, true);
               alert('Export successful (forced despite QA errors)');
             } catch (forceError) {
               alert('Export failed: ' + (forceError instanceof Error ? forceError.message : String(forceError)));

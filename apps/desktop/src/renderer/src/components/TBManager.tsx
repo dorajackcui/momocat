@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { TBImportWizard } from './TBImportWizard';
+import { apiClient } from '../services/apiClient';
 
 interface TermBase {
   id: string;
@@ -25,7 +26,7 @@ export const TBManager: React.FC = () => {
   const loadTBs = async () => {
     setLoading(true);
     try {
-      const data = await window.api.listTBs();
+      const data = await apiClient.listTBs();
       setTBs(data);
     } catch (error) {
       console.error('Failed to load term bases', error);
@@ -43,7 +44,7 @@ export const TBManager: React.FC = () => {
     if (!newName.trim()) return;
 
     try {
-      await window.api.createTB(newName.trim(), newSrc.trim(), newTgt.trim());
+      await apiClient.createTB(newName.trim(), newSrc.trim(), newTgt.trim());
       setNewName('');
       setShowCreate(false);
       await loadTBs();
@@ -55,7 +56,7 @@ export const TBManager: React.FC = () => {
   const handleDelete = async (tbId: string) => {
     if (!confirm('Are you sure you want to delete this term base? All terms will be deleted.')) return;
     try {
-      await window.api.deleteTB(tbId);
+      await apiClient.deleteTB(tbId);
       await loadTBs();
     } catch (error) {
       alert('Failed to delete term base.');
@@ -63,13 +64,13 @@ export const TBManager: React.FC = () => {
   };
 
   const handleStartImport = async (tbId: string) => {
-    const filePath = await window.api.openFileDialog([
+    const filePath = await apiClient.openFileDialog([
       { name: 'Spreadsheets', extensions: ['xlsx', 'xls', 'csv'] }
     ]);
     if (!filePath) return;
 
     try {
-      const preview = await window.api.getTBImportPreview(filePath);
+      const preview = await apiClient.getTBImportPreview(filePath);
       setImportingTBId(tbId);
       setImportFilePath(filePath);
       setImportPreview(preview);
@@ -83,7 +84,7 @@ export const TBManager: React.FC = () => {
     if (!importingTBId || !importFilePath) return;
 
     try {
-      const result = await window.api.importTBEntries(importingTBId, importFilePath, options);
+      const result = await apiClient.importTBEntries(importingTBId, importFilePath, options);
       setIsImportWizardOpen(false);
       alert(`Import completed!\nSuccess: ${result.success}\nSkipped: ${result.skipped}`);
       await loadTBs();

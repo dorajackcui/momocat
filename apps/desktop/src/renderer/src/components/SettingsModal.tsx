@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { apiClient } from '../services/apiClient';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -20,7 +21,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
     const load = async () => {
       try {
-        const settings = await window.api.getAISettings();
+        const settings = await apiClient.getAISettings();
         if (settings.apiKeySet && settings.apiKeyLast4) {
           setApiKeyHint(`****${settings.apiKeyLast4}`);
         } else {
@@ -46,7 +47,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setLoading(true);
     setStatus(null);
     try {
-      await window.api.setAIKey(key);
+      await apiClient.setAIKey(key);
       setApiKeyHint(`****${key.slice(-4)}`);
       setApiKeyInput('');
       setStatus('API key saved. You can run a test now.');
@@ -62,7 +63,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setStatus(null);
     try {
       const key = apiKeyInput.trim() || undefined;
-      await window.api.testAIConnection(key);
+      await apiClient.testAIConnection(key);
       setStatus('Connection successful.');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -76,7 +77,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setClearing(true);
     setStatus(null);
     try {
-      await window.api.clearAIKey();
+      await apiClient.clearAIKey();
       setApiKeyHint(null);
       setApiKeyInput('');
       setStatus('Saved API key removed.');

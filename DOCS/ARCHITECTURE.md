@@ -1,5 +1,14 @@
 # Simple CAT Tool 架构蓝图 (V2 - 专业演进版)
 
+> 文档定位：中长期架构蓝图（方向性文档）  
+> 最后校准：2026-02-10  
+> 适用范围：描述目标架构与演进方向，不作为当前实现的唯一事实来源。  
+> 若与代码或其他文档冲突，请优先参考：  
+> - `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/DOCS/REFACTOR_PROGRESS_TRACKER_2026-02-10.md`  
+> - `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/DOCS/ROADMAP.md`  
+> - `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/DOCS/PROJECT_STRUCTURE.md`  
+> - `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/DOCS/DATABASE_SCHEMA.md`
+
 本文档定义了从 MVP 向专业级 CAT 工具（如 memoQ, Smartcat）演进的系统架构。
 
 ## 1. 核心设计原则 (The Specter)

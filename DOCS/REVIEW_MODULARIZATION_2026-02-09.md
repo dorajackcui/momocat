@@ -1,5 +1,12 @@
 # 代码审查报告：解耦与模块化评估（2026-02-09）
 
+> 文档定位：代码审查快照（历史评估基线）  
+> 评估日期：2026-02-09  
+> 适用范围：仅反映评估当日代码状态，不代表当前实时实现。  
+> 当前进度与优先级请参考：  
+> - `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/DOCS/REFACTOR_PROGRESS_TRACKER_2026-02-10.md`  
+> - `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/DOCS/ROADMAP.md`
+
 ## 范围
 - 渲染层：编辑器、项目详情、TM/TB 管理页
 - 主进程：IPC 注册、Project/Segment/TM/TB 服务

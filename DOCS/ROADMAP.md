@@ -1,59 +1,72 @@
-# Simple CAT Tool 发展路线图
+# Simple CAT Tool 路线图（更新于 2026-02-10）
 
-## v0.1 可用性地基 (MVP) ✅ 已完成
-- [x] 项目骨架与运行闭环
-- [x] Token/Segment Schema
-- [x] 存储层 (SQLite)
-- [x] SpreadsheetFilter (Excel/CSV)
-- [x] UI (虚拟列表 + Token 编辑器)
-- [x] 最小 QA (Tag 校验)
+## 当前里程碑
 
-## v0.1.1 多文件架构 ✅ 已完成
-- [x] Project → File → Segment 三层架构
-- [x] 多文件项目支持
-- [x] ProjectDetail 视图
-
-## v0.2 专业能力门槛 ✅ 已完成
-- [x] Tag 校验与签名
-- [x] TM 引擎增强（100% 匹配、重复句自动传播）
-- [x] Concordance 搜索
-- [x] 多 TM 架构（Working TM + Main TM）
-- [x] 模糊匹配（Levenshtein 距离，70-99% 相似度）
-- [x] TM 导入向导
-
-## v0.3 效率飞跃 🚀 进行中
-详细规划见 `.kiro/specs/cat-tool-complete-mvp/`
-
-- [ ] 预翻译 Pipeline（TM -> MT -> Draft 自动填充）
-- [ ] 批量 QA 框架（数字、术语、标点一致性检查）
-- [ ] 术语库 (TB)（管理功能 + 编辑器实时高亮建议）
-- [ ] 编辑器生产力（复制源文本、插入所有标签）
-- [ ] 性能优化（支持 50,000+ 段落项目）
-
-## v0.4 生态与性能 📅 计划中
-- [ ] 多格式支持（DOCX、Markdown、JSON、XML）
-- [ ] 插件化 Provider（MT 引擎、分词器、QA 扩展）
-- [ ] 协作功能（云同步、多用户编辑、评论系统）
-- [ ] 高级 TM 功能（上下文匹配、元数据过滤、TM 维护工具）
+- 当前版本：`v0.3`（进行中）
+- 当前主题：**正确性收口 + 解耦改造 + 类型收紧**
+- 进度看板：`DOCS/REFACTOR_PROGRESS_TRACKER_2026-02-10.md`
 
 ---
 
-## 📊 当前状态
+## 已完成里程碑
 
-**版本**: v0.2 ✅  
-**下一步**: v0.3 (效率飞跃)  
-**详细文档**: `.kiro/specs/cat-tool-complete-mvp/`
+### v0.1 可用性地基（已完成）
 
-### 核心功能清单
+- [x] 项目骨架与运行闭环
+- [x] Token/Segment Schema
+- [x] SQLite 存储层
+- [x] CSV/XLSX 导入导出基础能力
+- [x] 双栏编辑器基础交互
+- [x] 基础 Tag QA 校验
 
-✅ Token-based 架构  
-✅ 多 TM 系统（Working TM + Main TM）  
-✅ 模糊匹配（70-99% 相似度）  
-✅ Concordance 搜索（FTS5 全文索引）  
-✅ QA 验证系统（Tag 完整性检查）  
-✅ 传播功能（带撤销支持）  
-✅ 完整 UI（Dashboard、Editor、TM 面板）  
-✅ 虚拟滚动（支持 10,000+ 段落）  
-✅ 导入/导出（CSV/XLSX，列选择器）  
-✅ TM 导入向导  
-✅ 项目-文件-段落三层架构
+### v0.2 专业能力门槛（已完成）
+
+- [x] 多文件项目（Project -> File -> Segment）
+- [x] 多 TM 架构（Working TM + Main TM）
+- [x] 100% 匹配 + 模糊匹配（Levenshtein）
+- [x] Concordance 检索（FTS5）
+- [x] TM 导入向导
+- [x] TB 系统基础链路（管理、挂载、命中）
+
+---
+
+## v0.3（进行中）
+
+### A. 正确性优先（高优先）
+
+- [x] 段落确认链路事务化（confirmed + TM upsert + propagation）
+- [x] 批量 TM 匹配改走统一确认流程
+- [x] 文件导入失败补偿（清理 file 记录和拷贝文件）
+- [ ] 批量匹配挂载边界校验（TM 必须已挂载到项目）
+- [ ] 批量匹配失败语义定稿（全量原子 / 部分成功+失败明细）
+- [ ] 导入补偿 cleanup 失败可观测化
+
+### B. 架构与类型（中优先）
+
+- [x] `ProjectDetail` 首轮容器化拆分（files/tm/tb + hooks）
+- [x] preload/renderer IPC contract 首轮强类型化
+- [ ] 主进程 `ports/adapters/repos` 核心链路去 `any`
+- [ ] 编辑器与管理页核心链路去 `any`
+
+### C. 体验与效率（中低优先）
+
+- [ ] 编辑器候选请求竞态控制（防旧请求覆盖）
+- [ ] 预翻译 pipeline（TM -> AI -> Draft）
+- [ ] 批量 QA 框架（数字/术语/标点）
+
+---
+
+## v0.4（规划中）
+
+- [ ] Provider 插件化（AI/TM/TB 接口可替换）
+- [ ] 更多文件格式（DOCX/Markdown/JSON/XML）
+- [ ] 协作能力（云同步/评论/多用户）
+- [ ] 高级 TM 维护能力（上下文匹配、元数据过滤）
+
+---
+
+## 说明
+
+1. 本路线图只保留“当前仍有效”的计划。
+2. 历史评审意见见：`DOCS/REVIEW_MODULARIZATION_2026-02-09.md`。
+3. 每次迭代优先更新进度看板，再回写路线图状态。

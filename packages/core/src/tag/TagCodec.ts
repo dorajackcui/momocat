@@ -112,7 +112,8 @@ export function parseDisplayTextToTokens(text: string, customPatterns?: RegExp[]
   }
 
   // Fast path for common plain-text rows.
-  if (!/[<{%]/.test(text)) {
+  const hasCustomPatterns = Array.isArray(customPatterns) && customPatterns.length > 0;
+  if (!hasCustomPatterns && !/[<{%]/.test(text)) {
     return [{ type: 'text', content: text }];
   }
 

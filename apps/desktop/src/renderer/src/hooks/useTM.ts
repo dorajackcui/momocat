@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { TMMatch } from '../components/TMPanel';
+import { apiClient } from '../services/apiClient';
 
 export function useTM(activeSegmentSource: string | undefined) {
   const [matches, setMatches] = useState<TMMatch[]>([]);
@@ -14,10 +15,9 @@ export function useTM(activeSegmentSource: string | undefined) {
 
       setLoading(true);
       try {
-        if (window.api) {
-          const results = await window.api.fuzzySearchTM(activeSegmentSource);
-          setMatches(results);
-        }
+        // Legacy hook: no active project context is available here.
+        // Keep behavior non-breaking by returning no matches.
+        setMatches([]);
       } catch (error) {
         console.error('TM search failed:', error);
       } finally {
@@ -30,10 +30,11 @@ export function useTM(activeSegmentSource: string | undefined) {
   }, [activeSegmentSource]);
 
   const updateTM = async (source: string, target: string) => {
+    void source;
+    void target;
     try {
-      if (window.api) {
-        await window.api.updateTM(source, target);
-      }
+      // Deprecated legacy API path retained as a no-op to keep callers stable.
+      await Promise.resolve();
     } catch (error) {
       console.error('Failed to update TM:', error);
     }
@@ -41,9 +42,9 @@ export function useTM(activeSegmentSource: string | undefined) {
 
   const importTM = async () => {
     try {
-      if (!window.api) return 0;
-      const count = await window.api.importTM();
-      return count;
+      // Legacy hook: no longer supported; keep return contract.
+      void apiClient;
+      return 0;
     } catch (error) {
       console.error('Import failed:', error);
       throw error;

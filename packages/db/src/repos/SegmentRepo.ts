@@ -1,0 +1,124 @@
+import Database from 'better-sqlite3';
+import { Segment, SegmentStatus, Token } from '@cat/core';
+
+export class SegmentRepo {
+  constructor(
+    private readonly db: Database.Database,
+    private readonly updateFileStats: (fileId: number) => void
+  ) {}
+
+  public bulkInsertSegments(segments: Segment[]) {
+    console.log(`[DB] Bulk inserting ${segments.length} segments`);
+    const insert = this.db.prepare(`
+      INSERT INTO segments (
+        segmentId, fileId, orderIndex, sourceTokensJson, targetTokensJson,
+        status, tagsSignature, matchKey, srcHash, metaJson
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const transaction = this.db.transaction((segmentRows: Segment[]) => {
+      for (const segment of segmentRows) {
+        insert.run(
+          segment.segmentId,
+          segment.fileId,
+          segment.orderIndex,
+          JSON.stringify(segment.sourceTokens),
+          JSON.stringify(segment.targetTokens),
+          segment.status,
+          segment.tagsSignature,
+          segment.matchKey,
+          segment.srcHash,
+          JSON.stringify(segment.meta)
+        );
+      }
+    });
+
+    transaction(segments);
+
+    if (segments.length > 0) {
+      this.updateFileStats(segments[0].fileId);
+    }
+  }
+
+  public getProjectSegmentsByHash(projectId: number, srcHash: string): Segment[] {
+    const rows = this.db
+      .prepare(`
+      SELECT segments.*
+      FROM segments
+      JOIN files ON segments.fileId = files.id
+      WHERE files.projectId = ? AND segments.srcHash = ?
+    `)
+      .all(projectId, srcHash) as any[];
+
+    return rows.map((row) => this.mapRowToSegment(row));
+  }
+
+  public getSegmentsPage(fileId: number, offset: number, limit: number): Segment[] {
+    const rows = this.db
+      .prepare(`
+      SELECT * FROM segments
+      WHERE fileId = ?
+      ORDER BY orderIndex ASC
+      LIMIT ? OFFSET ?
+    `)
+      .all(fileId, limit, offset) as any[];
+
+    return rows.map((row) => this.mapRowToSegment(row));
+  }
+
+  public getSegment(segmentId: string): Segment | undefined {
+    const row = this.db.prepare('SELECT * FROM segments WHERE segmentId = ?').get(segmentId) as any;
+    if (!row) {
+      return undefined;
+    }
+    return this.mapRowToSegment(row);
+  }
+
+  public updateSegmentTarget(segmentId: string, targetTokens: Token[], status: SegmentStatus) {
+    this.db
+      .prepare(
+        "UPDATE segments SET targetTokensJson = ?, status = ?, updatedAt = (strftime('%Y-%m-%dT%H:%M:%fZ','now')) WHERE segmentId = ?"
+      )
+      .run(JSON.stringify(targetTokens), status, segmentId);
+
+    const row = this.db.prepare('SELECT fileId FROM segments WHERE segmentId = ?').get(segmentId) as
+      | { fileId: number }
+      | undefined;
+
+    if (row) {
+      this.updateFileStats(row.fileId);
+    }
+  }
+
+  public getProjectStats(projectId: number): Array<{ status: string; count: number }> {
+    return this.db
+      .prepare(`
+      SELECT
+        status, COUNT(*) as count
+      FROM segments
+      JOIN files ON segments.fileId = files.id
+      WHERE files.projectId = ?
+      GROUP BY status
+    `)
+      .all(projectId) as Array<{ status: string; count: number }>;
+  }
+
+  public runInTransaction<T>(fn: () => T): T {
+    return this.db.transaction(fn)();
+  }
+
+  private mapRowToSegment(row: any): Segment {
+    return {
+      segmentId: row.segmentId,
+      fileId: row.fileId,
+      orderIndex: row.orderIndex,
+      sourceTokens: JSON.parse(row.sourceTokensJson),
+      targetTokens: JSON.parse(row.targetTokensJson),
+      status: row.status as SegmentStatus,
+      tagsSignature: row.tagsSignature,
+      matchKey: row.matchKey,
+      srcHash: row.srcHash,
+      meta: JSON.parse(row.metaJson)
+    };
+  }
+}

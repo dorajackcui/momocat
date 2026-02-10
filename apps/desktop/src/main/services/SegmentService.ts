@@ -1,8 +1,8 @@
-import { CATDatabase } from '@cat/db';
 import { Segment, SegmentStatus, Token } from '@cat/core';
 import { TMService } from './TMService';
 import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
+import { SegmentRepository, TransactionManager } from './ports';
 
 interface PropagationBatch {
   id: string;
@@ -16,14 +16,16 @@ interface PropagationBatch {
 }
 
 export class SegmentService extends EventEmitter {
-  private db: CATDatabase;
+  private db: SegmentRepository;
   private tmService: TMService;
+  private tx: TransactionManager;
   private lastBatch: PropagationBatch | null = null;
 
-  constructor(db: CATDatabase, tmService: TMService) {
+  constructor(db: SegmentRepository, tmService: TMService, tx: TransactionManager) {
     super();
     this.db = db;
     this.tmService = tmService;
+    this.tx = tx;
   }
 
   public getSegments(fileId: number, offset: number, limit: number): Segment[] {
@@ -34,22 +36,26 @@ export class SegmentService extends EventEmitter {
    * Update segment target and status, ensuring file stats and TM are updated
    */
   public async updateSegment(segmentId: string, targetTokens: Token[], status: SegmentStatus) {
-    // 1. Update the segment in DB
-    this.db.updateSegmentTarget(segmentId, targetTokens, status);
+    const { propagatedIds } = this.tx.runInTransaction(() => {
+      // 1. Update the segment in DB
+      this.db.updateSegmentTarget(segmentId, targetTokens, status);
 
-    let propagatedIds: string[] = [];
+      let propagatedIds: string[] = [];
 
-    // 2. If status is 'confirmed', upsert to TM and propagate
-    if (status === 'confirmed') {
-      const segment = this.db.getSegment(segmentId);
-      if (segment) {
-        const projectId = this.db.getProjectIdByFileId(segment.fileId);
-        if (projectId !== undefined) {
-          await this.tmService.upsertFromConfirmedSegment(projectId, segment);
-          propagatedIds = await this.propagate(projectId, segment);
+      // 2. If status is 'confirmed', upsert to TM and propagate
+      if (status === 'confirmed') {
+        const segment = this.db.getSegment(segmentId);
+        if (segment) {
+          const projectId = this.db.getProjectIdByFileId(segment.fileId);
+          if (projectId !== undefined) {
+            this.tmService.upsertFromConfirmedSegment(projectId, segment);
+            propagatedIds = this.propagate(projectId, segment);
+          }
         }
       }
-    }
+
+      return { propagatedIds };
+    });
 
     // Notify about updates (including propagation)
     this.emit('segments-updated', {
@@ -65,7 +71,7 @@ export class SegmentService extends EventEmitter {
   /**
    * Propagate translation to all identical segments in the project
    */
-  private async propagate(projectId: number, sourceSegment: Segment): Promise<string[]> {
+  private propagate(projectId: number, sourceSegment: Segment): string[] {
     console.log(`[SegmentService] Propagating segment ${sourceSegment.segmentId} in project ${projectId}`);
     
     // Find segments with same srcHash in the same project (across files)

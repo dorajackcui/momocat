@@ -4,10 +4,14 @@ import { existsSync, readFileSync } from 'fs';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { electronApp, optimizer, is } from '@electron-toolkit/utils';
 import { CATDatabase } from '@cat/db';
+import type { Segment, SegmentStatus, Token } from '@cat/core';
 import { ProjectService } from './services/ProjectService';
 import { ImportOptions } from './filters/SpreadsheetFilter';
 import { JobManager } from './JobManager';
 import { randomUUID } from 'crypto';
+import type { TMImportOptions } from './services/modules/TMModule';
+import type { TBImportOptions } from './services/modules/TBModule';
+import type { DialogFileFilter } from '../shared/ipc';
 
 // Disable hardware acceleration to avoid crashes in some environments
 app.disableHardwareAcceleration();
@@ -178,7 +182,7 @@ app.whenReady().then(() => {
     return projectService.getSpreadsheetPreview(filePath);
   });
 
-  ipcMain.handle('segment-update', (_event, segmentId: string, targetTokens: any[], status: any) => {
+  ipcMain.handle('segment-update', (_event, segmentId: string, targetTokens: Token[], status: SegmentStatus) => {
     return projectService.updateSegment(segmentId, targetTokens, status);
   });
 
@@ -190,7 +194,7 @@ app.whenReady().then(() => {
     return projectService.get100Match(projectId, srcHash);
   });
 
-  ipcMain.handle('tm-get-matches', async (_event, projectId: number, segment: any) => {
+  ipcMain.handle('tm-get-matches', async (_event, projectId: number, segment: Segment) => {
     return projectService.findMatches(projectId, segment);
   });
 
@@ -198,7 +202,7 @@ app.whenReady().then(() => {
     return projectService.searchConcordance(projectId, query);
   });
 
-  ipcMain.handle('tb-get-matches', async (_event, projectId: number, segment: any) => {
+  ipcMain.handle('tb-get-matches', async (_event, projectId: number, segment: Segment) => {
     return projectService.findTermMatches(projectId, segment);
   });
 
@@ -239,7 +243,7 @@ app.whenReady().then(() => {
     return projectService.getTMImportPreview(filePath);
   });
 
-  ipcMain.handle('tm-import-execute', async (_event, tmId: string, filePath: string, options: any) => {
+  ipcMain.handle('tm-import-execute', async (_event, tmId: string, filePath: string, options: TMImportOptions) => {
     return projectService.importTMEntries(tmId, filePath, options);
   });
 
@@ -272,7 +276,7 @@ app.whenReady().then(() => {
     return projectService.getTBImportPreview(filePath);
   });
 
-  ipcMain.handle('tb-import-execute', async (_event, tbId: string, filePath: string, options: any) => {
+  ipcMain.handle('tb-import-execute', async (_event, tbId: string, filePath: string, options: TBImportOptions) => {
     return projectService.importTBEntries(tbId, filePath, options);
   });
 
@@ -358,7 +362,7 @@ app.whenReady().then(() => {
   });
 
   // IPC: Dialogs
-  ipcMain.handle('dialog-open-file', async (_event, filters: any[]) => {
+  ipcMain.handle('dialog-open-file', async (_event, filters: DialogFileFilter[]) => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties: ['openFile'],
       filters
@@ -366,7 +370,7 @@ app.whenReady().then(() => {
     return canceled ? null : filePaths[0];
   });
 
-  ipcMain.handle('dialog-save-file', async (_event, defaultPath: string, filters: any[]) => {
+  ipcMain.handle('dialog-save-file', async (_event, defaultPath: string, filters: DialogFileFilter[]) => {
     const { canceled, filePath } = await dialog.showSaveDialog({
       defaultPath,
       filters

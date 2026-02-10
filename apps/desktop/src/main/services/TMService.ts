@@ -1,7 +1,7 @@
-import { CATDatabase } from '@cat/db';
 import { Segment, TMEntry, serializeTokensToDisplayText, serializeTokensToTextOnly } from '@cat/core';
 import { randomUUID } from 'crypto';
 import { distance } from 'fastest-levenshtein';
+import { ProjectRepository, TMRepository } from './ports';
 
 export interface TMMatch extends TMEntry {
   similarity: number;
@@ -10,21 +10,23 @@ export interface TMMatch extends TMEntry {
 }
 
 export class TMService {
-  private db: CATDatabase;
+  private projectRepo: ProjectRepository;
+  private tmRepo: TMRepository;
 
-  constructor(db: CATDatabase) {
-    this.db = db;
+  constructor(projectRepo: ProjectRepository, tmRepo: TMRepository) {
+    this.projectRepo = projectRepo;
+    this.tmRepo = tmRepo;
   }
 
   /**
    * Upsert a segment into the working TM of a project
    */
-  public async upsertFromConfirmedSegment(projectId: number, segment: Segment) {
-    const project = this.db.getProject(projectId);
+  public upsertFromConfirmedSegment(projectId: number, segment: Segment) {
+    const project = this.projectRepo.getProject(projectId);
     if (!project) return;
 
     // V5: Find the writable TM (Working TM) for this project
-    const mountedTMs = this.db.getProjectMountedTMs(projectId);
+    const mountedTMs = this.tmRepo.getProjectMountedTMs(projectId);
     const workingTM = mountedTMs.find(tm => tm.type === 'working' && (tm.permission === 'write' || tm.permission === 'readwrite'));
     
     if (!workingTM) {
@@ -49,8 +51,8 @@ export class TMService {
       usageCount: 1
     };
 
-    const entryId = this.db.upsertTMEntryBySrcHash(entry);
-    this.db.replaceTMFts(
+    const entryId = this.tmRepo.upsertTMEntryBySrcHash(entry);
+    this.tmRepo.replaceTMFts(
       workingTM.id,
       serializeTokensToDisplayText(segment.sourceTokens),
       serializeTokensToDisplayText(segment.targetTokens),
@@ -62,7 +64,7 @@ export class TMService {
    * Find matches for a segment, including 100% and fuzzy matches.
    */
   public async findMatches(projectId: number, segment: Segment): Promise<TMMatch[]> {
-    const mountedTMs = this.db.getProjectMountedTMs(projectId);
+    const mountedTMs = this.tmRepo.getProjectMountedTMs(projectId);
     if (mountedTMs.length === 0) return [];
 
     const sourceText = serializeTokensToDisplayText(segment.sourceTokens);
@@ -72,8 +74,8 @@ export class TMService {
     const seenHashes = new Set<string>();
 
     // 1. First, check for 100% matches (exact hash)
-    for (const tm of mountedTMs) {
-      const match = this.db.findTMEntryByHash(tm.id, segment.srcHash);
+      for (const tm of mountedTMs) {
+      const match = this.tmRepo.findTMEntryByHash(tm.id, segment.srcHash);
       if (match) {
         results.push({
           ...match,
@@ -94,7 +96,7 @@ export class TMService {
       .join(' OR ');
 
     if (query) {
-      const candidates = this.db.searchConcordance(projectId, query);
+      const candidates = this.tmRepo.searchConcordance(projectId, query);
       
       for (const cand of candidates) {
         if (seenHashes.has(cand.srcHash)) continue;
@@ -136,10 +138,10 @@ export class TMService {
 
   public async find100Match(projectId: number, srcHash: string) {
     // Keep for backward compatibility if needed, but UI should move to findMatches
-    const mountedTMs = this.db.getProjectMountedTMs(projectId);
+    const mountedTMs = this.tmRepo.getProjectMountedTMs(projectId);
     
     for (const tm of mountedTMs) {
-      const match = this.db.findTMEntryByHash(tm.id, srcHash);
+      const match = this.tmRepo.findTMEntryByHash(tm.id, srcHash);
       if (match) {
         return {
           ...match,

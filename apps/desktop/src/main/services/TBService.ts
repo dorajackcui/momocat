@@ -1,5 +1,5 @@
-import { CATDatabase } from '@cat/db';
 import { Segment, TBMatch, TBEntry, serializeTokensToDisplayText } from '@cat/core';
+import { TBRepository } from './ports';
 
 type ProjectTBEntry = TBEntry & {
   tbName: string;
@@ -7,9 +7,9 @@ type ProjectTBEntry = TBEntry & {
 };
 
 export class TBService {
-  private db: CATDatabase;
+  private db: TBRepository;
 
-  constructor(db: CATDatabase) {
+  constructor(db: TBRepository) {
     this.db = db;
   }
 

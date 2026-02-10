@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { TMEntry, serializeTokensToDisplayText } from '@cat/core';
+import { apiClient } from '../services/apiClient';
 
 interface ConcordancePanelProps {
   projectId: number;
@@ -29,7 +30,7 @@ export const ConcordancePanel: React.FC<ConcordancePanelProps> = ({
 
       setIsSearching(true);
       try {
-        const data = await window.api.searchConcordance(projectId, trimmedQuery);
+        const data = await apiClient.searchConcordance(projectId, trimmedQuery);
         setResults(data);
       } catch (error) {
         console.error('Search failed:', error);
