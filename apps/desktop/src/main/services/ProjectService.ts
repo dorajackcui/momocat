@@ -4,7 +4,7 @@ import { SpreadsheetFilter, ImportOptions } from '../filters/SpreadsheetFilter';
 import { TMService } from './TMService';
 import { SegmentService } from './SegmentService';
 import { TBService } from './TBService';
-import { AITransport, SpreadsheetGateway } from './ports';
+import { AITransport, SegmentsUpdatedPayload, SpreadsheetGateway, SpreadsheetPreviewData } from './ports';
 import { OpenAITransport } from './providers/OpenAITransport';
 import { ProjectFileModule } from './modules/ProjectFileModule';
 import { TMImportOptions, TMModule } from './modules/TMModule';
@@ -107,7 +107,7 @@ export class ProjectService {
     return this.segmentService.getSegments(fileId, offset, limit);
   }
 
-  public async getSpreadsheetPreview(filePath: string): Promise<any[][]> {
+  public async getSpreadsheetPreview(filePath: string): Promise<SpreadsheetPreviewData> {
     return this.projectModule.getSpreadsheetPreview(filePath);
   }
 
@@ -115,7 +115,7 @@ export class ProjectService {
     return this.segmentService.updateSegment(segmentId, targetTokens, status);
   }
 
-  public onSegmentsUpdated(callback: (data: any) => void) {
+  public onSegmentsUpdated(callback: (data: SegmentsUpdatedPayload) => void) {
     this.segmentService.on('segments-updated', callback);
     return () => this.segmentService.off('segments-updated', callback);
   }
@@ -195,7 +195,7 @@ export class ProjectService {
     return this.tbModule.unmountTBFromProject(projectId, tbId);
   }
 
-  public async getTMImportPreview(filePath: string): Promise<any[][]> {
+  public async getTMImportPreview(filePath: string): Promise<SpreadsheetPreviewData> {
     return this.tmModule.getTMImportPreview(filePath);
   }
 
@@ -203,7 +203,7 @@ export class ProjectService {
     return this.tmModule.importTMEntries(tmId, filePath, options);
   }
 
-  public async getTBImportPreview(filePath: string): Promise<any[][]> {
+  public async getTBImportPreview(filePath: string): Promise<SpreadsheetPreviewData> {
     return this.tbModule.getTBImportPreview(filePath);
   }
 

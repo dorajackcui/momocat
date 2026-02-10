@@ -25,6 +25,15 @@ export interface MountedTMRecord extends TMRecord {
   isEnabled: number;
 }
 
+export type TMEntryWithTmId = TMEntry & {
+  tmId: string;
+};
+
+export type TMConcordanceRecord = TMEntryWithTmId & {
+  tmName: string;
+  tmType: TMType;
+};
+
 export interface TBRecord {
   id: string;
   name: string;
@@ -68,7 +77,7 @@ export interface TMRepository {
   insertTMFts(tmId: string, srcText: string, tgtText: string, tmEntryId: string): void;
   replaceTMFts(tmId: string, srcText: string, tgtText: string, tmEntryId: string): void;
   findTMEntryByHash(tmId: string, srcHash: string): TMEntry | undefined;
-  searchConcordance(projectId: number, query: string): TMEntry[];
+  searchConcordance(projectId: number, query: string): TMEntryWithTmId[];
 
   listTMs(type?: TMType): TMRecord[];
   createTM(name: string, srcLang: string, tgtLang: string, type: TMType): string;
@@ -144,6 +153,13 @@ export interface ProgressPayload {
   current: number;
   total: number;
   message?: string;
+}
+
+export interface SegmentsUpdatedPayload {
+  segmentId: string;
+  targetTokens: Token[];
+  status: SegmentStatus;
+  propagatedIds: string[];
 }
 
 export type ProgressEmitter = (payload: ProgressPayload) => void;

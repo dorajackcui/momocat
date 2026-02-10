@@ -6,6 +6,7 @@ interface EditorRowProps {
   segment: Segment;
   rowNumber: number;
   isActive: boolean;
+  saveError?: string;
   onActivate: (id: string) => void;
   onChange: (id: string, value: string) => void;
   onConfirm: (id: string) => void;
@@ -15,6 +16,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
   segment,
   rowNumber,
   isActive,
+  saveError,
   onActivate,
   onChange,
   onConfirm
@@ -276,6 +278,13 @@ export const EditorRow: React.FC<EditorRowProps> = ({
                 {issue.message}
               </div>
             ))}
+          </div>
+        )}
+
+        {saveError && (
+          <div className="mt-2 text-[10px] flex items-center gap-1.5 px-2 py-0.5 rounded bg-red-50 text-red-600">
+            <span className="font-bold uppercase text-[8px]">save:</span>
+            {saveError}
           </div>
         )}
 

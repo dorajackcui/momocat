@@ -81,7 +81,7 @@ export class AIModule {
       const sourceText = serializeTokensToDisplayText(seg.sourceTokens).trim();
       if (!sourceText) {
         emptySourceStreak += 1;
-        if (emptySourceStreak >= 3) break;
+        if (emptySourceStreak >= 3) continue;
         continue;
       }
 

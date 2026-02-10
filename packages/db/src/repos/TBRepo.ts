@@ -1,12 +1,15 @@
 import Database from 'better-sqlite3';
 import { TBEntry } from '@cat/core';
 import { randomUUID } from 'crypto';
+import type { MountedTBRecord, ProjectTermEntryRecord, TBRecord } from '../types';
+
+type TBEntryDbRow = TBEntry;
 
 export class TBRepo {
   constructor(private readonly db: Database.Database) {}
 
-  public listTermBases(): any[] {
-    return this.db.prepare('SELECT * FROM term_bases ORDER BY updatedAt DESC').all();
+  public listTermBases(): TBRecord[] {
+    return this.db.prepare('SELECT * FROM term_bases ORDER BY updatedAt DESC').all() as TBRecord[];
   }
 
   public createTermBase(name: string, srcLang: string, tgtLang: string): string {
@@ -24,8 +27,8 @@ export class TBRepo {
     this.db.prepare('DELETE FROM term_bases WHERE id = ?').run(id);
   }
 
-  public getTermBase(tbId: string): any | undefined {
-    return this.db.prepare('SELECT * FROM term_bases WHERE id = ?').get(tbId);
+  public getTermBase(tbId: string): TBRecord | undefined {
+    return this.db.prepare('SELECT * FROM term_bases WHERE id = ?').get(tbId) as TBRecord | undefined;
   }
 
   public getTermBaseStats(tbId: string) {
@@ -51,7 +54,7 @@ export class TBRepo {
     this.db.prepare('DELETE FROM project_term_bases WHERE projectId = ? AND tbId = ?').run(projectId, tbId);
   }
 
-  public getProjectMountedTermBases(projectId: number): any[] {
+  public getProjectMountedTermBases(projectId: number): MountedTBRecord[] {
     return this.db
       .prepare(`
       SELECT term_bases.*, project_term_bases.priority, project_term_bases.isEnabled
@@ -60,7 +63,7 @@ export class TBRepo {
       WHERE project_term_bases.projectId = ? AND project_term_bases.isEnabled = 1
       ORDER BY project_term_bases.priority ASC, term_bases.updatedAt DESC
     `)
-      .all(projectId);
+      .all(projectId) as MountedTBRecord[];
   }
 
   public listTBEntries(tbId: string, limit: number = 500, offset: number = 0): TBEntry[] {
@@ -72,7 +75,7 @@ export class TBRepo {
       ORDER BY srcTerm COLLATE NOCASE ASC
       LIMIT ? OFFSET ?
     `)
-      .all(tbId, limit, offset) as any[];
+      .all(tbId, limit, offset) as TBEntryDbRow[];
 
     return rows.map((row) => ({ ...row })) as TBEntry[];
   }
@@ -88,9 +91,9 @@ export class TBRepo {
       ORDER BY project_term_bases.priority ASC, length(tb_entries.srcTerm) DESC
       LIMIT 5000
     `)
-      .all(projectId) as any[];
+      .all(projectId) as ProjectTermEntryRecord[];
 
-    return rows.map((row) => ({ ...row })) as Array<TBEntry & { tbName: string; priority: number }>;
+    return rows.map((row) => ({ ...row }));
   }
 
   public insertTBEntryIfAbsentBySrcTerm(params: {

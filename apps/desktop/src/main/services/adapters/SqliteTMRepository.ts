@@ -1,6 +1,6 @@
 import { CATDatabase } from '@cat/db';
 import { TMEntry } from '@cat/core';
-import { TMRepository } from '../ports';
+import { MountedTMRecord, TMRecord, TMRepository } from '../ports';
 
 export class SqliteTMRepository implements TMRepository {
   constructor(private readonly db: CATDatabase) {}
@@ -25,11 +25,11 @@ export class SqliteTMRepository implements TMRepository {
     return this.db.findTMEntryByHash(tmId, srcHash);
   }
 
-  searchConcordance(projectId: number, query: string): TMEntry[] {
-    return this.db.searchConcordance(projectId, query);
+  searchConcordance(projectId: number, query: string): Array<TMEntry & { tmId: string }> {
+    return this.db.searchConcordance(projectId, query) as Array<TMEntry & { tmId: string }>;
   }
 
-  listTMs(type?: 'working' | 'main'): any[] {
+  listTMs(type?: 'working' | 'main'): TMRecord[] {
     return this.db.listTMs(type);
   }
 
@@ -41,7 +41,7 @@ export class SqliteTMRepository implements TMRepository {
     this.db.deleteTM(id);
   }
 
-  getTM(tmId: string): any | undefined {
+  getTM(tmId: string): TMRecord | undefined {
     return this.db.getTM(tmId);
   }
 
@@ -49,7 +49,7 @@ export class SqliteTMRepository implements TMRepository {
     return this.db.getTMStats(tmId);
   }
 
-  getProjectMountedTMs(projectId: number): any[] {
+  getProjectMountedTMs(projectId: number): MountedTMRecord[] {
     return this.db.getProjectMountedTMs(projectId);
   }
 

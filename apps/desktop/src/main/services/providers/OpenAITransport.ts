@@ -54,9 +54,9 @@ export class OpenAITransport implements AITransport {
       throw new Error(`OpenAI request failed: ${response.status} ${rawBody}`);
     }
 
-    let data: any;
+    let data: { choices?: Array<{ message?: { content?: unknown } }> };
     try {
-      data = JSON.parse(rawBody);
+      data = JSON.parse(rawBody) as { choices?: Array<{ message?: { content?: unknown } }> };
     } catch {
       throw new Error(`OpenAI response is not valid JSON: ${rawBody}`);
     }

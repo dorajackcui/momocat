@@ -1,6 +1,12 @@
 import Database from 'better-sqlite3';
 import { TMEntry } from '@cat/core';
 import { randomUUID } from 'crypto';
+import type { MountedTMRecord, TMEntryRow, TMRecord, TMType } from '../types';
+
+type TMEntryDbRow = Omit<TMEntryRow, 'sourceTokens' | 'targetTokens'> & {
+  sourceTokensJson: string;
+  targetTokensJson: string;
+};
 
 export class TMRepo {
   private stmtUpsertTMEntry: Database.Statement;
@@ -124,7 +130,7 @@ export class TMRepo {
   }
 
   public findTMEntryByHash(tmId: string, srcHash: string): TMEntry | undefined {
-    const row = this.stmtFindTMEntryByHash.get(tmId, srcHash) as any;
+    const row = this.stmtFindTMEntryByHash.get(tmId, srcHash) as TMEntryDbRow | undefined;
 
     if (!row) {
       return undefined;
@@ -147,7 +153,7 @@ export class TMRepo {
     return row;
   }
 
-  public getProjectMountedTMs(projectId: number): any[] {
+  public getProjectMountedTMs(projectId: number): MountedTMRecord[] {
     return this.db
       .prepare(`
       SELECT tms.*, project_tms.priority, project_tms.permission, project_tms.isEnabled
@@ -156,10 +162,10 @@ export class TMRepo {
       WHERE project_tms.projectId = ? AND project_tms.isEnabled = 1
       ORDER BY project_tms.priority ASC
     `)
-      .all(projectId) as any[];
+      .all(projectId) as MountedTMRecord[];
   }
 
-  public searchConcordance(projectId: number, query: string): TMEntry[] {
+  public searchConcordance(projectId: number, query: string): TMEntryRow[] {
     const tmIds = this.getProjectMountedTMs(projectId).map((tm) => tm.id);
     if (tmIds.length === 0) {
       return [];
@@ -177,7 +183,7 @@ export class TMRepo {
       WHERE tm_fts.tmId IN (${placeholders}) AND tm_fts MATCH ?
       LIMIT 50
     `)
-      .all(...tmIds, ftsQuery) as any[];
+      .all(...tmIds, ftsQuery) as TMEntryDbRow[];
 
     return rows.map((row) => ({
       ...row,
@@ -186,14 +192,14 @@ export class TMRepo {
     }));
   }
 
-  public listTMs(type?: 'working' | 'main'): any[] {
+  public listTMs(type?: TMType): TMRecord[] {
     if (type) {
-      return this.db.prepare('SELECT * FROM tms WHERE type = ? ORDER BY updatedAt DESC').all(type);
+      return this.db.prepare('SELECT * FROM tms WHERE type = ? ORDER BY updatedAt DESC').all(type) as TMRecord[];
     }
-    return this.db.prepare('SELECT * FROM tms ORDER BY updatedAt DESC').all();
+    return this.db.prepare('SELECT * FROM tms ORDER BY updatedAt DESC').all() as TMRecord[];
   }
 
-  public createTM(name: string, srcLang: string, tgtLang: string, type: 'working' | 'main'): string {
+  public createTM(name: string, srcLang: string, tgtLang: string, type: TMType): string {
     const id = randomUUID();
     this.db
       .prepare(`
@@ -232,7 +238,7 @@ export class TMRepo {
     return { entryCount: count.count };
   }
 
-  public getTM(tmId: string): any | undefined {
-    return this.db.prepare('SELECT * FROM tms WHERE id = ?').get(tmId);
+  public getTM(tmId: string): TMRecord | undefined {
+    return this.db.prepare('SELECT * FROM tms WHERE id = ?').get(tmId) as TMRecord | undefined;
   }
 }

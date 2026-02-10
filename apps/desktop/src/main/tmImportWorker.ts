@@ -7,8 +7,9 @@ import {
   computeSrcHash
 } from '@cat/core';
 import { randomUUID } from 'crypto';
-import { readFileSync } from 'fs';
+import { readFile } from 'fs/promises';
 import * as XLSX from 'xlsx';
+import { extractSheetRows } from './filters/sheetRows';
 
 interface TMImportOptions {
   sourceCol: number;
@@ -49,13 +50,15 @@ const run = async () => {
     }
 
     emitProgress(0, 1, 'Reading spreadsheet...');
-    const workbook = XLSX.read(readFileSync(input.filePath), { type: 'buffer' });
+    const workbook = XLSX.read(await readFile(input.filePath), { type: 'buffer' });
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
-    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+    const sourceRows = extractSheetRows(worksheet, {
+      columnIndexes: [input.options.sourceCol, input.options.targetCol]
+    });
+    const rows = input.options.hasHeader ? sourceRows.slice(1) : sourceRows;
 
-    const startIndex = input.options.hasHeader ? 1 : 0;
-    const totalRows = Math.max(rawData.length - startIndex, 0);
+    const totalRows = rows.length;
     let success = 0;
     let skipped = 0;
 
@@ -68,13 +71,12 @@ const run = async () => {
 
     const chunkSize = totalRows >= 100000 ? 1500 : 800;
 
-    for (let i = startIndex; i < rawData.length; i += chunkSize) {
-      const end = Math.min(i + chunkSize, rawData.length);
+    for (let i = 0; i < rows.length; i += chunkSize) {
+      const end = Math.min(i + chunkSize, rows.length);
 
       db.runInTransaction(() => {
         for (let j = i; j < end; j++) {
-          const row = rawData[j];
-          if (!row) continue;
+          const row = rows[j].cells;
 
           const sourceText = row[input.options.sourceCol] !== undefined ? String(row[input.options.sourceCol]).trim() : '';
           const targetText = row[input.options.targetCol] !== undefined ? String(row[input.options.targetCol]).trim() : '';
@@ -125,7 +127,7 @@ const run = async () => {
         }
       });
 
-      const processedRows = end - startIndex;
+      const processedRows = end;
       emitProgress(processedRows, totalRows, `Imported ${processedRows} of ${totalRows} rows...`);
       await new Promise<void>(resolve => setImmediate(resolve));
     }

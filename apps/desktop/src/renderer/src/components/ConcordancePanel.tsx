@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { TMEntry, serializeTokensToDisplayText } from '@cat/core';
+import { serializeTokensToDisplayText } from '@cat/core';
 import { apiClient } from '../services/apiClient';
+import type { TMConcordanceEntry } from '../../../shared/ipc';
 
 interface ConcordancePanelProps {
   projectId: number;
@@ -16,7 +17,7 @@ export const ConcordancePanel: React.FC<ConcordancePanelProps> = ({
   searchSignal = 0
 }) => {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<TMEntry[]>([]);
+  const [results, setResults] = useState<TMConcordanceEntry[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -96,8 +97,8 @@ export const ConcordancePanel: React.FC<ConcordancePanelProps> = ({
               </div>
               <div className="mt-2 flex items-center justify-between text-[10px] text-gray-400">
                 <div className="flex items-center gap-2">
-                  <span className={`px-1 py-0.5 rounded-[3px] font-bold uppercase text-[8px] ${(entry as any).tmType === 'working' ? 'bg-blue-50 text-blue-500' : 'bg-purple-50 text-purple-500'}`}>
-                    {(entry as any).tmType === 'working' ? 'Working' : (entry as any).tmName}
+                  <span className={`px-1 py-0.5 rounded-[3px] font-bold uppercase text-[8px] ${entry.tmType === 'working' ? 'bg-blue-50 text-blue-500' : 'bg-purple-50 text-purple-500'}`}>
+                    {entry.tmType === 'working' ? 'Working' : entry.tmName}
                   </span>
                   <span>Used {entry.usageCount} times</span>
                 </div>

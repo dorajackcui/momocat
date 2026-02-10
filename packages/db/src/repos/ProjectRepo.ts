@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
-import { Project, ProjectFile } from '@cat/core';
+import { Project } from '@cat/core';
 import { randomUUID } from 'crypto';
+import type { ProjectFileRecord } from '../types';
 
 export class ProjectRepo {
   constructor(private readonly db: Database.Database) {}
@@ -55,13 +56,13 @@ export class ProjectRepo {
     return result.lastInsertRowid as number;
   }
 
-  public listFiles(projectId: number): ProjectFile[] {
-    return this.db.prepare('SELECT * FROM files WHERE projectId = ? ORDER BY createdAt DESC').all(projectId) as ProjectFile[];
+  public listFiles(projectId: number): ProjectFileRecord[] {
+    return this.db.prepare('SELECT * FROM files WHERE projectId = ? ORDER BY createdAt DESC').all(projectId) as ProjectFileRecord[];
   }
 
-  public getFile(id: number): (ProjectFile & { importOptionsJson?: string }) | undefined {
+  public getFile(id: number): ProjectFileRecord | undefined {
     return this.db.prepare('SELECT * FROM files WHERE id = ?').get(id) as
-      | (ProjectFile & { importOptionsJson?: string })
+      | ProjectFileRecord
       | undefined;
   }
 

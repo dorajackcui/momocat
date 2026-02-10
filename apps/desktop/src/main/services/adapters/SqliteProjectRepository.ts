@@ -1,5 +1,5 @@
 import { CATDatabase } from '@cat/db';
-import { ProjectRepository } from '../ports';
+import { ProjectRepository, ProjectFileRecord, ProjectListRecord, ProjectRecord } from '../ports';
 
 export class SqliteProjectRepository implements ProjectRepository {
   constructor(private readonly db: CATDatabase) {}
@@ -8,11 +8,11 @@ export class SqliteProjectRepository implements ProjectRepository {
     return this.db.createProject(name, srcLang, tgtLang);
   }
 
-  listProjects(): any[] {
+  listProjects(): ProjectListRecord[] {
     return this.db.listProjects();
   }
 
-  getProject(id: number): any | undefined {
+  getProject(id: number): ProjectRecord | undefined {
     return this.db.getProject(id);
   }
 
@@ -32,11 +32,11 @@ export class SqliteProjectRepository implements ProjectRepository {
     return this.db.createFile(projectId, name, importOptionsJson);
   }
 
-  listFiles(projectId: number): any[] {
+  listFiles(projectId: number): ProjectFileRecord[] {
     return this.db.listFiles(projectId);
   }
 
-  getFile(id: number): any | undefined {
+  getFile(id: number): ProjectFileRecord | undefined {
     return this.db.getFile(id);
   }
 

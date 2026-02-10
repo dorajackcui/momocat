@@ -1,9 +1,10 @@
 import { randomUUID } from 'crypto';
-import { readFileSync } from 'fs';
+import { readFile } from 'fs/promises';
 import * as XLSX from 'xlsx';
 import { Segment } from '@cat/core';
-import { ProgressEmitter, TBRepository, TransactionManager } from '../ports';
+import { ProgressEmitter, SpreadsheetPreviewData, TBRepository, TransactionManager } from '../ports';
 import { TBService } from '../TBService';
+import { extractSheetRows } from '../../filters/sheetRows';
 
 export interface TBImportOptions {
   sourceCol: number;
@@ -57,12 +58,11 @@ export class TBModule {
     this.tbRepo.unmountTermBaseFromProject(projectId, tbId);
   }
 
-  public async getTBImportPreview(filePath: string): Promise<any[][]> {
-    const workbook = XLSX.read(readFileSync(filePath), { type: 'buffer' });
+  public async getTBImportPreview(filePath: string): Promise<SpreadsheetPreviewData> {
+    const workbook = XLSX.read(await readFile(filePath), { type: 'buffer' });
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
-    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, range: 0 }) as any[][];
-    return rawData.slice(0, 10);
+    return extractSheetRows(worksheet, { maxRows: 10 }).map((row) => row.cells);
   }
 
   public async importTBEntries(tbId: string, filePath: string, options: TBImportOptions): Promise<{ success: number; skipped: number }> {
@@ -71,13 +71,17 @@ export class TBModule {
 
     this.emitProgress({ type: 'tb-import', current: 0, total: 1, message: 'Reading spreadsheet...' });
 
-    const workbook = XLSX.read(readFileSync(filePath), { type: 'buffer' });
+    const workbook = XLSX.read(await readFile(filePath), { type: 'buffer' });
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
-    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+    const columnIndexes = [options.sourceCol, options.targetCol];
+    if (typeof options.noteCol === 'number') {
+      columnIndexes.push(options.noteCol);
+    }
+    const sourceRows = extractSheetRows(worksheet, { columnIndexes });
+    const rows = options.hasHeader ? sourceRows.slice(1) : sourceRows;
 
-    const startIndex = options.hasHeader ? 1 : 0;
-    const totalRows = Math.max(rawData.length - startIndex, 0);
+    const totalRows = rows.length;
     let success = 0;
     let skipped = 0;
 
@@ -88,13 +92,12 @@ export class TBModule {
     const chunkSize = totalRows >= 100000 ? 1500 : 800;
     this.emitProgress({ type: 'tb-import', current: 0, total: totalRows, message: 'Preparing import...' });
 
-    for (let i = startIndex; i < rawData.length; i += chunkSize) {
-      const end = Math.min(i + chunkSize, rawData.length);
+    for (let i = 0; i < rows.length; i += chunkSize) {
+      const end = Math.min(i + chunkSize, rows.length);
 
       this.tx.runInTransaction(() => {
         for (let j = i; j < end; j++) {
-          const row = rawData[j];
-          if (!row) continue;
+          const row = rows[j].cells;
 
           const srcTerm = row[options.sourceCol] !== undefined ? String(row[options.sourceCol]).trim() : '';
           const tgtTerm = row[options.targetCol] !== undefined ? String(row[options.targetCol]).trim() : '';
@@ -132,7 +135,7 @@ export class TBModule {
         }
       });
 
-      const processedRows = end - startIndex;
+      const processedRows = end;
       this.emitProgress({
         type: 'tb-import',
         current: processedRows,

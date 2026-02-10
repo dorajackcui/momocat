@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { join } from 'path';
 import { Worker } from 'worker_threads';
-import { existsSync, readFileSync } from 'fs';
+import { access, readFile } from 'fs/promises';
 import * as XLSX from 'xlsx';
 import {
   Segment,
@@ -11,7 +11,16 @@ import {
   parseDisplayTextToTokens,
   serializeTokensToDisplayText
 } from '@cat/core';
-import { ProgressEmitter, ProjectRepository, SegmentRepository, TMRepository, TransactionManager } from '../ports';
+import { extractSheetRows } from '../../filters/sheetRows';
+import {
+  ProgressEmitter,
+  ProjectRepository,
+  SegmentRepository,
+  TMConcordanceRecord,
+  TMRepository,
+  TransactionManager,
+  SpreadsheetPreviewData
+} from '../ports';
 import { TMService } from '../TMService';
 import { SegmentService } from '../SegmentService';
 
@@ -21,6 +30,25 @@ export interface TMImportOptions {
   hasHeader: boolean;
   overwrite: boolean;
 }
+
+interface TMImportWorkerProgressMessage {
+  type: 'progress';
+  current: number;
+  total: number;
+  message?: string;
+}
+
+interface TMImportWorkerDoneMessage {
+  type: 'done';
+  result?: { success: number; skipped: number };
+}
+
+interface TMImportWorkerErrorMessage {
+  type: 'error';
+  error?: string;
+}
+
+type TMImportWorkerMessage = TMImportWorkerProgressMessage | TMImportWorkerDoneMessage | TMImportWorkerErrorMessage;
 
 export class TMModule {
   constructor(
@@ -42,8 +70,18 @@ export class TMModule {
     return this.tmService.findMatches(projectId, segment);
   }
 
-  public async searchConcordance(projectId: number, query: string) {
-    return this.tmRepo.searchConcordance(projectId, query);
+  public async searchConcordance(projectId: number, query: string): Promise<TMConcordanceRecord[]> {
+    const entries = this.tmRepo.searchConcordance(projectId, query);
+    const mountedById = new Map(this.tmRepo.getProjectMountedTMs(projectId).map((tm) => [tm.id, tm] as const));
+
+    return entries.map((entry) => {
+      const tm = mountedById.get(entry.tmId);
+      return {
+        ...entry,
+        tmName: tm?.name ?? 'Unknown TM',
+        tmType: tm?.type ?? 'main'
+      };
+    });
   }
 
   public async listTMs(type?: 'working' | 'main') {
@@ -78,12 +116,11 @@ export class TMModule {
     this.tmRepo.unmountTMFromProject(projectId, tmId);
   }
 
-  public async getTMImportPreview(filePath: string): Promise<any[][]> {
-    const workbook = XLSX.read(readFileSync(filePath), { type: 'buffer' });
+  public async getTMImportPreview(filePath: string): Promise<SpreadsheetPreviewData> {
+    const workbook = XLSX.read(await readFile(filePath), { type: 'buffer' });
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
-    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, range: 0 }) as any[][];
-    return rawData.slice(0, 10);
+    return extractSheetRows(worksheet, { maxRows: 10 }).map((row) => row.cells);
   }
 
   public async importTMEntries(tmId: string, filePath: string, options: TMImportOptions): Promise<{ success: number; skipped: number }> {
@@ -105,7 +142,7 @@ export class TMModule {
       join(__dirname, '../tmImportWorker.js'),
       join(__dirname, '../../tmImportWorker.js')
     ];
-    const workerPath = candidatePaths.find(path => existsSync(path));
+    const workerPath = await this.resolveWorkerPath(candidatePaths);
     if (!workerPath) {
       throw new Error(`TM import worker not found. Tried: ${candidatePaths.join(', ')}`);
     }
@@ -127,7 +164,7 @@ export class TMModule {
         reject(error instanceof Error ? error : new Error(String(error)));
       };
 
-      worker.on('message', (message: any) => {
+      worker.on('message', (message: TMImportWorkerMessage) => {
         if (!message || typeof message !== 'object') return;
 
         if (message.type === 'progress') {
@@ -174,13 +211,15 @@ export class TMModule {
 
     this.emitProgress({ type: 'tm-import', current: 0, total: 1, message: 'Reading spreadsheet...' });
 
-    const workbook = XLSX.read(readFileSync(filePath), { type: 'buffer' });
+    const workbook = XLSX.read(await readFile(filePath), { type: 'buffer' });
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
-    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+    const sourceRows = extractSheetRows(worksheet, {
+      columnIndexes: [options.sourceCol, options.targetCol]
+    });
+    const rows = options.hasHeader ? sourceRows.slice(1) : sourceRows;
 
-    const startIndex = options.hasHeader ? 1 : 0;
-    const totalRows = Math.max(rawData.length - startIndex, 0);
+    const totalRows = rows.length;
     let success = 0;
     let skipped = 0;
 
@@ -191,13 +230,12 @@ export class TMModule {
     const chunkSize = totalRows >= 100000 ? 1500 : 800;
     this.emitProgress({ type: 'tm-import', current: 0, total: totalRows, message: 'Preparing import...' });
 
-    for (let i = startIndex; i < rawData.length; i += chunkSize) {
-      const end = Math.min(i + chunkSize, rawData.length);
+    for (let i = 0; i < rows.length; i += chunkSize) {
+      const end = Math.min(i + chunkSize, rows.length);
 
       this.tx.runInTransaction(() => {
         for (let j = i; j < end; j++) {
-          const row = rawData[j];
-          if (!row) continue;
+          const row = rows[j].cells;
 
           const sourceText = row[options.sourceCol] !== undefined ? String(row[options.sourceCol]).trim() : '';
           const targetText = row[options.targetCol] !== undefined ? String(row[options.targetCol]).trim() : '';
@@ -248,7 +286,7 @@ export class TMModule {
         }
       });
 
-      const processedRows = end - startIndex;
+      const processedRows = end;
       this.emitProgress({
         type: 'tm-import',
         current: processedRows,
@@ -260,6 +298,18 @@ export class TMModule {
     }
 
     return { success, skipped };
+  }
+
+  private async resolveWorkerPath(candidatePaths: string[]): Promise<string | undefined> {
+    for (const candidatePath of candidatePaths) {
+      try {
+        await access(candidatePath);
+        return candidatePath;
+      } catch {
+        // Ignore missing path candidate and try next.
+      }
+    }
+    return undefined;
   }
 
   public async commitToMainTM(tmId: string, fileId: number) {

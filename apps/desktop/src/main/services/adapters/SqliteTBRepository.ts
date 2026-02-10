@@ -1,11 +1,11 @@
 import { CATDatabase } from '@cat/db';
 import { TBEntry } from '@cat/core';
-import { TBRepository } from '../ports';
+import { MountedTBRecord, TBRecord, TBRepository } from '../ports';
 
 export class SqliteTBRepository implements TBRepository {
   constructor(private readonly db: CATDatabase) {}
 
-  listTermBases(): any[] {
+  listTermBases(): TBRecord[] {
     return this.db.listTermBases();
   }
 
@@ -17,7 +17,7 @@ export class SqliteTBRepository implements TBRepository {
     this.db.deleteTermBase(id);
   }
 
-  getTermBase(tbId: string): any | undefined {
+  getTermBase(tbId: string): TBRecord | undefined {
     return this.db.getTermBase(tbId);
   }
 
@@ -25,7 +25,7 @@ export class SqliteTBRepository implements TBRepository {
     return this.db.getTermBaseStats(tbId);
   }
 
-  getProjectMountedTermBases(projectId: number): any[] {
+  getProjectMountedTermBases(projectId: number): MountedTBRecord[] {
     return this.db.getProjectMountedTermBases(projectId);
   }
 

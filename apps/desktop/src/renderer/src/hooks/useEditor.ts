@@ -7,6 +7,55 @@ interface UseEditorProps {
   activeFileId: number | null;
 }
 
+interface PersistSegmentUpdateInput {
+  segmentId: string;
+  targetTokens: Token[];
+  status: SegmentStatus;
+  previousSegment: Segment;
+}
+
+interface SegmentPersistorDeps {
+  updateSegment: (segmentId: string, targetTokens: Token[], status: SegmentStatus) => Promise<unknown>;
+  rollbackSegment: (segmentId: string, previousSegment: Segment) => void;
+  setSegmentSaveError: (segmentId: string, message: string) => void;
+  clearSegmentSaveError: (segmentId: string) => void;
+}
+
+interface SegmentPersistor {
+  persistSegmentUpdate: (input: PersistSegmentUpdateInput) => Promise<void>;
+  clear: () => void;
+}
+
+export function createSegmentPersistor(deps: SegmentPersistorDeps): SegmentPersistor {
+  const latestRequestVersionBySegment = new Map<string, number>();
+
+  return {
+    persistSegmentUpdate: async ({ segmentId, targetTokens, status, previousSegment }) => {
+      const nextVersion = (latestRequestVersionBySegment.get(segmentId) ?? 0) + 1;
+      latestRequestVersionBySegment.set(segmentId, nextVersion);
+      deps.clearSegmentSaveError(segmentId);
+
+      try {
+        await deps.updateSegment(segmentId, targetTokens, status);
+        if (latestRequestVersionBySegment.get(segmentId) !== nextVersion) {
+          return;
+        }
+        deps.clearSegmentSaveError(segmentId);
+      } catch (error) {
+        if (latestRequestVersionBySegment.get(segmentId) !== nextVersion) {
+          return;
+        }
+        deps.rollbackSegment(segmentId, previousSegment);
+        const message = error instanceof Error ? error.message : String(error);
+        deps.setSegmentSaveError(segmentId, `保存失败：${message}`);
+      }
+    },
+    clear: () => {
+      latestRequestVersionBySegment.clear();
+    }
+  };
+}
+
 export function useEditor({ activeFileId }: UseEditorProps) {
   const SEGMENT_PAGE_SIZE = 1000;
   const MATCH_REQUEST_DEBOUNCE_MS = 150;
@@ -15,10 +64,12 @@ export function useEditor({ activeFileId }: UseEditorProps) {
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
   const [activeMatches, setActiveMatches] = useState<TMMatch[]>([]);
   const [activeTerms, setActiveTerms] = useState<TBMatch[]>([]);
+  const [segmentSaveErrors, setSegmentSaveErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const tagValidator = new TagValidator();
   const matchRequestSeqRef = useRef(0);
   const termRequestSeqRef = useRef(0);
+  const segmentPersistorRef = useRef<SegmentPersistor | null>(null);
 
   const isTokenLike = (value: unknown): value is Token => {
     if (!value || typeof value !== 'object') return false;
@@ -38,11 +89,52 @@ export function useEditor({ activeFileId }: UseEditorProps) {
     return cleaned;
   };
 
+  const setSegmentSaveError = useCallback((segmentId: string, message: string) => {
+    setSegmentSaveErrors(prev => {
+      if (prev[segmentId] === message) return prev;
+      return {
+        ...prev,
+        [segmentId]: message
+      };
+    });
+  }, []);
+
+  const clearSegmentSaveError = useCallback((segmentId: string) => {
+    setSegmentSaveErrors(prev => {
+      if (!prev[segmentId]) return prev;
+      const next = { ...prev };
+      delete next[segmentId];
+      return next;
+    });
+  }, []);
+
+  const rollbackSegment = useCallback((segmentId: string, previousSegment: Segment) => {
+    setSegments(prev =>
+      prev.map(seg => {
+        if (seg.segmentId !== segmentId) return seg;
+        return {
+          ...previousSegment
+        };
+      })
+    );
+  }, []);
+
+  if (!segmentPersistorRef.current) {
+    segmentPersistorRef.current = createSegmentPersistor({
+      updateSegment: (segmentId, targetTokens, status) => apiClient.updateSegment(segmentId, targetTokens, status),
+      rollbackSegment,
+      setSegmentSaveError,
+      clearSegmentSaveError
+    });
+  }
+
   // Load Segments & Project Info
   const loadEditorData = useCallback(async () => {
     if (activeFileId === null) {
       setSegments([]);
       setProjectId(null);
+      setSegmentSaveErrors({});
+      segmentPersistorRef.current?.clear();
       return;
     }
 
@@ -73,6 +165,8 @@ export function useEditor({ activeFileId }: UseEditorProps) {
         autoFixSuggestions: undefined
       }));
       setSegments(normalized);
+      setSegmentSaveErrors({});
+      segmentPersistorRef.current?.clear();
       setActiveSegmentId((prev) => {
         if (prev && normalized.some((seg) => seg.segmentId === prev)) return prev;
         return normalized.length > 0 ? normalized[0].segmentId : null;
@@ -91,6 +185,22 @@ export function useEditor({ activeFileId }: UseEditorProps) {
   // Listen for real-time updates from backend (Propagation, etc.)
   useEffect(() => {
     const unsubscribe = apiClient.onSegmentsUpdated((data) => {
+      setSegmentSaveErrors(prev => {
+        let changed = false;
+        const next = { ...prev };
+        if (next[data.segmentId]) {
+          delete next[data.segmentId];
+          changed = true;
+        }
+        for (const propagatedId of data.propagatedIds ?? []) {
+          if (next[propagatedId]) {
+            delete next[propagatedId];
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+
       setSegments(prev => {
         let changed = false;
         const newSegments: Segment[] = prev.map((seg): Segment => {
@@ -203,28 +313,52 @@ export function useEditor({ activeFileId }: UseEditorProps) {
   }, [activeSegmentId, segments, projectId]);
 
   // Actions
+  const applyOptimisticSegmentUpdate = useCallback(
+    (segmentId: string, updater: (segment: Segment) => Segment) => {
+      const snapshot: {
+        previousSegment?: Segment;
+        nextSegment?: Segment;
+      } = {};
+
+      setSegments(prev =>
+        prev.map((seg): Segment => {
+          if (seg.segmentId !== segmentId) return seg;
+          snapshot.previousSegment = seg;
+          snapshot.nextSegment = updater(seg);
+          return snapshot.nextSegment;
+        })
+      );
+
+      const previousSegment = snapshot.previousSegment;
+      const nextSegment = snapshot.nextSegment;
+      if (!previousSegment || !nextSegment) {
+        return;
+      }
+
+      void segmentPersistorRef.current?.persistSegmentUpdate({
+        segmentId,
+        targetTokens: nextSegment.targetTokens,
+        status: nextSegment.status,
+        previousSegment
+      });
+    },
+    []
+  );
+
   const handleTranslationChange = (segmentId: string, text: string) => {
     try {
-      setSegments(prev => prev.map((seg): Segment => {
-        if (seg.segmentId === segmentId) {
-          const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-          const tokens = parseEditorTextToTokens(normalizedText, seg.sourceTokens);
-          const nextStatus: SegmentStatus = normalizedText.trim() ? 'draft' : 'new';
-          
-          const updated: Segment = { 
-            ...seg, 
-            targetTokens: tokens,
-            status: nextStatus,
-            // Run QA only on confirm to avoid per-keystroke/per-segment compute cost.
-            qaIssues: undefined,
-            autoFixSuggestions: undefined
-          };
-          // Async save
-          apiClient.updateSegment(segmentId, tokens, nextStatus);
-          return updated;
-        }
-        return seg;
-      }));
+      applyOptimisticSegmentUpdate(segmentId, (seg) => {
+        const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        const tokens = parseEditorTextToTokens(normalizedText, seg.sourceTokens);
+        const nextStatus: SegmentStatus = normalizedText.trim() ? 'draft' : 'new';
+        return {
+          ...seg,
+          targetTokens: tokens,
+          status: nextStatus,
+          qaIssues: undefined,
+          autoFixSuggestions: undefined
+        };
+      });
     } catch (error) {
       console.error('Error in handleTranslationChange:', error);
       console.error('Segment ID:', segmentId);
@@ -234,20 +368,13 @@ export function useEditor({ activeFileId }: UseEditorProps) {
 
   const handleApplyMatch = (tokens: Token[]) => {
     if (!activeSegmentId) return;
-    
-    setSegments(prev => prev.map((seg): Segment => {
-      if (seg.segmentId === activeSegmentId) {
-        const updated: Segment = { 
-          ...seg, 
-          targetTokens: tokens,
-          status: 'draft',
-          qaIssues: undefined,
-          autoFixSuggestions: undefined
-        };
-        apiClient.updateSegment(activeSegmentId, tokens, 'draft');
-        return updated;
-      }
-      return seg;
+
+    applyOptimisticSegmentUpdate(activeSegmentId, (seg) => ({
+      ...seg,
+      targetTokens: tokens,
+      status: 'draft',
+      qaIssues: undefined,
+      autoFixSuggestions: undefined
     }));
   };
 
@@ -261,9 +388,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
   const handleApplyTerm = (term: string) => {
     if (!activeSegmentId) return;
 
-    setSegments(prev => prev.map((seg): Segment => {
-      if (seg.segmentId !== activeSegmentId) return seg;
-
+    applyOptimisticSegmentUpdate(activeSegmentId, (seg) => {
       const currentText = serializeTokensToEditorText(seg.targetTokens, seg.sourceTokens)
         .replace(/\r\n/g, '\n')
         .replace(/\r/g, '\n');
@@ -272,7 +397,6 @@ export function useEditor({ activeFileId }: UseEditorProps) {
       const nextTokens = parseEditorTextToTokens(nextText, seg.sourceTokens);
       const nextStatus: SegmentStatus = nextText.trim() ? 'draft' : 'new';
 
-      apiClient.updateSegment(activeSegmentId, nextTokens, nextStatus);
       return {
         ...seg,
         targetTokens: nextTokens,
@@ -280,7 +404,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
         qaIssues: undefined,
         autoFixSuggestions: undefined
       };
-    }));
+    });
   };
 
   const confirmSegment = async (segmentId: string) => {
@@ -321,6 +445,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
     activeSegmentId,
     activeMatches,
     activeTerms,
+    segmentSaveErrors,
     setActiveSegmentId,
     loading,
     handleTranslationChange,

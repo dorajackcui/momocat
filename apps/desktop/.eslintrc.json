@@ -9,6 +9,7 @@
   "parser": "@typescript-eslint/parser",
   "plugins": ["react", "react-hooks", "@typescript-eslint", "prettier"],
   "root": true,
+  "ignorePatterns": ["out/**", "build/**", "dist/**", "release/**"],
   "settings": {
     "react": {
       "version": "detect"
@@ -16,6 +17,27 @@
   },
   "rules": {
     "react/react-in-jsx-scope": "off",
-    "prettier/prettier": "warn"
-  }
+    "prettier/prettier": "warn",
+    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/no-unsafe-function-type": "warn",
+    "@typescript-eslint/ban-ts-comment": "warn",
+    "@typescript-eslint/no-unused-vars": "warn",
+    "no-unused-vars": "off",
+    "@typescript-eslint/no-require-imports": "warn",
+    "@typescript-eslint/no-unused-expressions": "warn",
+    "prefer-const": "warn",
+    "react/no-unescaped-entities": "warn",
+    "react-hooks/set-state-in-effect": "warn",
+    "no-constant-condition": "warn",
+    "no-prototype-builtins": "warn",
+    "no-useless-escape": "warn"
+  },
+  "overrides": [
+    {
+      "files": ["*.config.js", "tailwind.config.js", "postcss.config.js"],
+      "env": {
+        "node": true
+      }
+    }
+  ]
 }

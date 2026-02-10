@@ -1,15 +1,15 @@
 import * as XLSX from 'xlsx';
-import { readFileSync, writeFileSync } from 'fs';
+import { readFile, writeFile } from 'fs/promises';
 import { extname } from 'path';
 import { 
   Segment, 
-  SegmentStatus, 
   parseDisplayTextToTokens, 
   computeTagsSignature, 
   computeMatchKey, 
   computeSrcHash 
 } from '@cat/core';
 import { randomUUID } from 'crypto';
+import { extractSheetRows, SheetCellValue } from './sheetRows';
 
 export interface ImportOptions {
   hasHeader: boolean;
@@ -19,8 +19,8 @@ export interface ImportOptions {
 }
 
 export class SpreadsheetFilter {
-  private readWorkbook(filePath: string) {
-    const fileBuffer = readFileSync(filePath);
+  private async readWorkbook(filePath: string) {
+    const fileBuffer = await readFile(filePath);
     return XLSX.read(fileBuffer, { type: 'buffer' });
   }
 
@@ -35,39 +35,47 @@ export class SpreadsheetFilter {
    * Import a spreadsheet file (XLSX/CSV) and convert to Segments
    */
   public async import(
-    filePath: string, 
-    projectId: number, 
+    filePath: string,
+    projectId: number,
     fileId: number,
     options: ImportOptions
   ): Promise<Segment[]> {
+    void projectId;
     console.log(`[SpreadsheetFilter] Reading file: ${filePath}`);
-    const workbook = this.readWorkbook(filePath);
+    const workbook = await this.readWorkbook(filePath);
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
-    
-    // Read as array of arrays
-    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
-    console.log(`[SpreadsheetFilter] Read ${rawData.length} rows from sheet: ${firstSheetName}`);
-    
-    const segments: Segment[] = [];
-    const startIndex = options.hasHeader ? 1 : 0;
-    
-    for (let i = startIndex; i < rawData.length; i++) {
-      const row = rawData[i];
-      if (!row) continue;
 
-      const sourceText = row[options.sourceCol] !== undefined ? String(row[options.sourceCol]) : '';
-      if (!sourceText.trim()) {
-        console.log(`[SpreadsheetFilter] Skipping row ${i}: source text is empty`);
+    const importColumnIndexes = [options.sourceCol, options.targetCol];
+    if (typeof options.contextCol === 'number') {
+      importColumnIndexes.push(options.contextCol);
+    }
+
+    // Only iterate rows that actually contain values in import-related columns.
+    const sourceRows = extractSheetRows(worksheet, { columnIndexes: importColumnIndexes });
+    console.log(
+      `[SpreadsheetFilter] Read ${sourceRows.length} effective rows from sheet: ${firstSheetName}`
+    );
+
+    const segments: Segment[] = [];
+    for (let rowCursor = 0; rowCursor < sourceRows.length; rowCursor++) {
+      if (options.hasHeader && rowCursor === 0) {
         continue;
       }
 
-      const targetText = row[options.targetCol] !== undefined ? String(row[options.targetCol]) : '';
-      const context = options.contextCol !== undefined ? String(row[options.contextCol] || '') : undefined;
-      
+      const row = sourceRows[rowCursor];
+      const sourceText = this.toCellText(row.cells[options.sourceCol]);
+      if (!sourceText.trim()) {
+        continue;
+      }
+
+      const targetText = this.toCellText(row.cells[options.targetCol]);
+      const context =
+        options.contextCol !== undefined ? this.toCellText(row.cells[options.contextCol]) : undefined;
+
       const sourceTokens = parseDisplayTextToTokens(sourceText);
       const targetTokens = targetText ? parseDisplayTextToTokens(targetText) : [];
-      
+
       const tagsSignature = computeTagsSignature(sourceTokens);
       const matchKey = computeMatchKey(sourceTokens);
       const srcHash = computeSrcHash(matchKey, tagsSignature);
@@ -75,7 +83,7 @@ export class SpreadsheetFilter {
       segments.push({
         segmentId: randomUUID(),
         fileId,
-        orderIndex: i,
+        orderIndex: row.rowIndex,
         sourceTokens,
         targetTokens,
         status: targetText ? 'translated' : 'new',
@@ -83,25 +91,24 @@ export class SpreadsheetFilter {
         matchKey,
         srcHash,
         meta: {
-          rowRef: i + 1, // 1-based row reference
+          rowRef: row.rowIndex + 1,
           context,
           updatedAt: new Date().toISOString()
         }
       });
     }
-    
+
     return segments;
   }
 
   /**
    * Get first few rows of a spreadsheet for preview
    */
-  public async getPreview(filePath: string, rowLimit: number = 10): Promise<any[][]> {
-    const workbook = this.readWorkbook(filePath);
+  public async getPreview(filePath: string, rowLimit: number = 10): Promise<SheetCellValue[][]> {
+    const workbook = await this.readWorkbook(filePath);
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
-    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, range: 0 }) as any[][];
-    return rawData.slice(0, rowLimit);
+    return extractSheetRows(worksheet, { maxRows: rowLimit }).map((row) => row.cells);
   }
 
   /**
@@ -114,7 +121,7 @@ export class SpreadsheetFilter {
     options: ImportOptions,
     outputPath: string
   ): Promise<void> {
-    const workbook = this.readWorkbook(originalFilePath);
+    const workbook = await this.readWorkbook(originalFilePath);
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
     
@@ -140,10 +147,15 @@ export class SpreadsheetFilter {
     }) as Buffer | Uint8Array | string;
 
     if (typeof data === 'string') {
-      writeFileSync(outputPath, data, 'utf8');
+      await writeFile(outputPath, data, 'utf8');
       return;
     }
 
-    writeFileSync(outputPath, Buffer.from(data));
+    await writeFile(outputPath, Buffer.from(data));
+  }
+
+  private toCellText(value: SheetCellValue): string {
+    if (value === null || value === undefined) return '';
+    return String(value);
   }
 }

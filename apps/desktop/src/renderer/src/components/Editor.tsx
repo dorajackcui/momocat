@@ -29,6 +29,7 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
     activeSegmentId, 
     activeMatches,
     activeTerms,
+    segmentSaveErrors,
     loading, 
     setActiveSegmentId, 
     handleTranslationChange,
@@ -40,6 +41,7 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
 
   const totalSegments = segments.length;
   const confirmedSegments = segments.filter((s) => s.status === 'confirmed').length;
+  const saveErrorCount = Object.keys(segmentSaveErrors).length;
 
   useEffect(() => {
     const loadInfo = async () => {
@@ -205,6 +207,11 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
         </div>
 
         <div className="flex items-center gap-6">
+          {saveErrorCount > 0 && (
+            <div className="px-2.5 py-1 bg-red-50 border border-red-200 rounded-md text-[11px] font-bold text-red-700">
+              {saveErrorCount} 段保存失败
+            </div>
+          )}
           <div className="flex items-center gap-3">
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Progress</span>
             <div className="px-2.5 py-1 bg-gray-100 rounded-md text-[11px] font-bold text-gray-700">
@@ -240,6 +247,7 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
                 onActivate={setActiveSegmentId}
                 onChange={handleTranslationChange}
                 onConfirm={confirmSegment}
+                saveError={segmentSaveErrors[segment.segmentId]}
               />
             ))}
             

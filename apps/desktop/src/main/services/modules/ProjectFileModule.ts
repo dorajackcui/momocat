@@ -1,7 +1,7 @@
 import { basename, join } from 'path';
-import { copyFileSync, existsSync, mkdirSync, rmSync, unlinkSync } from 'fs';
+import { copyFile, mkdir, rm, unlink } from 'fs/promises';
 import { Segment, validateSegmentTags } from '@cat/core';
-import { ImportOptions, ProjectRepository, SegmentRepository, SpreadsheetGateway } from '../ports';
+import { ImportOptions, ProjectRepository, SegmentRepository, SpreadsheetGateway, SpreadsheetPreviewData } from '../ports';
 
 export class ProjectFileModule {
   constructor(
@@ -9,19 +9,22 @@ export class ProjectFileModule {
     private readonly segmentRepo: SegmentRepository,
     private readonly filter: SpreadsheetGateway,
     private readonly projectsDir: string
-  ) {
-    if (!existsSync(this.projectsDir)) {
-      mkdirSync(this.projectsDir, { recursive: true });
-    }
+  ) {}
+
+  private async ensureDirectory(path: string) {
+    await mkdir(path, { recursive: true });
+  }
+
+  private isFileNotFoundError(error: unknown): boolean {
+    return typeof error === 'object' && error !== null && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT';
   }
 
   public async createProject(name: string, srcLang: string, tgtLang: string) {
+    await this.ensureDirectory(this.projectsDir);
     const projectId = this.projectRepo.createProject(name, srcLang, tgtLang);
 
     const projectDir = join(this.projectsDir, projectId.toString());
-    if (!existsSync(projectDir)) {
-      mkdirSync(projectDir, { recursive: true });
-    }
+    await this.ensureDirectory(projectDir);
 
     const project = this.projectRepo.getProject(projectId);
     if (!project) {
@@ -51,9 +54,7 @@ export class ProjectFileModule {
     this.projectRepo.deleteProject(projectId);
 
     const projectDir = join(this.projectsDir, projectId.toString());
-    if (existsSync(projectDir)) {
-      rmSync(projectDir, { recursive: true, force: true });
-    }
+    await rm(projectDir, { recursive: true, force: true });
   }
 
   public async addFileToProject(projectId: number, filePath: string, options: ImportOptions) {
@@ -62,9 +63,8 @@ export class ProjectFileModule {
 
     const fileName = basename(filePath);
     const projectDir = join(this.projectsDir, projectId.toString());
-    if (!existsSync(projectDir)) {
-      mkdirSync(projectDir, { recursive: true });
-    }
+    await this.ensureDirectory(this.projectsDir);
+    await this.ensureDirectory(projectDir);
 
     let fileId: number | undefined;
     let storedPath: string | undefined;
@@ -72,7 +72,7 @@ export class ProjectFileModule {
     try {
       fileId = this.projectRepo.createFile(projectId, fileName, JSON.stringify(options));
       storedPath = join(projectDir, `${fileId}_${fileName}`);
-      copyFileSync(filePath, storedPath);
+      await copyFile(filePath, storedPath);
 
       const segments = await this.filter.import(storedPath, projectId, fileId, options);
       if (segments.length === 0) {
@@ -98,12 +98,16 @@ export class ProjectFileModule {
         }
       }
 
-      if (storedPath && existsSync(storedPath)) {
+      if (storedPath) {
         try {
-          unlinkSync(storedPath);
+          await unlink(storedPath);
         } catch (cleanupError) {
-          console.warn('[ProjectFileModule] Failed to cleanup copied file after import failure:', cleanupError);
-          cleanupErrors.push(cleanupError instanceof Error ? cleanupError : new Error(String(cleanupError)));
+          if (!this.isFileNotFoundError(cleanupError)) {
+            console.warn('[ProjectFileModule] Failed to cleanup copied file after import failure:', cleanupError);
+            cleanupErrors.push(
+              cleanupError instanceof Error ? cleanupError : new Error(String(cleanupError))
+            );
+          }
         }
       }
 
@@ -133,12 +137,16 @@ export class ProjectFileModule {
     this.projectRepo.deleteFile(fileId);
 
     const filePath = join(this.projectsDir, file.projectId.toString(), `${file.id}_${file.name}`);
-    if (existsSync(filePath)) {
-      unlinkSync(filePath);
+    try {
+      await unlink(filePath);
+    } catch (error) {
+      if (!this.isFileNotFoundError(error)) {
+        throw error;
+      }
     }
   }
 
-  public async getSpreadsheetPreview(filePath: string): Promise<any[][]> {
+  public async getSpreadsheetPreview(filePath: string): Promise<SpreadsheetPreviewData> {
     return this.filter.getPreview(filePath);
   }
 
@@ -171,7 +179,7 @@ export class ProjectFileModule {
     if (errors.length > 0 && !forceExport) {
       const errorMsg = errors.slice(0, 5).map(e => `Row ${e.row}: ${e.message}`).join('\n');
       const error = new Error(`Export blocked by QA errors:\n${errorMsg}${errors.length > 5 ? `\n...and ${errors.length - 5} more.` : ''}`);
-      (error as any).qaErrors = errors;
+      Object.assign(error, { qaErrors: errors });
       throw error;
     }
 

@@ -117,7 +117,7 @@ export class TMService {
         }
 
         if (similarity >= 70) {
-          const tm = mountedTMs.find(t => t.id === (cand as any).tmId);
+          const tm = mountedTMs.find(t => t.id === cand.tmId);
           results.push({
             ...cand,
             similarity,

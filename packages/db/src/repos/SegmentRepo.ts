@@ -1,6 +1,19 @@
 import Database from 'better-sqlite3';
 import { Segment, SegmentStatus, Token } from '@cat/core';
 
+interface SegmentRow {
+  segmentId: string;
+  fileId: number;
+  orderIndex: number;
+  sourceTokensJson: string;
+  targetTokensJson: string;
+  status: SegmentStatus;
+  tagsSignature: string;
+  matchKey: string;
+  srcHash: string;
+  metaJson: string;
+}
+
 export class SegmentRepo {
   constructor(
     private readonly db: Database.Database,
@@ -48,7 +61,7 @@ export class SegmentRepo {
       JOIN files ON segments.fileId = files.id
       WHERE files.projectId = ? AND segments.srcHash = ?
     `)
-      .all(projectId, srcHash) as any[];
+      .all(projectId, srcHash) as SegmentRow[];
 
     return rows.map((row) => this.mapRowToSegment(row));
   }
@@ -61,13 +74,13 @@ export class SegmentRepo {
       ORDER BY orderIndex ASC
       LIMIT ? OFFSET ?
     `)
-      .all(fileId, limit, offset) as any[];
+      .all(fileId, limit, offset) as SegmentRow[];
 
     return rows.map((row) => this.mapRowToSegment(row));
   }
 
   public getSegment(segmentId: string): Segment | undefined {
-    const row = this.db.prepare('SELECT * FROM segments WHERE segmentId = ?').get(segmentId) as any;
+    const row = this.db.prepare('SELECT * FROM segments WHERE segmentId = ?').get(segmentId) as SegmentRow | undefined;
     if (!row) {
       return undefined;
     }
@@ -107,7 +120,7 @@ export class SegmentRepo {
     return this.db.transaction(fn)();
   }
 
-  private mapRowToSegment(row: any): Segment {
+  private mapRowToSegment(row: SegmentRow): Segment {
     return {
       segmentId: row.segmentId,
       fileId: row.fileId,

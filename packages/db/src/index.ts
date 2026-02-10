@@ -1,5 +1,16 @@
 import Database from 'better-sqlite3';
 import { Project, ProjectFile, Segment, SegmentStatus, TBEntry, TMEntry, Token } from '@cat/core';
+import {
+  MountedTBRecord,
+  MountedTMRecord,
+  ProjectFileRecord,
+  ProjectListRecord,
+  ProjectTermEntryRecord,
+  TBRecord,
+  TMEntryRow,
+  TMRecord,
+  TMType
+} from './types';
 
 import { runMigrations } from './migration/runMigrations';
 import { ProjectRepo } from './repos/ProjectRepo';
@@ -7,6 +18,7 @@ import { SegmentRepo } from './repos/SegmentRepo';
 import { SettingsRepo } from './repos/SettingsRepo';
 import { TBRepo } from './repos/TBRepo';
 import { TMRepo } from './repos/TMRepo';
+export * from './types';
 
 export class CATDatabase {
   private readonly db: Database.Database;
@@ -41,7 +53,7 @@ export class CATDatabase {
     return projectId;
   }
 
-  public listProjects(): (Project & { progress: number; fileCount: number })[] {
+  public listProjects(): (ProjectListRecord & { progress: number; fileCount: number })[] {
     console.log('[DB] Listing projects');
     const projects = this.projectRepo.listProjects();
 
@@ -77,11 +89,11 @@ export class CATDatabase {
     return this.projectRepo.createFile(projectId, name, importOptionsJson);
   }
 
-  public listFiles(projectId: number): ProjectFile[] {
+  public listFiles(projectId: number): ProjectFileRecord[] {
     return this.projectRepo.listFiles(projectId);
   }
 
-  public getFile(id: number): (ProjectFile & { importOptionsJson?: string }) | undefined {
+  public getFile(id: number): ProjectFileRecord | undefined {
     return this.projectRepo.getFile(id);
   }
 
@@ -133,7 +145,7 @@ export class CATDatabase {
     this.settingsRepo.setSetting(key, value);
   }
 
-  public listTermBases(): any[] {
+  public listTermBases(): TBRecord[] {
     return this.tbRepo.listTermBases();
   }
 
@@ -145,7 +157,7 @@ export class CATDatabase {
     this.tbRepo.deleteTermBase(id);
   }
 
-  public getTermBase(tbId: string): any | undefined {
+  public getTermBase(tbId: string): TBRecord | undefined {
     return this.tbRepo.getTermBase(tbId);
   }
 
@@ -161,7 +173,7 @@ export class CATDatabase {
     this.tbRepo.unmountTermBaseFromProject(projectId, tbId);
   }
 
-  public getProjectMountedTermBases(projectId: number): any[] {
+  public getProjectMountedTermBases(projectId: number): MountedTBRecord[] {
     return this.tbRepo.getProjectMountedTermBases(projectId);
   }
 
@@ -169,7 +181,7 @@ export class CATDatabase {
     return this.tbRepo.listTBEntries(tbId, limit, offset);
   }
 
-  public listProjectTermEntries(projectId: number): Array<TBEntry & { tbName: string; priority: number }> {
+  public listProjectTermEntries(projectId: number): ProjectTermEntryRecord[] {
     return this.tbRepo.listProjectTermEntries(projectId);
   }
 
@@ -230,19 +242,19 @@ export class CATDatabase {
     return this.tmRepo.findTMEntryMetaByHash(tmId, srcHash);
   }
 
-  public getProjectMountedTMs(projectId: number) {
+  public getProjectMountedTMs(projectId: number): MountedTMRecord[] {
     return this.tmRepo.getProjectMountedTMs(projectId);
   }
 
-  public searchConcordance(projectId: number, query: string): TMEntry[] {
+  public searchConcordance(projectId: number, query: string): TMEntryRow[] {
     return this.tmRepo.searchConcordance(projectId, query);
   }
 
-  public listTMs(type?: 'working' | 'main'): any[] {
+  public listTMs(type?: TMType): TMRecord[] {
     return this.tmRepo.listTMs(type);
   }
 
-  public createTM(name: string, srcLang: string, tgtLang: string, type: 'working' | 'main'): string {
+  public createTM(name: string, srcLang: string, tgtLang: string, type: TMType): string {
     return this.tmRepo.createTM(name, srcLang, tgtLang, type);
   }
 
@@ -262,7 +274,7 @@ export class CATDatabase {
     return this.tmRepo.getTMStats(tmId);
   }
 
-  public getTM(tmId: string): any | undefined {
+  public getTM(tmId: string): TMRecord | undefined {
     return this.tmRepo.getTM(tmId);
   }
 
