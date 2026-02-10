@@ -3,22 +3,79 @@ import { Project } from '@cat/core';
 import type { JobProgressEvent } from '../../../../shared/ipc';
 import { apiClient } from '../../services/apiClient';
 
-const DEFAULT_AI_TEMPERATURE = 0.2;
+export const DEFAULT_AI_TEMPERATURE = 0.2;
 
-function normalizeTemperatureValue(value: number): number {
+export function normalizeTemperatureValue(value: number): number {
   return Math.max(0, Math.min(2, Number(value.toFixed(2))));
 }
 
-function formatTemperature(value: number): string {
+export function formatTemperature(value: number): string {
   return normalizeTemperatureValue(value).toString();
 }
 
-function parseTemperatureInput(input: string): number | null {
+export function parseTemperatureInput(input: string): number | null {
   const trimmed = input.trim();
   if (trimmed.length === 0) return null;
   const parsed = Number(trimmed);
   if (!Number.isFinite(parsed)) return null;
   return normalizeTemperatureValue(parsed);
+}
+
+export interface ProjectAIFlagsInput {
+  promptDraft: string;
+  savedPromptValue: string;
+  temperatureDraft: string;
+  savedTemperatureValue: string;
+  testMeta: string | null;
+  testUserMessage: string | null;
+  testPromptUsed: string | null;
+  testRawResponse: string | null;
+}
+
+export interface ProjectAIFlags {
+  normalizedPromptDraft: string;
+  normalizedSavedPrompt: string;
+  normalizedTemperatureDraft: number | null;
+  normalizedSavedTemperature: number | null;
+  hasUnsavedPromptChanges: boolean;
+  hasInvalidTemperature: boolean;
+  hasTestDetails: boolean;
+}
+
+export function deriveProjectAIFlags(input: ProjectAIFlagsInput): ProjectAIFlags {
+  const normalizedPromptDraft = input.promptDraft.trim();
+  const normalizedSavedPrompt = input.savedPromptValue.trim();
+  const normalizedTemperatureDraft = parseTemperatureInput(input.temperatureDraft);
+  const normalizedSavedTemperature = parseTemperatureInput(input.savedTemperatureValue);
+  const hasUnsavedTemperatureChanges = normalizedTemperatureDraft !== normalizedSavedTemperature;
+
+  return {
+    normalizedPromptDraft,
+    normalizedSavedPrompt,
+    normalizedTemperatureDraft,
+    normalizedSavedTemperature,
+    hasUnsavedPromptChanges: normalizedPromptDraft !== normalizedSavedPrompt || hasUnsavedTemperatureChanges,
+    hasInvalidTemperature: normalizedTemperatureDraft === null,
+    hasTestDetails: Boolean(input.testMeta || input.testUserMessage || input.testPromptUsed || input.testRawResponse)
+  };
+}
+
+export interface AITestMetaInput {
+  status?: number;
+  requestId?: string;
+  model?: string;
+  endpoint?: string;
+  ok: boolean;
+}
+
+export function buildAITestMeta(input: AITestMetaInput): string {
+  const metaParts: string[] = [];
+  if (typeof input.status === 'number') metaParts.push(`status: ${input.status}`);
+  if (input.requestId) metaParts.push(`requestId: ${input.requestId}`);
+  if (input.model) metaParts.push(`model: ${input.model}`);
+  if (input.endpoint) metaParts.push(`endpoint: ${input.endpoint}`);
+  metaParts.push(`ok: ${input.ok ? 'true' : 'false'}`);
+  return metaParts.join(' • ');
 }
 
 export interface TrackedAIJob extends JobProgressEvent {
@@ -115,15 +172,22 @@ export function useProjectAI({
     return unsubscribe;
   }, [loadData]);
 
-  const normalizedPromptDraft = promptDraft.trim();
-  const normalizedSavedPrompt = savedPromptValue.trim();
-  const normalizedTemperatureDraft = parseTemperatureInput(temperatureDraft);
-  const normalizedSavedTemperature = parseTemperatureInput(savedTemperatureValue);
-
-  const hasUnsavedTemperatureChanges = normalizedTemperatureDraft !== normalizedSavedTemperature;
-  const hasInvalidTemperature = normalizedTemperatureDraft === null;
-  const hasUnsavedPromptChanges = normalizedPromptDraft !== normalizedSavedPrompt || hasUnsavedTemperatureChanges;
-  const hasTestDetails = Boolean(testMeta || testUserMessage || testPromptUsed || testRawResponse);
+  const aiFlags = deriveProjectAIFlags({
+    promptDraft,
+    savedPromptValue,
+    temperatureDraft,
+    savedTemperatureValue,
+    testMeta,
+    testUserMessage,
+    testPromptUsed,
+    testRawResponse
+  });
+  const normalizedPromptDraft = aiFlags.normalizedPromptDraft;
+  const normalizedSavedPrompt = aiFlags.normalizedSavedPrompt;
+  const normalizedSavedTemperature = aiFlags.normalizedSavedTemperature;
+  const hasUnsavedPromptChanges = aiFlags.hasUnsavedPromptChanges;
+  const hasInvalidTemperature = aiFlags.hasInvalidTemperature;
+  const hasTestDetails = aiFlags.hasTestDetails;
 
   const savePrompt = useCallback(async () => {
     if (!project) return;
@@ -194,13 +258,7 @@ export function useProjectAI({
       setTestError(result.error || null);
       setTestRawResponse(result.rawResponseText || null);
 
-      const metaParts: string[] = [];
-      if (typeof result.status === 'number') metaParts.push(`status: ${result.status}`);
-      if (result.requestId) metaParts.push(`requestId: ${result.requestId}`);
-      if (result.model) metaParts.push(`model: ${result.model}`);
-      if (result.endpoint) metaParts.push(`endpoint: ${result.endpoint}`);
-      metaParts.push(`ok: ${result.ok ? 'true' : 'false'}`);
-      setTestMeta(metaParts.length ? metaParts.join(' • ') : null);
+      setTestMeta(buildAITestMeta(result));
       setShowTestDetails(!result.ok);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

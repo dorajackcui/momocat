@@ -1,17 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { TBImportWizard } from './TBImportWizard';
 import { apiClient } from '../services/apiClient';
-
-interface TermBase {
-  id: string;
-  name: string;
-  srcLang: string;
-  tgtLang: string;
-  stats: { entryCount: number };
-}
+import type { SpreadsheetPreviewData, TBImportOptions, TBWithStats } from '../../../shared/ipc';
 
 export const TBManager: React.FC = () => {
-  const [tbs, setTBs] = useState<TermBase[]>([]);
+  const [tbs, setTBs] = useState<TBWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
@@ -19,7 +12,7 @@ export const TBManager: React.FC = () => {
   const [newTgt, setNewTgt] = useState('zh-CN');
 
   const [importingTBId, setImportingTBId] = useState<string | null>(null);
-  const [importPreview, setImportPreview] = useState<any[][]>([]);
+  const [importPreview, setImportPreview] = useState<SpreadsheetPreviewData>([]);
   const [importFilePath, setImportFilePath] = useState<string | null>(null);
   const [isImportWizardOpen, setIsImportWizardOpen] = useState(false);
 
@@ -80,7 +73,7 @@ export const TBManager: React.FC = () => {
     }
   };
 
-  const handleConfirmImport = async (options: any) => {
+  const handleConfirmImport = async (options: TBImportOptions) => {
     if (!importingTBId || !importFilePath) return;
 
     try {

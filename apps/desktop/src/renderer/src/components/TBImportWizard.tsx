@@ -1,17 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { apiClient } from '../services/apiClient';
+import type { AppProgressEvent, SpreadsheetPreviewData, TBImportOptions } from '../../../shared/ipc';
 
 interface TBImportWizardProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (options: {
-    hasHeader: boolean;
-    sourceCol: number;
-    targetCol: number;
-    noteCol?: number;
-    overwrite: boolean;
-  }) => void;
-  previewData: any[][];
+  onConfirm: (options: TBImportOptions) => void;
+  previewData: SpreadsheetPreviewData;
 }
 
 export function TBImportWizard({ isOpen, onClose, onConfirm, previewData }: TBImportWizardProps) {
@@ -24,7 +19,7 @@ export function TBImportWizard({ isOpen, onClose, onConfirm, previewData }: TBIm
 
   useEffect(() => {
     if (isOpen) {
-      const unsubscribe = apiClient.onProgress((data: any) => {
+      const unsubscribe = apiClient.onProgress((data: AppProgressEvent) => {
         if (data.type === 'tb-import') {
           setProgress({ current: data.current, total: data.total, message: data.message });
         }

@@ -15,6 +15,16 @@ interface PropagationBatch {
   }[];
 }
 
+interface SegmentUpdateInput {
+  segmentId: string;
+  targetTokens: Token[];
+  status: SegmentStatus;
+}
+
+interface SegmentUpdateEventPayload extends SegmentUpdateInput {
+  propagatedIds: string[];
+}
+
 export class SegmentService extends EventEmitter {
   private db: SegmentRepository;
   private tmService: TMService;
@@ -36,29 +46,11 @@ export class SegmentService extends EventEmitter {
    * Update segment target and status, ensuring file stats and TM are updated
    */
   public async updateSegment(segmentId: string, targetTokens: Token[], status: SegmentStatus) {
-    const { propagatedIds } = this.tx.runInTransaction(() => {
-      // 1. Update the segment in DB
-      this.db.updateSegmentTarget(segmentId, targetTokens, status);
+    const { propagatedIds } = this.tx.runInTransaction(() =>
+      this.updateSegmentInternal(segmentId, targetTokens, status)
+    );
 
-      let propagatedIds: string[] = [];
-
-      // 2. If status is 'confirmed', upsert to TM and propagate
-      if (status === 'confirmed') {
-        const segment = this.db.getSegment(segmentId);
-        if (segment) {
-          const projectId = this.db.getProjectIdByFileId(segment.fileId);
-          if (projectId !== undefined) {
-            this.tmService.upsertFromConfirmedSegment(projectId, segment);
-            propagatedIds = this.propagate(projectId, segment);
-          }
-        }
-      }
-
-      return { propagatedIds };
-    });
-
-    // Notify about updates (including propagation)
-    this.emit('segments-updated', {
+    this.emitSegmentUpdated({
       segmentId,
       targetTokens,
       status,
@@ -66,6 +58,57 @@ export class SegmentService extends EventEmitter {
     });
 
     return { propagatedIds };
+  }
+
+  /**
+   * Update multiple segments in one transaction with all-or-nothing semantics.
+   * Events are emitted only after transaction commit.
+   */
+  public async updateSegmentsAtomically(updates: SegmentUpdateInput[]): Promise<SegmentUpdateEventPayload[]> {
+    if (updates.length === 0) return [];
+
+    const events = this.tx.runInTransaction(() =>
+      updates.map((update) => {
+        const { propagatedIds } = this.updateSegmentInternal(
+          update.segmentId,
+          update.targetTokens,
+          update.status
+        );
+        return {
+          ...update,
+          propagatedIds
+        };
+      })
+    );
+
+    for (const event of events) {
+      this.emitSegmentUpdated(event);
+    }
+
+    return events;
+  }
+
+  private updateSegmentInternal(segmentId: string, targetTokens: Token[], status: SegmentStatus): { propagatedIds: string[] } {
+    this.db.updateSegmentTarget(segmentId, targetTokens, status);
+
+    let propagatedIds: string[] = [];
+
+    if (status === 'confirmed') {
+      const segment = this.db.getSegment(segmentId);
+      if (segment) {
+        const projectId = this.db.getProjectIdByFileId(segment.fileId);
+        if (projectId !== undefined) {
+          this.tmService.upsertFromConfirmedSegment(projectId, segment);
+          propagatedIds = this.propagate(projectId, segment);
+        }
+      }
+    }
+
+    return { propagatedIds };
+  }
+
+  private emitSegmentUpdated(payload: SegmentUpdateEventPayload) {
+    this.emit('segments-updated', payload);
   }
 
   /**

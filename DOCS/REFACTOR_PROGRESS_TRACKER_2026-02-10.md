@@ -22,10 +22,10 @@
 | 项目 | 状态 | 结论 |
 |---|---|---|
 | 1. 段落确认事务化 | 已完成 | 事务链路已落地，并有成功/失败回滚测试 |
-| 2. TM 批量匹配统一流程 | 基本完成 | 已走 `SegmentService.updateSegment`，但仍有边界待补 |
-| 3. 导入失败补偿 | 基本完成 | 已补清理逻辑与测试，但清理失败仍是“告警后继续抛原错” |
-| 4. IPC 强类型契约 | 进行中 | preload + renderer 主链路已明显收敛，主进程端口层仍有 `any` |
-| 5. `ProjectDetail` 拆分 | 首轮完成 | 已拆容器+hooks+子组件，仍可继续收敛局部状态和复用逻辑 |
+| 2. TM 批量匹配统一流程 | 已完成 | 已校验挂载边界，批量确认走原子事务并与单段确认语义一致 |
+| 3. 导入失败补偿 | 已完成 | 失败时会清理 DB + 文件；cleanup 失败抛组合错误，避免静默脏数据 |
+| 4. IPC 强类型契约 | 阶段完成 | `4.2` 指定链路已收敛为强类型，剩余零散历史 `any` 可后续清理 |
+| 5. `ProjectDetail` 拆分 | 阶段完成 | `4.3` 三项完成：AI 面板拆分、hooks 行为测试、编辑器匹配请求防抖与竞态保护 |
 
 ---
 
@@ -61,26 +61,26 @@
 
 ### 4.1 正确性（本周应完成）
 
-- [ ] `TMModule.batchMatchFileWithTM` 校验 TM 挂载关系  
+- [x] `TMModule.batchMatchFileWithTM` 校验 TM 挂载关系  
   目标文件：`apps/desktop/src/main/services/modules/TMModule.ts`
-- [ ] 批量匹配失败语义定稿（原子/部分成功）并落地实现  
+- [x] 批量匹配失败语义定稿（原子/部分成功）并落地实现  
   目标文件：`apps/desktop/src/main/services/modules/TMModule.ts`
-- [ ] 导入补偿在 cleanup 失败时提供组合错误  
+- [x] 导入补偿在 cleanup 失败时提供组合错误  
   目标文件：`apps/desktop/src/main/services/modules/ProjectFileModule.ts`
-- [ ] 增补对应测试  
+- [x] 增补对应测试  
   目标文件：`apps/desktop/src/main/services/modules/TMModule.test.ts`、`apps/desktop/src/main/services/modules/ProjectFileModule.test.ts`
 
 ### 4.2 类型契约（下周推进）
 
-- [ ] 去除 `main/services/ports.ts` 中核心链路 `any`
-- [ ] 去除 `renderer/hooks/useEditor.ts` 中核心链路 `any`
-- [ ] 去除 `TM/TB Manager/Import Wizard` 中 `options: any` / `preview: any[][]`
+- [x] 去除 `main/services/ports.ts` 中核心链路 `any`
+- [x] 去除 `renderer/hooks/useEditor.ts` 中核心链路 `any`
+- [x] 去除 `TM/TB Manager/Import Wizard` 中 `options: any` / `preview: any[][]`
 
 ### 4.3 渲染层拆分（持续项）
 
-- [ ] 拆出 `ProjectAIPane`，降低 `ProjectFilesPane` 复杂度
-- [ ] `useProjectAI` / `useProjectDetailData` 增加行为测试
-- [ ] 编辑器匹配请求增加防抖/取消/请求序号保护
+- [x] 拆出 `ProjectAIPane`，降低 `ProjectFilesPane` 复杂度
+- [x] `useProjectAI` / `useProjectDetailData` 增加行为测试
+- [x] 编辑器匹配请求增加防抖/取消/请求序号保护
 
 ---
 
@@ -88,15 +88,15 @@
 
 ### 正确性 DoD
 
-- [ ] 关键链路异常时无半状态（符合定义的事务语义）
-- [ ] 数据库无孤儿记录，磁盘无残留文件
-- [ ] 批量匹配行为与文档定义一致，可通过测试稳定复现
+- [x] 关键链路异常时无半状态（符合定义的事务语义）
+- [x] 数据库无孤儿记录，磁盘无残留文件
+- [x] 批量匹配行为与文档定义一致，可通过测试稳定复现
 
 ### 工程质量 DoD
 
-- [ ] `npx tsc -p apps/desktop/tsconfig.json --noEmit` 通过
-- [ ] `npx vitest run` 全量通过
-- [ ] 新增/变更行为有对应测试覆盖
+- [x] `npx tsc -p apps/desktop/tsconfig.json --noEmit` 通过
+- [x] `npx vitest run` 全量通过
+- [x] 新增/变更行为有对应测试覆盖
 
 ---
 
@@ -113,12 +113,11 @@
 ### 2026-02-10
 
 - 已完成：
-  - 段落确认事务化 + 回滚测试
-  - 批量匹配走统一确认流程 + 行为集成测试
-  - 导入失败补偿 + 失败测试
-  - `ProjectDetail` 首轮容器化拆分
+  - 段落确认事务化 + 回滚测试（含批量原子更新接口）
+  - 批量匹配挂载校验 + 原子失败语义 + 行为集成测试
+  - 导入失败补偿 + cleanup 失败组合错误 + 单测
+  - `4.2` 类型收敛：`ports.ts`、`useEditor`、`TM/TB Manager + Import Wizard` 去除核心 `any`
+  - `4.3` 渲染层推进：`ProjectAIPane` 拆分、`useProjectAI/useProjectDetailData` 行为测试、编辑器匹配请求防抖与竞态保护
+  - 正确性 DoD 验证：`npx tsc -p apps/desktop/tsconfig.json --noEmit`、`npx vitest run` 均通过
 - 待完成：
-  - 批量匹配挂载校验与失败语义定稿
-  - 导入补偿“清理失败可观测化”
-  - 核心链路 `any` 继续收敛
-
+  - 进入下一阶段改造（建议更新 4.4 / 新里程碑）

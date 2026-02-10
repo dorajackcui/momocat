@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Project, ProjectFile } from '@cat/core';
-import type { MountedTB, MountedTM, TBWithStats, TMBatchMatchResult, TMWithStats } from '../../../../shared/ipc';
+import type { DesktopApi, MountedTB, MountedTM, TBWithStats, TMBatchMatchResult, TMWithStats } from '../../../../shared/ipc';
 import { apiClient } from '../../services/apiClient';
 
 export interface UseProjectDetailDataResult {
@@ -20,6 +20,61 @@ export interface UseProjectDetailDataResult {
   unmountTB: (tbId: string) => Promise<void>;
   commitToMainTM: (tmId: string, fileId: number) => Promise<number>;
   matchFileWithTM: (fileId: number, tmId: string) => Promise<TMBatchMatchResult>;
+}
+
+type ProjectDetailApi = Pick<
+  DesktopApi,
+  'mountTMToProject' | 'unmountTMFromProject' | 'mountTBToProject' | 'unmountTBFromProject' | 'commitToMainTM' | 'matchFileWithTM'
+>;
+
+interface ProjectDetailActionDeps {
+  projectId: number;
+  api: ProjectDetailApi;
+  loadData: () => Promise<void>;
+  runMutation: <T>(fn: () => Promise<T>) => Promise<T>;
+}
+
+export function createProjectDetailActions({ projectId, api, loadData, runMutation }: ProjectDetailActionDeps) {
+  return {
+    mountTM: async (tmId: string) => {
+      await runMutation(async () => {
+        await api.mountTMToProject(projectId, tmId);
+        await loadData();
+      });
+    },
+    unmountTM: async (tmId: string) => {
+      await runMutation(async () => {
+        await api.unmountTMFromProject(projectId, tmId);
+        await loadData();
+      });
+    },
+    mountTB: async (tbId: string) => {
+      await runMutation(async () => {
+        await api.mountTBToProject(projectId, tbId);
+        await loadData();
+      });
+    },
+    unmountTB: async (tbId: string) => {
+      await runMutation(async () => {
+        await api.unmountTBFromProject(projectId, tbId);
+        await loadData();
+      });
+    },
+    commitToMainTM: async (tmId: string, fileId: number) => {
+      return runMutation(async () => {
+        const count = await api.commitToMainTM(tmId, fileId);
+        await loadData();
+        return count;
+      });
+    },
+    matchFileWithTM: async (fileId: number, tmId: string) => {
+      return runMutation(async () => {
+        const result = await api.matchFileWithTM(fileId, tmId);
+        await loadData();
+        return result;
+      });
+    }
+  };
 }
 
 export function useProjectDetailData(projectId: number): UseProjectDetailDataResult {
@@ -70,66 +125,15 @@ export function useProjectDetailData(projectId: number): UseProjectDetailDataRes
     }
   }, []);
 
-  const mountTM = useCallback(
-    async (tmId: string) => {
-      await runMutation(async () => {
-        await apiClient.mountTMToProject(projectId, tmId);
-        await loadData();
-      });
-    },
+  const actions = useMemo(
+    () =>
+      createProjectDetailActions({
+        projectId,
+        api: apiClient,
+        loadData,
+        runMutation
+      }),
     [loadData, projectId, runMutation]
-  );
-
-  const unmountTM = useCallback(
-    async (tmId: string) => {
-      await runMutation(async () => {
-        await apiClient.unmountTMFromProject(projectId, tmId);
-        await loadData();
-      });
-    },
-    [loadData, projectId, runMutation]
-  );
-
-  const mountTB = useCallback(
-    async (tbId: string) => {
-      await runMutation(async () => {
-        await apiClient.mountTBToProject(projectId, tbId);
-        await loadData();
-      });
-    },
-    [loadData, projectId, runMutation]
-  );
-
-  const unmountTB = useCallback(
-    async (tbId: string) => {
-      await runMutation(async () => {
-        await apiClient.unmountTBFromProject(projectId, tbId);
-        await loadData();
-      });
-    },
-    [loadData, projectId, runMutation]
-  );
-
-  const commitToMainTM = useCallback(
-    async (tmId: string, fileId: number) => {
-      return runMutation(async () => {
-        const count = await apiClient.commitToMainTM(tmId, fileId);
-        await loadData();
-        return count;
-      });
-    },
-    [loadData, runMutation]
-  );
-
-  const matchFileWithTM = useCallback(
-    async (fileId: number, tmId: string) => {
-      return runMutation(async () => {
-        const result = await apiClient.matchFileWithTM(fileId, tmId);
-        await loadData();
-        return result;
-      });
-    },
-    [loadData, runMutation]
   );
 
   return {
@@ -143,11 +147,11 @@ export function useProjectDetailData(projectId: number): UseProjectDetailDataRes
     loading,
     loadData,
     runMutation,
-    mountTM,
-    unmountTM,
-    mountTB,
-    unmountTB,
-    commitToMainTM,
-    matchFileWithTM
+    mountTM: actions.mountTM,
+    unmountTM: actions.unmountTM,
+    mountTB: actions.mountTB,
+    unmountTB: actions.unmountTB,
+    commitToMainTM: actions.commitToMainTM,
+    matchFileWithTM: actions.matchFileWithTM
   };
 }

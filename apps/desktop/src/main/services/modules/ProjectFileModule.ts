@@ -86,11 +86,15 @@ export class ProjectFileModule {
 
       return file;
     } catch (error) {
+      const originalError = error instanceof Error ? error : new Error(String(error));
+      const cleanupErrors: Error[] = [];
+
       if (fileId !== undefined) {
         try {
           this.projectRepo.deleteFile(fileId);
         } catch (cleanupError) {
           console.warn('[ProjectFileModule] Failed to cleanup file record after import failure:', cleanupError);
+          cleanupErrors.push(cleanupError instanceof Error ? cleanupError : new Error(String(cleanupError)));
         }
       }
 
@@ -99,10 +103,18 @@ export class ProjectFileModule {
           unlinkSync(storedPath);
         } catch (cleanupError) {
           console.warn('[ProjectFileModule] Failed to cleanup copied file after import failure:', cleanupError);
+          cleanupErrors.push(cleanupError instanceof Error ? cleanupError : new Error(String(cleanupError)));
         }
       }
 
-      throw error;
+      if (cleanupErrors.length > 0) {
+        throw new AggregateError(
+          [originalError, ...cleanupErrors],
+          `[ProjectFileModule] Import failed and cleanup encountered ${cleanupErrors.length} error(s)`
+        );
+      }
+
+      throw originalError;
     }
   }
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TBMatch, TMEntry, serializeTokensToDisplayText } from '@cat/core';
+import { TBMatch, TMEntry, Token, serializeTokensToDisplayText } from '@cat/core';
 
 export interface TMMatch extends TMEntry {
   similarity: number;
@@ -10,7 +10,7 @@ export interface TMMatch extends TMEntry {
 interface TMPanelProps {
   matches: TMMatch[];
   termMatches: TBMatch[];
-  onApply: (tokens: any[]) => void;
+  onApply: (tokens: Token[]) => void;
   onApplyTerm: (term: string) => void;
 }
 

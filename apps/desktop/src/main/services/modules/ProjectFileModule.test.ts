@@ -109,4 +109,58 @@ describe('ProjectFileModule.addFileToProject cleanup', () => {
       rmSync(rootDir, { recursive: true, force: true });
     }
   });
+
+  it('throws aggregate error when import fails and cleanup also fails', async () => {
+    const rootDir = mkdtempSync(join(tmpdir(), 'project-file-module-'));
+    const inputPath = join(rootDir, 'input.xlsx');
+    writeFileSync(inputPath, 'fake spreadsheet');
+
+    const createdFileId = 44;
+    const projectRepo = {
+      getProject: vi.fn().mockReturnValue({ id: 1 }),
+      createFile: vi.fn().mockReturnValue(createdFileId),
+      deleteFile: vi.fn().mockImplementation(() => {
+        throw new Error('cleanup delete failed');
+      }),
+      getFile: vi.fn()
+    } as unknown as ProjectRepository;
+
+    const segmentRepo = {
+      bulkInsertSegments: vi.fn()
+    } as unknown as SegmentRepository;
+
+    const filter = {
+      import: vi.fn().mockRejectedValue(new Error('Import failed')),
+      export: vi.fn(),
+      getPreview: vi.fn()
+    } as unknown as SpreadsheetGateway;
+
+    const module = new ProjectFileModule(projectRepo, segmentRepo, filter, rootDir);
+    const options = {
+      hasHeader: true,
+      sourceCol: 0,
+      targetCol: 1
+    };
+
+    try {
+      let thrown: unknown;
+      try {
+        await module.addFileToProject(1, inputPath, options);
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(thrown).toBeInstanceOf(AggregateError);
+      const aggregate = thrown as AggregateError;
+      expect(aggregate.message).toContain('Import failed and cleanup encountered');
+      expect(aggregate.errors).toHaveLength(2);
+      expect((aggregate.errors[0] as Error).message).toContain('Import failed');
+      expect((aggregate.errors[1] as Error).message).toContain('cleanup delete failed');
+
+      const copiedPath = join(rootDir, '1', `${createdFileId}_input.xlsx`);
+      expect(existsSync(copiedPath)).toBe(false);
+    } finally {
+      rmSync(rootDir, { recursive: true, force: true });
+    }
+  });
 });

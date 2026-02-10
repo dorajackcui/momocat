@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../services/apiClient';
+import type { AppProgressEvent, SpreadsheetPreviewData, TMImportOptions } from '../../../shared/ipc';
 
 interface TMImportWizardProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (options: { hasHeader: boolean; sourceCol: number; targetCol: number; overwrite: boolean }) => void;
-  previewData: any[][];
+  onConfirm: (options: TMImportOptions) => void;
+  previewData: SpreadsheetPreviewData;
 }
 
 export function TMImportWizard({ isOpen, onClose, onConfirm, previewData }: TMImportWizardProps) {
@@ -17,7 +18,7 @@ export function TMImportWizard({ isOpen, onClose, onConfirm, previewData }: TMIm
 
   useEffect(() => {
     if (isOpen) {
-      const unsubscribe = apiClient.onProgress((data: any) => {
+      const unsubscribe = apiClient.onProgress((data: AppProgressEvent) => {
         if (data.type === 'tm-import') {
           setProgress({ current: data.current, total: data.total, message: data.message });
         }

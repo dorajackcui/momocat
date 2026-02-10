@@ -308,10 +308,15 @@ export class TMModule {
     const tm = this.tmRepo.getTM(tmId);
     if (!tm) throw new Error('TM not found');
 
+    const mountedTMs = this.tmRepo.getProjectMountedTMs(file.projectId);
+    if (!mountedTMs.some(mounted => mounted.id === tmId)) {
+      throw new Error('TM is not mounted to this file project');
+    }
+
     const segments = this.segmentRepo.getSegmentsPage(fileId, 0, 1000000);
     let matched = 0;
-    let applied = 0;
     let skipped = 0;
+    const updates: Array<{ segmentId: string; targetTokens: Segment['targetTokens']; status: 'confirmed' }> = [];
 
     for (const seg of segments) {
       const match = this.tmRepo.findTMEntryByHash(tmId, seg.srcHash);
@@ -323,14 +328,21 @@ export class TMModule {
         continue;
       }
 
-      await this.segmentService.updateSegment(seg.segmentId, match.targetTokens, 'confirmed');
-      applied += 1;
+      updates.push({
+        segmentId: seg.segmentId,
+        targetTokens: match.targetTokens,
+        status: 'confirmed'
+      });
+    }
+
+    if (updates.length > 0) {
+      await this.segmentService.updateSegmentsAtomically(updates);
     }
 
     return {
       total: segments.length,
       matched,
-      applied,
+      applied: updates.length,
       skipped
     };
   }

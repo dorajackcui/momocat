@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
+import type { ImportOptions, SpreadsheetPreviewData } from '../../../shared/ipc';
 
 interface ColumnSelectorProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (options: { hasHeader: boolean; sourceCol: number; targetCol: number; contextCol?: number }) => void;
-  previewData: any[][];
+  onConfirm: (options: ImportOptions) => void;
+  previewData: SpreadsheetPreviewData;
 }
 
 export function ColumnSelector({ isOpen, onClose, onConfirm, previewData }: ColumnSelectorProps) {

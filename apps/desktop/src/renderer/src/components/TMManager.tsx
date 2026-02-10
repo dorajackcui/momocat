@@ -1,18 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { TMImportWizard } from './TMImportWizard';
 import { apiClient } from '../services/apiClient';
-
-interface TM {
-  id: string;
-  name: string;
-  srcLang: string;
-  tgtLang: string;
-  type: 'working' | 'main';
-  stats: { entryCount: number };
-}
+import type { SpreadsheetPreviewData, TMImportOptions, TMWithStats } from '../../../shared/ipc';
 
 export const TMManager: React.FC = () => {
-  const [tms, setTMs] = useState<TM[]>([]);
+  const [tms, setTMs] = useState<TMWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
@@ -21,7 +13,7 @@ export const TMManager: React.FC = () => {
 
   // Import State
   const [importingTMId, setImportingTMId] = useState<string | null>(null);
-  const [importPreview, setImportPreview] = useState<any[][]>([]);
+  const [importPreview, setImportPreview] = useState<SpreadsheetPreviewData>([]);
   const [importFilePath, setImportFilePath] = useState<string | null>(null);
   const [isImportWizardOpen, setIsImportWizardOpen] = useState(false);
 
@@ -81,7 +73,7 @@ export const TMManager: React.FC = () => {
     }
   };
 
-  const handleConfirmImport = async (options: any) => {
+  const handleConfirmImport = async (options: TMImportOptions) => {
     if (!importingTMId || !importFilePath) return;
     
     // Don't close wizard yet, it will show progress

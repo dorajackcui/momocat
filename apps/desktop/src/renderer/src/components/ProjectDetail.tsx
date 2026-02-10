@@ -292,7 +292,6 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
           )
         ) : activeTab === 'files' ? (
           <ProjectFilesPane
-            project={project}
             files={files}
             onOpenFile={onOpenFile}
             onOpenCommitModal={openCommitModal}
