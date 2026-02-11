@@ -2,6 +2,7 @@ import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useState } f
 import { Project } from '@cat/core';
 import type { JobProgressEvent } from '../../../../shared/ipc';
 import { apiClient } from '../../services/apiClient';
+import { feedbackService } from '../../services/feedbackService';
 
 export const DEFAULT_AI_TEMPERATURE = 0.2;
 
@@ -54,9 +55,12 @@ export function deriveProjectAIFlags(input: ProjectAIFlagsInput): ProjectAIFlags
     normalizedSavedPrompt,
     normalizedTemperatureDraft,
     normalizedSavedTemperature,
-    hasUnsavedPromptChanges: normalizedPromptDraft !== normalizedSavedPrompt || hasUnsavedTemperatureChanges,
+    hasUnsavedPromptChanges:
+      normalizedPromptDraft !== normalizedSavedPrompt || hasUnsavedTemperatureChanges,
     hasInvalidTemperature: normalizedTemperatureDraft === null,
-    hasTestDetails: Boolean(input.testMeta || input.testUserMessage || input.testPromptUsed || input.testRawResponse)
+    hasTestDetails: Boolean(
+      input.testMeta || input.testUserMessage || input.testPromptUsed || input.testRawResponse,
+    ),
   };
 }
 
@@ -119,12 +123,16 @@ export function useProjectAI({
   project,
   setProject,
   loadData,
-  runMutation
+  runMutation,
 }: UseProjectAIParams): ProjectAIController {
   const [promptDraft, setPromptDraft] = useState('');
   const [savedPromptValue, setSavedPromptValue] = useState('');
-  const [temperatureDraft, setTemperatureDraft] = useState(formatTemperature(DEFAULT_AI_TEMPERATURE));
-  const [savedTemperatureValue, setSavedTemperatureValue] = useState(formatTemperature(DEFAULT_AI_TEMPERATURE));
+  const [temperatureDraft, setTemperatureDraft] = useState(
+    formatTemperature(DEFAULT_AI_TEMPERATURE),
+  );
+  const [savedTemperatureValue, setSavedTemperatureValue] = useState(
+    formatTemperature(DEFAULT_AI_TEMPERATURE),
+  );
   const [promptSavedAt, setPromptSavedAt] = useState<string | null>(null);
   const [savingPrompt, setSavingPrompt] = useState(false);
   const [testSource, setTestSource] = useState('');
@@ -154,14 +162,14 @@ export function useProjectAI({
 
   useEffect(() => {
     const unsubscribe = apiClient.onJobProgress((progress: JobProgressEvent) => {
-      setAiJobs(prev => {
+      setAiJobs((prev) => {
         if (!prev[progress.jobId]) return prev;
         return {
           ...prev,
           [progress.jobId]: {
             ...prev[progress.jobId],
-            ...progress
-          }
+            ...progress,
+          },
         };
       });
 
@@ -180,7 +188,7 @@ export function useProjectAI({
     testMeta,
     testUserMessage,
     testPromptUsed,
-    testRawResponse
+    testRawResponse,
   });
   const normalizedPromptDraft = aiFlags.normalizedPromptDraft;
   const normalizedSavedPrompt = aiFlags.normalizedSavedPrompt;
@@ -193,14 +201,14 @@ export function useProjectAI({
     if (!project) return;
     const parsedTemperature = parseTemperatureInput(temperatureDraft);
     if (parsedTemperature === null) {
-      alert('Temperature must be a number between 0 and 2.');
+      feedbackService.error('Temperature must be a number between 0 and 2.');
       return;
     }
 
     if (
-      normalizedPromptDraft === normalizedSavedPrompt
-      && normalizedSavedTemperature !== null
-      && parsedTemperature === normalizedSavedTemperature
+      normalizedPromptDraft === normalizedSavedPrompt &&
+      normalizedSavedTemperature !== null &&
+      parsedTemperature === normalizedSavedTemperature
     ) {
       return;
     }
@@ -210,7 +218,7 @@ export function useProjectAI({
       await runMutation(async () => {
         const promptValue = normalizedPromptDraft.length > 0 ? normalizedPromptDraft : null;
         await apiClient.updateProjectAISettings(project.id, promptValue, parsedTemperature);
-        setProject(prev => {
+        setProject((prev) => {
           if (!prev) return prev;
           return { ...prev, aiPrompt: promptValue, aiTemperature: parsedTemperature };
         });
@@ -221,7 +229,7 @@ export function useProjectAI({
         setPromptSavedAt(new Date().toLocaleTimeString());
       });
     } catch {
-      alert('Failed to save AI settings');
+      feedbackService.error('Failed to save AI settings');
     } finally {
       setSavingPrompt(false);
     }
@@ -232,14 +240,14 @@ export function useProjectAI({
     project,
     runMutation,
     setProject,
-    temperatureDraft
+    temperatureDraft,
   ]);
 
   const testPrompt = useCallback(async () => {
     if (!project) return;
     const source = testSource.trim();
     if (!source) {
-      alert('Please enter test source text.');
+      feedbackService.info('Please enter test source text.');
       return;
     }
 
@@ -268,69 +276,78 @@ export function useProjectAI({
   }, [project, testSource]);
 
   const startAITranslateFile = useCallback(async (fileId: number, fileName: string) => {
-    if (!confirm(`Run AI translation for "${fileName}"? This will fill empty target segments only.`)) return;
+    const confirmed = await feedbackService.confirm(
+      `Run AI translation for "${fileName}"? This will fill empty target segments only.`,
+    );
+    if (!confirmed) return;
     try {
       const jobId = await apiClient.aiTranslateFile(fileId);
-      setAiJobs(prev => ({
+      setAiJobs((prev) => ({
         ...prev,
-        [jobId]: { jobId, fileId, progress: 0, status: 'running', message: 'Queued' }
+        [jobId]: { jobId, fileId, progress: 0, status: 'running', message: 'Queued' },
       }));
-      setFileJobIndex(prev => ({ ...prev, [fileId]: jobId }));
+      setFileJobIndex((prev) => ({ ...prev, [fileId]: jobId }));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      alert(`Failed to start AI translation: ${message}`);
+      feedbackService.error(`Failed to start AI translation: ${message}`);
     }
   }, []);
 
-  const getFileJob = useCallback((fileId: number): TrackedAIJob | null => {
-    const jobId = fileJobIndex[fileId];
-    if (!jobId) return null;
-    return aiJobs[jobId] ?? null;
-  }, [aiJobs, fileJobIndex]);
+  const getFileJob = useCallback(
+    (fileId: number): TrackedAIJob | null => {
+      const jobId = fileJobIndex[fileId];
+      if (!jobId) return null;
+      return aiJobs[jobId] ?? null;
+    },
+    [aiJobs, fileJobIndex],
+  );
 
-  return useMemo(() => ({
-    promptDraft,
-    setPromptDraft,
-    temperatureDraft,
-    setTemperatureDraft,
-    promptSavedAt,
-    savingPrompt,
-    testSource,
-    setTestSource,
-    testResult,
-    testPromptUsed,
-    testUserMessage,
-    testMeta,
-    testError,
-    testRawResponse,
-    showTestDetails,
-    setShowTestDetails,
-    hasUnsavedPromptChanges,
-    hasInvalidTemperature,
-    hasTestDetails,
-    savePrompt,
-    testPrompt,
-    startAITranslateFile,
-    getFileJob
-  }), [
-    getFileJob,
-    hasInvalidTemperature,
-    hasTestDetails,
-    hasUnsavedPromptChanges,
-    promptDraft,
-    promptSavedAt,
-    savePrompt,
-    savingPrompt,
-    showTestDetails,
-    startAITranslateFile,
-    temperatureDraft,
-    testError,
-    testMeta,
-    testPrompt,
-    testPromptUsed,
-    testRawResponse,
-    testResult,
-    testSource,
-    testUserMessage
-  ]);
+  return useMemo(
+    () => ({
+      promptDraft,
+      setPromptDraft,
+      temperatureDraft,
+      setTemperatureDraft,
+      promptSavedAt,
+      savingPrompt,
+      testSource,
+      setTestSource,
+      testResult,
+      testPromptUsed,
+      testUserMessage,
+      testMeta,
+      testError,
+      testRawResponse,
+      showTestDetails,
+      setShowTestDetails,
+      hasUnsavedPromptChanges,
+      hasInvalidTemperature,
+      hasTestDetails,
+      savePrompt,
+      testPrompt,
+      startAITranslateFile,
+      getFileJob,
+    }),
+    [
+      getFileJob,
+      hasInvalidTemperature,
+      hasTestDetails,
+      hasUnsavedPromptChanges,
+      promptDraft,
+      promptSavedAt,
+      savePrompt,
+      savingPrompt,
+      showTestDetails,
+      startAITranslateFile,
+      temperatureDraft,
+      testError,
+      testMeta,
+      testPrompt,
+      testPromptUsed,
+      testRawResponse,
+      testResult,
+      testSource,
+      testUserMessage,
+    ],
+  );
 }

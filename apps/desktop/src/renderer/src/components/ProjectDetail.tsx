@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ProjectFile } from '@cat/core';
 import { ColumnSelector } from './ColumnSelector';
 import { apiClient } from '../services/apiClient';
+import { feedbackService } from '../services/feedbackService';
 import { useProjectDetailData } from '../hooks/projectDetail/useProjectDetailData';
 import { useProjectFileImport } from '../hooks/projectDetail/useProjectFileImport';
 import { useProjectAI } from '../hooks/projectDetail/useProjectAI';
@@ -40,26 +41,26 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
     mountTB,
     unmountTB,
     commitToMainTM,
-    matchFileWithTM
+    matchFileWithTM,
   } = useProjectDetailData(projectId);
 
   const fileImport = useProjectFileImport({
     projectId,
     loadData,
-    runMutation
+    runMutation,
   });
 
   const ai = useProjectAI({
     project,
     setProject,
     loadData,
-    runMutation
+    runMutation,
   });
 
   const openCommitModal = (file: ProjectFile) => {
-    const mountedMainTMs = mountedTMs.filter(tm => tm.type === 'main');
+    const mountedMainTMs = mountedTMs.filter((tm) => tm.type === 'main');
     if (mountedMainTMs.length === 0) {
-      alert('No mounted Main TM found. Please mount a Main TM first.');
+      feedbackService.info('No mounted Main TM found. Please mount a Main TM first.');
       return;
     }
     setCommitModalFile(file);
@@ -70,9 +71,9 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
     if (!commitModalFile || !commitTmId) return;
     try {
       const count = await commitToMainTM(commitTmId, commitModalFile.id);
-      alert(`Successfully committed ${count} confirmed segments to Main TM.`);
+      feedbackService.success(`Successfully committed ${count} confirmed segments to Main TM.`);
     } catch {
-      alert('Failed to commit segments');
+      feedbackService.error('Failed to commit segments');
     } finally {
       setCommitModalFile(null);
       setCommitTmId('');
@@ -81,7 +82,7 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
 
   const openMatchModal = (file: ProjectFile) => {
     if (mountedTMs.length === 0) {
-      alert('No mounted TM found. Please mount a TM first.');
+      feedbackService.info('No mounted TM found. Please mount a TM first.');
       return;
     }
     setMatchModalFile(file);
@@ -92,11 +93,11 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
     if (!matchModalFile || !matchTmId) return;
     try {
       const result = await matchFileWithTM(matchModalFile.id, matchTmId);
-      alert(
-        `TM batch matching completed.\nTotal: ${result.total}\nMatched: ${result.matched}\nApplied: ${result.applied}\nSkipped: ${result.skipped}`
+      feedbackService.success(
+        `TM batch matching completed.\nTotal: ${result.total}\nMatched: ${result.matched}\nApplied: ${result.applied}\nSkipped: ${result.skipped}`,
       );
     } catch {
-      alert('TM matching failed.');
+      feedbackService.error('TM matching failed.');
     } finally {
       setMatchModalFile(null);
       setMatchTmId('');
@@ -107,7 +108,7 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
     try {
       await mountTM(tmId);
     } catch {
-      alert('Failed to mount TM');
+      feedbackService.error('Failed to mount TM');
     }
   };
 
@@ -115,7 +116,7 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
     try {
       await unmountTM(tmId);
     } catch {
-      alert('Failed to unmount TM');
+      feedbackService.error('Failed to unmount TM');
     }
   };
 
@@ -123,7 +124,7 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
     try {
       await mountTB(tbId);
     } catch {
-      alert('Failed to mount term base');
+      feedbackService.error('Failed to mount term base');
     }
   };
 
@@ -131,12 +132,15 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
     try {
       await unmountTB(tbId);
     } catch {
-      alert('Failed to unmount term base');
+      feedbackService.error('Failed to unmount term base');
     }
   };
 
   const handleDeleteFile = async (fileId: number, fileName: string) => {
-    if (!confirm(`Are you sure you want to delete "${fileName}"?`)) return;
+    const confirmed = await feedbackService.confirm(
+      `Are you sure you want to delete "${fileName}"?`,
+    );
+    if (!confirmed) return;
 
     try {
       await runMutation(async () => {
@@ -144,14 +148,14 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
         await loadData();
       });
     } catch {
-      alert('Failed to delete file');
+      feedbackService.error('Failed to delete file');
     }
   };
 
   const handleExportFile = async (fileId: number, fileName: string) => {
     const defaultPath = fileName.replace(/(\.xlsx|\.csv)$/i, '_translated$1');
     const outputPath = await apiClient.saveFileDialog(defaultPath, [
-      { name: 'Spreadsheets', extensions: ['xlsx', 'csv'] }
+      { name: 'Spreadsheets', extensions: ['xlsx', 'csv'] },
     ]);
     if (!outputPath) return;
 
@@ -159,16 +163,16 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
       await runMutation(async () => {
         await apiClient.exportFile(fileId, outputPath);
       });
-      alert('Export successful');
+      feedbackService.success('Export successful');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       if (!errorMessage.includes('Export blocked by QA errors')) {
-        alert(`Export failed: ${errorMessage}`);
+        feedbackService.error(`Export failed: ${errorMessage}`);
         return;
       }
 
-      const forceExport = confirm(
-        `${errorMessage}\n\nDo you want to force export despite these errors?`
+      const forceExport = await feedbackService.confirm(
+        `${errorMessage}\n\nDo you want to force export despite these errors?`,
       );
 
       if (!forceExport) return;
@@ -177,9 +181,11 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
         await runMutation(async () => {
           await apiClient.exportFile(fileId, outputPath, undefined, true);
         });
-        alert('Export successful (forced despite QA errors)');
+        feedbackService.success('Export successful (forced despite QA errors)');
       } catch (forceError) {
-        alert(`Export failed: ${forceError instanceof Error ? forceError.message : String(forceError)}`);
+        feedbackService.error(
+          `Export failed: ${forceError instanceof Error ? forceError.message : String(forceError)}`,
+        );
       }
     }
   };
@@ -224,13 +230,29 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
             className="p-2 hover:bg-gray-200 rounded-full transition-colors"
             title="Back to Dashboard"
           >
-            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <svg
+              className="w-5 h-5 text-gray-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
             </svg>
           </button>
           <div>
-            <h2 className="text-xl font-bold text-gray-900">{loading ? 'Loading...' : project?.name || 'Project Not Found'}</h2>
-            {project && <p className="text-xs text-gray-500">{project.srcLang} → {project.tgtLang}</p>}
+            <h2 className="text-xl font-bold text-gray-900">
+              {loading ? 'Loading...' : project?.name || 'Project Not Found'}
+            </h2>
+            {project && (
+              <p className="text-xs text-gray-500">
+                {project.srcLang} → {project.tgtLang}
+              </p>
+            )}
           </div>
         </div>
 
@@ -239,7 +261,9 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
             <button
               onClick={() => setActiveTab('files')}
               className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
-                activeTab === 'files' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                activeTab === 'files'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               Files
@@ -247,7 +271,9 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
             <button
               onClick={() => setActiveTab('tm')}
               className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
-                activeTab === 'tm' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                activeTab === 'tm'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               Translation Memory
@@ -255,7 +281,9 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
             <button
               onClick={() => setActiveTab('tb')}
               className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
-                activeTab === 'tb' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                activeTab === 'tb'
+                  ? 'bg-white text-emerald-600 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               Term Bases
@@ -284,7 +312,9 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
             </div>
           ) : (
             <div className="max-w-4xl mx-auto text-center py-20 bg-red-50 rounded-xl border border-red-100">
-              <p className="text-red-600 font-medium">Error: Project with ID {projectId} could not be found.</p>
+              <p className="text-red-600 font-medium">
+                Error: Project with ID {projectId} could not be found.
+              </p>
               <button onClick={onBack} className="mt-4 text-blue-600 font-bold hover:underline">
                 Go back to Dashboard
               </button>

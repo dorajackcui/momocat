@@ -22,15 +22,15 @@ function createSegment(segmentId: string, srcHash: string, status: Segment['stat
     matchKey: 'hello',
     srcHash,
     meta: {
-      updatedAt: new Date().toISOString()
-    }
+      updatedAt: new Date().toISOString(),
+    },
   };
 }
 
 class FailingSegmentRepository implements SegmentRepository {
   constructor(
     private readonly delegate: SegmentRepository,
-    private readonly shouldFail: (segmentId: string, status: Segment['status']) => boolean
+    private readonly shouldFail: (segmentId: string, status: Segment['status']) => boolean,
   ) {}
 
   bulkInsertSegments(segments: Segment[]): void {
@@ -74,16 +74,16 @@ describe('TMModule.batchMatchFileWithTM', () => {
     const segments = [
       createSegment('seg-1', 'hash-1', 'new'),
       createSegment('seg-2', 'hash-2', 'confirmed'),
-      createSegment('seg-3', 'hash-3', 'new')
+      createSegment('seg-3', 'hash-3', 'new'),
     ];
 
     const projectRepo = {
-      getFile: vi.fn().mockReturnValue({ id: 1, projectId: 1, name: 'demo.xlsx' })
+      getFile: vi.fn().mockReturnValue({ id: 1, projectId: 1, name: 'demo.xlsx' }),
     } as unknown as ProjectRepository;
 
     const segmentRepo = {
       getSegmentsPage: vi.fn().mockReturnValue(segments),
-      updateSegmentTarget: vi.fn()
+      updateSegmentTarget: vi.fn(),
     } as unknown as SegmentRepository;
 
     const tmRepo = {
@@ -94,15 +94,15 @@ describe('TMModule.batchMatchFileWithTM', () => {
           return { targetTokens: matchedTokens };
         }
         return undefined;
-      })
+      }),
     } as unknown as TMRepository;
 
     const tx = {
-      runInTransaction: <T>(fn: () => T) => fn()
+      runInTransaction: <T>(fn: () => T) => fn(),
     } as TransactionManager;
 
     const segmentService = {
-      updateSegmentsAtomically: vi.fn().mockResolvedValue([])
+      updateSegmentsAtomically: vi.fn().mockResolvedValue([]),
     } as unknown as SegmentService;
 
     const module = new TMModule(
@@ -113,7 +113,7 @@ describe('TMModule.batchMatchFileWithTM', () => {
       {} as TMService,
       segmentService,
       ':memory:',
-      vi.fn()
+      vi.fn(),
     );
 
     const result = await module.batchMatchFileWithTM(1, 'tm-1');
@@ -122,36 +122,36 @@ describe('TMModule.batchMatchFileWithTM', () => {
       total: 3,
       matched: 2,
       applied: 1,
-      skipped: 1
+      skipped: 1,
     });
 
     expect(segmentService.updateSegmentsAtomically).toHaveBeenCalledTimes(1);
     expect(segmentService.updateSegmentsAtomically).toHaveBeenCalledWith([
-      { segmentId: 'seg-1', targetTokens: matchedTokens, status: 'confirmed' }
+      { segmentId: 'seg-1', targetTokens: matchedTokens, status: 'confirmed' },
     ]);
     expect(segmentRepo.updateSegmentTarget).not.toHaveBeenCalled();
   });
 
   it('rejects when TM is not mounted to the target project', async () => {
     const projectRepo = {
-      getFile: vi.fn().mockReturnValue({ id: 1, projectId: 1, name: 'demo.xlsx' })
+      getFile: vi.fn().mockReturnValue({ id: 1, projectId: 1, name: 'demo.xlsx' }),
     } as unknown as ProjectRepository;
 
     const segmentRepo = {
-      getSegmentsPage: vi.fn()
+      getSegmentsPage: vi.fn(),
     } as unknown as SegmentRepository;
 
     const tmRepo = {
       getTM: vi.fn().mockReturnValue({ id: 'tm-main', srcLang: 'en', tgtLang: 'zh' }),
-      getProjectMountedTMs: vi.fn().mockReturnValue([])
+      getProjectMountedTMs: vi.fn().mockReturnValue([]),
     } as unknown as TMRepository;
 
     const tx = {
-      runInTransaction: <T>(fn: () => T) => fn()
+      runInTransaction: <T>(fn: () => T) => fn(),
     } as TransactionManager;
 
     const segmentService = {
-      updateSegmentsAtomically: vi.fn()
+      updateSegmentsAtomically: vi.fn(),
     } as unknown as SegmentService;
 
     const module = new TMModule(
@@ -162,12 +162,88 @@ describe('TMModule.batchMatchFileWithTM', () => {
       {} as TMService,
       segmentService,
       ':memory:',
-      vi.fn()
+      vi.fn(),
     );
 
-    await expect(module.batchMatchFileWithTM(1, 'tm-main')).rejects.toThrow('TM is not mounted to this file project');
+    await expect(module.batchMatchFileWithTM(1, 'tm-main')).rejects.toThrow(
+      'TM is not mounted to this file project',
+    );
     expect(segmentRepo.getSegmentsPage).not.toHaveBeenCalled();
     expect(segmentService.updateSegmentsAtomically).not.toHaveBeenCalled();
+  });
+
+  it('scans segments page by page for large files', async () => {
+    const projectRepo = {
+      getFile: vi.fn().mockReturnValue({ id: 1, projectId: 1, name: 'large.xlsx' }),
+    } as unknown as ProjectRepository;
+
+    const firstPage: Segment[] = Array.from({ length: 2000 }, (_, index) =>
+      createSegment(`seg-${index}`, index === 0 ? 'hash-first' : `hash-${index}`, 'new'),
+    );
+    const secondPage: Segment[] = [
+      createSegment('seg-last', 'hash-last', 'new'),
+      createSegment('seg-confirmed', 'hash-confirmed', 'confirmed'),
+    ];
+
+    const segmentRepo = {
+      getSegmentsPage: vi.fn((fileId: number, offset: number, limit: number) => {
+        if (fileId !== 1) return [];
+        if (offset === 0) {
+          expect(limit).toBe(2000);
+          return firstPage;
+        }
+        if (offset === limit) {
+          return secondPage;
+        }
+        return [];
+      }),
+    } as unknown as SegmentRepository;
+
+    const matchedTokens: Token[] = [{ type: 'text', content: '匹配结果' }];
+    const tmRepo = {
+      getTM: vi.fn().mockReturnValue({ id: 'tm-large', srcLang: 'en', tgtLang: 'zh' }),
+      getProjectMountedTMs: vi.fn().mockReturnValue([{ id: 'tm-large' }]),
+      findTMEntryByHash: vi.fn((_: string, srcHash: string) => {
+        if (srcHash === 'hash-first' || srcHash === 'hash-last' || srcHash === 'hash-confirmed') {
+          return { targetTokens: matchedTokens };
+        }
+        return undefined;
+      }),
+    } as unknown as TMRepository;
+
+    const tx = {
+      runInTransaction: <T>(fn: () => T) => fn(),
+    } as TransactionManager;
+
+    const segmentService = {
+      updateSegmentsAtomically: vi.fn().mockResolvedValue([]),
+    } as unknown as SegmentService;
+
+    const module = new TMModule(
+      projectRepo,
+      segmentRepo,
+      tmRepo,
+      tx,
+      {} as TMService,
+      segmentService,
+      ':memory:',
+      vi.fn(),
+    );
+
+    const result = await module.batchMatchFileWithTM(1, 'tm-large');
+
+    expect(result).toEqual({
+      total: 2002,
+      matched: 3,
+      applied: 2,
+      skipped: 1,
+    });
+
+    expect(segmentRepo.getSegmentsPage).toHaveBeenCalledTimes(2);
+    expect(segmentService.updateSegmentsAtomically).toHaveBeenCalledWith([
+      { segmentId: 'seg-0', targetTokens: matchedTokens, status: 'confirmed' },
+      { segmentId: 'seg-last', targetTokens: matchedTokens, status: 'confirmed' },
+    ]);
   });
 
   it('keeps propagation, Working TM updates, and events consistent with manual confirmations', async () => {
@@ -179,7 +255,7 @@ describe('TMModule.batchMatchFileWithTM', () => {
     const segments: Segment[] = [
       createSegment('seg-1', srcHash, 'new'),
       createSegment('seg-2', srcHash, 'new'),
-      createSegment('seg-3', 'hash-miss', 'new')
+      createSegment('seg-3', 'hash-miss', 'new'),
     ].map((segment, index) => ({ ...segment, fileId, orderIndex: index }));
 
     db.bulkInsertSegments(segments);
@@ -202,7 +278,7 @@ describe('TMModule.batchMatchFileWithTM', () => {
       targetTokens: matchedTokens,
       createdAt: now,
       updatedAt: now,
-      usageCount: 1
+      usageCount: 1,
     });
     db.replaceTMFts(mainTmId, 'Hello', '你好', entryId);
 
@@ -212,7 +288,16 @@ describe('TMModule.batchMatchFileWithTM', () => {
     const tx = new SqliteTransactionManager(db);
     const tmService = new TMService(projectRepo, tmRepo);
     const segmentService = new SegmentService(segmentRepo, tmService, tx);
-    const module = new TMModule(projectRepo, segmentRepo, tmRepo, tx, tmService, segmentService, ':memory:', vi.fn());
+    const module = new TMModule(
+      projectRepo,
+      segmentRepo,
+      tmRepo,
+      tx,
+      tmService,
+      segmentService,
+      ':memory:',
+      vi.fn(),
+    );
 
     const eventSpy = vi.fn();
     segmentService.on('segments-updated', eventSpy);
@@ -223,7 +308,7 @@ describe('TMModule.batchMatchFileWithTM', () => {
       total: 3,
       matched: 2,
       applied: 2,
-      skipped: 0
+      skipped: 0,
     });
 
     const seg1 = db.getSegment('seg-1');
@@ -235,7 +320,7 @@ describe('TMModule.batchMatchFileWithTM', () => {
     expect(seg1?.targetTokens).toEqual(matchedTokens);
     expect(seg2?.targetTokens).toEqual(matchedTokens);
 
-    const workingTM = db.getProjectMountedTMs(projectId).find(tm => tm.type === 'working');
+    const workingTM = db.getProjectMountedTMs(projectId).find((tm) => tm.type === 'working');
     expect(workingTM).toBeDefined();
     if (!workingTM) {
       throw new Error('Expected working TM to exist');
@@ -249,12 +334,12 @@ describe('TMModule.batchMatchFileWithTM', () => {
     expect(firstEvent).toMatchObject({
       segmentId: 'seg-1',
       status: 'confirmed',
-      propagatedIds: ['seg-2']
+      propagatedIds: ['seg-2'],
     });
     expect(secondEvent).toMatchObject({
       segmentId: 'seg-2',
       status: 'confirmed',
-      propagatedIds: []
+      propagatedIds: [],
     });
   });
 
@@ -265,7 +350,7 @@ describe('TMModule.batchMatchFileWithTM', () => {
 
     const segments: Segment[] = [
       createSegment('seg-1', 'hash-1', 'new'),
-      createSegment('seg-2', 'hash-2', 'new')
+      createSegment('seg-2', 'hash-2', 'new'),
     ].map((segment, index) => ({ ...segment, fileId, orderIndex: index }));
     db.bulkInsertSegments(segments);
 
@@ -286,7 +371,7 @@ describe('TMModule.batchMatchFileWithTM', () => {
       targetTokens: [{ type: 'text', content: '你好 1' }],
       createdAt: now,
       updatedAt: now,
-      usageCount: 1
+      usageCount: 1,
     });
     db.replaceTMFts(mainTmId, 'Hello 1', '你好 1', entryId1);
 
@@ -303,7 +388,7 @@ describe('TMModule.batchMatchFileWithTM', () => {
       targetTokens: [{ type: 'text', content: '你好 2' }],
       createdAt: now,
       updatedAt: now,
-      usageCount: 1
+      usageCount: 1,
     });
     db.replaceTMFts(mainTmId, 'Hello 2', '你好 2', entryId2);
 
@@ -311,18 +396,29 @@ describe('TMModule.batchMatchFileWithTM', () => {
     const baseSegmentRepo = new SqliteSegmentRepository(db);
     const failingSegmentRepo = new FailingSegmentRepository(
       baseSegmentRepo,
-      (segmentId, status) => segmentId === 'seg-2' && status === 'confirmed'
+      (segmentId, status) => segmentId === 'seg-2' && status === 'confirmed',
     );
     const tmRepo = new SqliteTMRepository(db);
     const tx = new SqliteTransactionManager(db);
     const tmService = new TMService(projectRepo, tmRepo);
     const segmentService = new SegmentService(failingSegmentRepo, tmService, tx);
-    const module = new TMModule(projectRepo, baseSegmentRepo, tmRepo, tx, tmService, segmentService, ':memory:', vi.fn());
+    const module = new TMModule(
+      projectRepo,
+      baseSegmentRepo,
+      tmRepo,
+      tx,
+      tmService,
+      segmentService,
+      ':memory:',
+      vi.fn(),
+    );
 
     const eventSpy = vi.fn();
     segmentService.on('segments-updated', eventSpy);
 
-    await expect(module.batchMatchFileWithTM(fileId, mainTmId)).rejects.toThrow('Forced segment update failure');
+    await expect(module.batchMatchFileWithTM(fileId, mainTmId)).rejects.toThrow(
+      'Forced segment update failure',
+    );
 
     const seg1 = db.getSegment('seg-1');
     const seg2 = db.getSegment('seg-2');
@@ -331,7 +427,7 @@ describe('TMModule.batchMatchFileWithTM', () => {
     expect(seg1?.targetTokens).toEqual([]);
     expect(seg2?.targetTokens).toEqual([]);
 
-    const workingTM = db.getProjectMountedTMs(projectId).find(tm => tm.type === 'working');
+    const workingTM = db.getProjectMountedTMs(projectId).find((tm) => tm.type === 'working');
     expect(workingTM).toBeDefined();
     if (!workingTM) {
       throw new Error('Expected working TM to exist');

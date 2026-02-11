@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Project } from '@cat/core';
 import { apiClient } from '../services/apiClient';
+import { feedbackService } from '../services/feedbackService';
 
 export interface ProjectWithStats extends Project {
   progress: number;
@@ -34,7 +35,9 @@ export function useProjects() {
       return newProject;
     } catch (error) {
       console.error('Failed to create project:', error);
-      alert('Failed to create project: ' + (error instanceof Error ? error.message : String(error)));
+      feedbackService.error(
+        `Failed to create project: ${error instanceof Error ? error.message : String(error)}`,
+      );
       return null;
     } finally {
       setLoading(false);
@@ -42,7 +45,10 @@ export function useProjects() {
   };
 
   const deleteProject = async (projectId: number) => {
-    if (!confirm('Are you sure you want to delete this project? This will remove all files and translations.')) return;
+    const confirmed = await feedbackService.confirm(
+      'Are you sure you want to delete this project? This will remove all files and translations.',
+    );
+    if (!confirmed) return;
 
     setLoading(true);
     try {
@@ -50,7 +56,7 @@ export function useProjects() {
       await loadProjects();
     } catch (error) {
       console.error('Failed to delete project:', error);
-      alert('Failed to delete project');
+      feedbackService.error('Failed to delete project');
     } finally {
       setLoading(false);
     }
@@ -61,6 +67,6 @@ export function useProjects() {
     loading,
     loadProjects,
     createProject,
-    deleteProject
+    deleteProject,
   };
 }

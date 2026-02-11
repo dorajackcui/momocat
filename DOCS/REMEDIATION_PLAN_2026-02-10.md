@@ -1,8 +1,14 @@
-# 项目整改计划（2026-02-10）
+# 项目整改计划（2026-02-10，状态更新于 2026-02-11）
 
 > 文档定位：针对当前代码审查结论的执行清单  
 > 来源：本轮全项目 review（模块化/可维护性/可扩展性）  
 > 目标：将“发现的问题”转化为可落地整改步骤，并纳入迭代节奏
+
+## 当前状态摘要（2026-02-11）
+
+1. P1/P2/P3 整改项已全部完成。
+2. 功能开发前 6 个 P0 Gate 已全部通过（见 `DOCS/PRE_FEATURE_GATES_2026-02-11.md`）。
+3. 本文档进入“历史计划 + 后续治理基线”模式，不再作为阻塞功能开发的待办清单。
 
 ---
 
@@ -275,30 +281,24 @@
 
 ---
 
-## 4. 建议执行顺序（两周）
+## 4. 后续治理节奏（功能并行）
 
-1. 第 1-2 天：完成 P1-01、P1-02（先正确性）。
-2. 第 3-5 天：完成 P2-04（lint 门禁）+ P2-02（类型收敛第一批）。
-3. 第 6-8 天：完成 P2-01（IPC 拆分）。
-4. 第 9-10 天：推进 P2-03（I/O 下沉）并做压测。
-5. 第 11 天：完成 P3-01 清理。
-6. 第 12-14 天：回归测试与文档更新（Tracker/Roadmap/Development Guide）。
+1. 每个功能 PR 默认只允许处理“功能本身 + 直接阻塞问题 + 必要测试”。
+2. 历史 warning、插件化深化、UI 统一等非阻塞项进入 backlog，按功能触达范围逐步治理。
+3. 触达架构敏感区（`ProjectService` / `CATDatabase` / IPC 契约）时，必须补齐守卫与测试。
 
 ---
 
-## 5. 统一验收命令
+## 5. 统一验收命令（当前基线）
 
 ```bash
-npm run typecheck --workspace=apps/desktop
-npm test
-npm run lint
+npm run gate:check
 ```
 
 执行结果（2026-02-11）：
 
-- [x] `npm run typecheck --workspace=apps/desktop`
-- [x] `npm test`
-- [x] `npm run lint`（当前存在 warning，但无 error，流程可执行）
+- [x] `npm run gate:check`（通过）
+- [x] `npm run lint`（当前存在 warning，但无 error，不阻塞 gate）
 
 ---
 
@@ -309,3 +309,4 @@ npm run lint
 1. `DOCS/REFACTOR_PROGRESS_TRACKER_2026-02-10.md`（状态与勾选项）
 2. `DOCS/ROADMAP.md`（里程碑与节奏）
 3. `DOCS/DEVELOPMENT_GUIDE.md`（沉淀新规范）
+4. `DOCS/PRE_FEATURE_GATES_2026-02-11.md`（功能开发前后门槛与执行规则）

@@ -2,24 +2,30 @@ import { randomUUID } from 'crypto';
 import { readFile } from 'fs/promises';
 import * as XLSX from 'xlsx';
 import { Segment } from '@cat/core';
-import { ProgressEmitter, SpreadsheetPreviewData, TBRepository, TransactionManager } from '../ports';
+import {
+  ProgressEmitter,
+  SpreadsheetPreviewData,
+  TBRepository,
+  TransactionManager,
+} from '../ports';
 import { TBService } from '../TBService';
 import { extractSheetRows } from '../../filters/sheetRows';
+import type { TBImportOptions } from '../../../shared/ipc';
 
-export interface TBImportOptions {
-  sourceCol: number;
-  targetCol: number;
-  noteCol?: number;
-  hasHeader: boolean;
-  overwrite: boolean;
+export interface ImportProgress {
+  current: number;
+  total: number;
+  message?: string;
 }
+
+type ImportProgressCallback = (progress: ImportProgress) => void;
 
 export class TBModule {
   constructor(
     private readonly tbRepo: TBRepository,
     private readonly tx: TransactionManager,
     private readonly tbService: TBService,
-    private readonly emitProgress: ProgressEmitter
+    private readonly emitProgress: ProgressEmitter,
   ) {}
 
   public async findTermMatches(projectId: number, segment: Segment) {
@@ -28,9 +34,9 @@ export class TBModule {
 
   public async listTBs() {
     const tbs = this.tbRepo.listTermBases();
-    return tbs.map(tb => ({
+    return tbs.map((tb) => ({
       ...tb,
-      stats: this.tbRepo.getTermBaseStats(tb.id)
+      stats: this.tbRepo.getTermBaseStats(tb.id),
     }));
   }
 
@@ -44,9 +50,9 @@ export class TBModule {
 
   public async getProjectMountedTBs(projectId: number) {
     const mounted = this.tbRepo.getProjectMountedTermBases(projectId);
-    return mounted.map(tb => ({
+    return mounted.map((tb) => ({
       ...tb,
-      stats: this.tbRepo.getTermBaseStats(tb.id)
+      stats: this.tbRepo.getTermBaseStats(tb.id),
     }));
   }
 
@@ -65,11 +71,19 @@ export class TBModule {
     return extractSheetRows(worksheet, { maxRows: 10 }).map((row) => row.cells);
   }
 
-  public async importTBEntries(tbId: string, filePath: string, options: TBImportOptions): Promise<{ success: number; skipped: number }> {
+  public async importTBEntries(
+    tbId: string,
+    filePath: string,
+    options: TBImportOptions,
+    onProgress?: ImportProgressCallback,
+  ): Promise<{ success: number; skipped: number }> {
     const tb = this.tbRepo.getTermBase(tbId);
     if (!tb) throw new Error('Target TB not found');
 
-    this.emitProgress({ type: 'tb-import', current: 0, total: 1, message: 'Reading spreadsheet...' });
+    this.emitImportProgress(
+      { current: 0, total: 1, message: 'Reading spreadsheet...' },
+      onProgress,
+    );
 
     const workbook = XLSX.read(await readFile(filePath), { type: 'buffer' });
     const firstSheetName = workbook.SheetNames[0];
@@ -90,7 +104,10 @@ export class TBModule {
     }
 
     const chunkSize = totalRows >= 100000 ? 1500 : 800;
-    this.emitProgress({ type: 'tb-import', current: 0, total: totalRows, message: 'Preparing import...' });
+    this.emitImportProgress(
+      { current: 0, total: totalRows, message: 'Preparing import...' },
+      onProgress,
+    );
 
     for (let i = 0; i < rows.length; i += chunkSize) {
       const end = Math.min(i + chunkSize, rows.length);
@@ -99,8 +116,10 @@ export class TBModule {
         for (let j = i; j < end; j++) {
           const row = rows[j].cells;
 
-          const srcTerm = row[options.sourceCol] !== undefined ? String(row[options.sourceCol]).trim() : '';
-          const tgtTerm = row[options.targetCol] !== undefined ? String(row[options.targetCol]).trim() : '';
+          const srcTerm =
+            row[options.sourceCol] !== undefined ? String(row[options.sourceCol]).trim() : '';
+          const tgtTerm =
+            row[options.targetCol] !== undefined ? String(row[options.targetCol]).trim() : '';
           const note =
             options.noteCol !== undefined && row[options.noteCol] !== undefined
               ? String(row[options.noteCol]).trim()
@@ -116,7 +135,7 @@ export class TBModule {
             tbId,
             srcTerm,
             tgtTerm,
-            note
+            note,
           };
 
           if (options.overwrite) {
@@ -136,16 +155,28 @@ export class TBModule {
       });
 
       const processedRows = end;
-      this.emitProgress({
-        type: 'tb-import',
-        current: processedRows,
-        total: totalRows,
-        message: `Imported ${processedRows} of ${totalRows} rows...`
-      });
+      this.emitImportProgress(
+        {
+          current: processedRows,
+          total: totalRows,
+          message: `Imported ${processedRows} of ${totalRows} rows...`,
+        },
+        onProgress,
+      );
 
-      await new Promise<void>(resolve => setImmediate(resolve));
+      await new Promise<void>((resolve) => setImmediate(resolve));
     }
 
     return { success, skipped };
+  }
+
+  private emitImportProgress(progress: ImportProgress, onProgress?: ImportProgressCallback) {
+    this.emitProgress({
+      type: 'tb-import',
+      current: progress.current,
+      total: progress.total,
+      message: progress.message,
+    });
+    onProgress?.(progress);
   }
 }

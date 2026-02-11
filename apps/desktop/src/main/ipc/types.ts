@@ -15,6 +15,10 @@ export interface AIHandlerDeps extends MainHandlerDeps {
   jobManager: JobManager;
 }
 
+export interface JobBackedHandlerDeps extends MainHandlerDeps {
+  jobManager: JobManager;
+}
+
 export interface DialogHandlerDeps {
   ipcMain: IpcMainLike;
   dialog: Pick<Dialog, 'showOpenDialog' | 'showSaveDialog'>;

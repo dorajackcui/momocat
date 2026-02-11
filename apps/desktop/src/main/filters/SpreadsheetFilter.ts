@@ -1,22 +1,16 @@
 import * as XLSX from 'xlsx';
 import { readFile, writeFile } from 'fs/promises';
 import { extname } from 'path';
-import { 
-  Segment, 
-  parseDisplayTextToTokens, 
-  computeTagsSignature, 
-  computeMatchKey, 
-  computeSrcHash 
+import {
+  Segment,
+  parseDisplayTextToTokens,
+  computeTagsSignature,
+  computeMatchKey,
+  computeSrcHash,
 } from '@cat/core';
 import { randomUUID } from 'crypto';
 import { extractSheetRows, SheetCellValue } from './sheetRows';
-
-export interface ImportOptions {
-  hasHeader: boolean;
-  sourceCol: number;
-  targetCol: number;
-  contextCol?: number;
-}
+import type { ImportOptions } from '../../shared/ipc';
 
 export class SpreadsheetFilter {
   private async readWorkbook(filePath: string) {
@@ -38,7 +32,7 @@ export class SpreadsheetFilter {
     filePath: string,
     projectId: number,
     fileId: number,
-    options: ImportOptions
+    options: ImportOptions,
   ): Promise<Segment[]> {
     void projectId;
     console.log(`[SpreadsheetFilter] Reading file: ${filePath}`);
@@ -54,7 +48,7 @@ export class SpreadsheetFilter {
     // Only iterate rows that actually contain values in import-related columns.
     const sourceRows = extractSheetRows(worksheet, { columnIndexes: importColumnIndexes });
     console.log(
-      `[SpreadsheetFilter] Read ${sourceRows.length} effective rows from sheet: ${firstSheetName}`
+      `[SpreadsheetFilter] Read ${sourceRows.length} effective rows from sheet: ${firstSheetName}`,
     );
 
     const segments: Segment[] = [];
@@ -71,7 +65,9 @@ export class SpreadsheetFilter {
 
       const targetText = this.toCellText(row.cells[options.targetCol]);
       const context =
-        options.contextCol !== undefined ? this.toCellText(row.cells[options.contextCol]) : undefined;
+        options.contextCol !== undefined
+          ? this.toCellText(row.cells[options.contextCol])
+          : undefined;
 
       const sourceTokens = parseDisplayTextToTokens(sourceText);
       const targetTokens = targetText ? parseDisplayTextToTokens(targetText) : [];
@@ -93,8 +89,8 @@ export class SpreadsheetFilter {
         meta: {
           rowRef: row.rowIndex + 1,
           context,
-          updatedAt: new Date().toISOString()
-        }
+          updatedAt: new Date().toISOString(),
+        },
       });
     }
 
@@ -119,31 +115,31 @@ export class SpreadsheetFilter {
     originalFilePath: string,
     segments: Segment[],
     options: ImportOptions,
-    outputPath: string
+    outputPath: string,
   ): Promise<void> {
     const workbook = await this.readWorkbook(originalFilePath);
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
-    
+
     // We update the worksheet in-place for high fidelity
     for (const seg of segments) {
       const rowIndex = seg.orderIndex; // 0-based index from rawData
-      const targetText = seg.targetTokens.map(t => t.content).join('');
-      
+      const targetText = seg.targetTokens.map((t) => t.content).join('');
+
       // XLSX row/col are 0-based in some utilities but cells are A1, B2...
       // sheet_to_json with header:1 gave us the array.
       // To write back, we can use XLSX.utils.sheet_add_aoa or direct cell access.
-      
+
       const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: options.targetCol });
       worksheet[cellAddress] = { t: 's', v: targetText };
-      
+
       // Optionally write back status or other meta to specific columns if protocol allows
     }
-    
+
     const bookType = this.detectBookType(outputPath);
     const data = XLSX.write(workbook, {
       bookType,
-      type: 'buffer'
+      type: 'buffer',
     }) as Buffer | Uint8Array | string;
 
     if (typeof data === 'string') {

@@ -1,7 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { TMImportWizard } from './TMImportWizard';
 import { apiClient } from '../services/apiClient';
-import type { SpreadsheetPreviewData, TMImportOptions, TMWithStats } from '../../../shared/ipc';
+import { feedbackService } from '../services/feedbackService';
+import type {
+  ImportExecutionResult,
+  SpreadsheetPreviewData,
+  StructuredJobError,
+  TMImportOptions,
+  TMWithStats,
+} from '../../../shared/ipc';
+
+type ImportNotice = {
+  tone: 'success' | 'error';
+  message: string;
+};
 
 export const TMManager: React.FC = () => {
   const [tms, setTMs] = useState<TMWithStats[]>([]);
@@ -16,6 +28,8 @@ export const TMManager: React.FC = () => {
   const [importPreview, setImportPreview] = useState<SpreadsheetPreviewData>([]);
   const [importFilePath, setImportFilePath] = useState<string | null>(null);
   const [isImportWizardOpen, setIsImportWizardOpen] = useState(false);
+  const [importJobId, setImportJobId] = useState<string | null>(null);
+  const [importNotice, setImportNotice] = useState<ImportNotice | null>(null);
 
   const loadTMs = async () => {
     setLoading(true);
@@ -41,24 +55,28 @@ export const TMManager: React.FC = () => {
       setNewName('');
       setShowCreate(false);
       loadTMs();
-    } catch (e) {
-      alert('Failed to create TM');
+    } catch {
+      feedbackService.error('Failed to create TM');
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this Main TM? All data inside will be lost.')) return;
+    const confirmed = await feedbackService.confirm(
+      'Are you sure you want to delete this Main TM? All data inside will be lost.',
+    );
+    if (!confirmed) return;
     try {
       await apiClient.deleteTM(id);
       loadTMs();
-    } catch (e) {
-      alert('Failed to delete TM');
+    } catch {
+      feedbackService.error('Failed to delete TM');
     }
   };
 
   const handleStartImport = async (tmId: string) => {
+    setImportNotice(null);
     const filePath = await apiClient.openFileDialog([
-      { name: 'Spreadsheets', extensions: ['xlsx', 'xls', 'csv'] }
+      { name: 'Spreadsheets', extensions: ['xlsx', 'xls', 'csv'] },
     ]);
     if (!filePath) return;
 
@@ -68,36 +86,67 @@ export const TMManager: React.FC = () => {
       setImportFilePath(filePath);
       setImportPreview(preview);
       setIsImportWizardOpen(true);
-    } catch (e) {
-      alert('Failed to read file for preview');
+    } catch {
+      feedbackService.error('Failed to read file for preview');
     }
   };
 
   const handleConfirmImport = async (options: TMImportOptions) => {
     if (!importingTMId || !importFilePath) return;
-    
-    // Don't close wizard yet, it will show progress
+
     try {
-      const result = await apiClient.importTMEntries(importingTMId, importFilePath, options);
-      setIsImportWizardOpen(false); // Close it after done
-      alert(`Import completed!\nSuccess: ${result.success}\nSkipped: ${result.skipped}`);
-      loadTMs();
-    } catch (e) {
-      alert('Import failed');
+      const jobId = await apiClient.importTMEntries(importingTMId, importFilePath, options);
+      setImportJobId(jobId);
+    } catch (error) {
+      setImportNotice({
+        tone: 'error',
+        message: `Failed to start import: ${error instanceof Error ? error.message : String(error)}`,
+      });
       setIsImportWizardOpen(false);
-    } finally {
+      setImportJobId(null);
       setImportingTMId(null);
       setImportFilePath(null);
     }
   };
 
+  const handleImportCompleted = (result: ImportExecutionResult) => {
+    setImportNotice({
+      tone: 'success',
+      message: `Import completed: ${result.success} imported, ${result.skipped} skipped.`,
+    });
+    setIsImportWizardOpen(false);
+    setImportJobId(null);
+    setImportingTMId(null);
+    setImportFilePath(null);
+    void loadTMs();
+  };
+
+  const handleImportFailed = (error: StructuredJobError) => {
+    setImportNotice({
+      tone: 'error',
+      message: `Import failed (${error.code}): ${error.message}`,
+    });
+    setIsImportWizardOpen(false);
+    setImportJobId(null);
+    setImportingTMId(null);
+    setImportFilePath(null);
+  };
+
   return (
     <div className="flex-1 p-8 bg-gray-50 overflow-y-auto">
-      <TMImportWizard 
+      <TMImportWizard
         isOpen={isImportWizardOpen}
         previewData={importPreview}
-        onClose={() => setIsImportWizardOpen(false)}
+        jobId={importJobId}
+        onClose={() => {
+          if (importJobId) return;
+          setIsImportWizardOpen(false);
+          setImportingTMId(null);
+          setImportFilePath(null);
+        }}
         onConfirm={handleConfirmImport}
+        onJobCompleted={handleImportCompleted}
+        onJobFailed={handleImportFailed}
       />
 
       <div className="max-w-5xl mx-auto">
@@ -114,12 +163,37 @@ export const TMManager: React.FC = () => {
           </button>
         </div>
 
+        {importNotice && (
+          <div
+            className={`mb-6 rounded-lg border px-4 py-3 text-sm ${
+              importNotice.tone === 'success'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                : 'border-red-200 bg-red-50 text-red-700'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <span>{importNotice.message}</span>
+              <button
+                type="button"
+                onClick={() => setImportNotice(null)}
+                className="text-xs font-bold uppercase tracking-wide opacity-70 hover:opacity-100"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+
         {showCreate && (
           <div className="mb-8 p-6 bg-white rounded-xl border border-gray-200 shadow-sm animate-in fade-in slide-in-from-top-4">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-4">Create New Main TM</h2>
+            <h2 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-4">
+              Create New Main TM
+            </h2>
             <form onSubmit={handleCreate} className="grid grid-cols-4 gap-4 items-end">
               <div className="col-span-2">
-                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">TM Name</label>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">
+                  TM Name
+                </label>
                 <input
                   type="text"
                   value={newName}
@@ -130,7 +204,9 @@ export const TMManager: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Source</label>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">
+                  Source
+                </label>
                 <input
                   type="text"
                   value={newSrc}
@@ -139,7 +215,9 @@ export const TMManager: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Target</label>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">
+                  Target
+                </label>
                 <input
                   type="text"
                   value={newTgt}
@@ -175,7 +253,9 @@ export const TMManager: React.FC = () => {
           <div className="bg-white rounded-xl border border-dashed border-gray-300 p-12 text-center">
             <div className="text-3xl mb-4">📚</div>
             <h3 className="text-sm font-bold text-gray-900 mb-1">No Main TMs found</h3>
-            <p className="text-xs text-gray-500 mb-6">Create a Main TM to store your verified high-quality translations.</p>
+            <p className="text-xs text-gray-500 mb-6">
+              Create a Main TM to store your verified high-quality translations.
+            </p>
             <button
               onClick={() => setShowCreate(true)}
               className="text-blue-600 text-sm font-bold hover:underline"
@@ -186,10 +266,15 @@ export const TMManager: React.FC = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {tms.map((tm) => (
-              <div key={tm.id} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:border-blue-200 transition-colors group">
+              <div
+                key={tm.id}
+                className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:border-blue-200 transition-colors group"
+              >
                 <div className="flex justify-between items-start mb-3">
                   <div>
-                    <h3 className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{tm.name}</h3>
+                    <h3 className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+                      {tm.name}
+                    </h3>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded uppercase tracking-wider">
                         {tm.srcLang} → {tm.tgtLang}
@@ -205,8 +290,18 @@ export const TMManager: React.FC = () => {
                       className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
                       title="Import from Excel/CSV"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                        />
                       </svg>
                     </button>
                     <button
@@ -214,16 +309,30 @@ export const TMManager: React.FC = () => {
                       className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
                       title="Delete TM"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
                       </svg>
                     </button>
                   </div>
                 </div>
                 <div className="flex items-center justify-between pt-4 border-t border-gray-50">
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Size</span>
-                    <span className="text-sm font-bold text-gray-700">{tm.stats.entryCount} segments</span>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">
+                      Size
+                    </span>
+                    <span className="text-sm font-bold text-gray-700">
+                      {tm.stats.entryCount} segments
+                    </span>
                   </div>
                   <div className="text-[10px] text-gray-400 font-medium">
                     Last updated {new Date().toLocaleDateString()}

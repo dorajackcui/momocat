@@ -1,44 +1,89 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { apiClient } from '../services/apiClient';
-import type { AppProgressEvent, SpreadsheetPreviewData, TBImportOptions } from '../../../shared/ipc';
+import type {
+  ImportExecutionResult,
+  JobProgressEvent,
+  SpreadsheetPreviewData,
+  StructuredJobError,
+  TBImportOptions,
+} from '../../../shared/ipc';
 
 interface TBImportWizardProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (options: TBImportOptions) => void;
+  jobId: string | null;
+  onJobCompleted: (result: ImportExecutionResult) => void;
+  onJobFailed: (error: StructuredJobError) => void;
   previewData: SpreadsheetPreviewData;
 }
 
-export function TBImportWizard({ isOpen, onClose, onConfirm, previewData }: TBImportWizardProps) {
+export function TBImportWizard({
+  isOpen,
+  onClose,
+  onConfirm,
+  jobId,
+  onJobCompleted,
+  onJobFailed,
+  previewData,
+}: TBImportWizardProps) {
   const [hasHeader, setHasHeader] = useState(true);
   const [sourceCol, setSourceCol] = useState(0);
   const [targetCol, setTargetCol] = useState(1);
   const [noteCol, setNoteCol] = useState<number | undefined>(2);
   const [overwrite, setOverwrite] = useState(false);
-  const [progress, setProgress] = useState<{ current: number; total: number; message?: string } | null>(null);
+  const [jobProgress, setJobProgress] = useState<JobProgressEvent | null>(null);
+  const terminalStateHandledRef = useRef(false);
 
   useEffect(() => {
-    if (isOpen) {
-      const unsubscribe = apiClient.onProgress((data: AppProgressEvent) => {
-        if (data.type === 'tb-import') {
-          setProgress({ current: data.current, total: data.total, message: data.message });
+    terminalStateHandledRef.current = false;
+    setJobProgress(null);
+  }, [jobId]);
+
+  useEffect(() => {
+    if (!isOpen || !jobId) return undefined;
+
+    const unsubscribe = apiClient.onJobProgress((progress) => {
+      if (progress.jobId !== jobId) return;
+      setJobProgress(progress);
+
+      if (terminalStateHandledRef.current) return;
+
+      if (progress.status === 'completed') {
+        terminalStateHandledRef.current = true;
+        if (progress.result?.kind === 'tb-import') {
+          onJobCompleted({
+            success: progress.result.success,
+            skipped: progress.result.skipped,
+          });
+        } else {
+          onJobCompleted({ success: 0, skipped: 0 });
         }
-      });
-      return () => unsubscribe();
-    }
-    setProgress(null);
-    return undefined;
-  }, [isOpen]);
+      }
+
+      if (progress.status === 'failed') {
+        terminalStateHandledRef.current = true;
+        onJobFailed(
+          progress.error ?? {
+            code: 'TB_IMPORT_FAILED',
+            message: progress.message || 'TB import failed',
+          },
+        );
+      }
+    });
+
+    return () => unsubscribe();
+  }, [isOpen, jobId, onJobCompleted, onJobFailed]);
 
   if (!isOpen) return null;
 
   const maxCols = previewData.length > 0 ? previewData[0].length : 0;
   const colIndexes = Array.from({ length: maxCols }, (_, i) => i);
 
-  if (progress) {
-    const hasKnownTotal = progress.total > 0;
-    const safeTotal = hasKnownTotal ? progress.total : 1;
-    const percent = hasKnownTotal ? Math.round((progress.current / safeTotal) * 100) : 0;
+  if (jobId) {
+    const progress = jobProgress?.progress ?? 0;
+    const clampedProgress = Math.max(0, Math.min(progress, 100));
+    const progressMessage = jobProgress?.message || 'Starting import...';
 
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] backdrop-blur-sm">
@@ -48,20 +93,16 @@ export function TBImportWizard({ isOpen, onClose, onConfirm, previewData }: TBIm
               <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
             </div>
             <h2 className="text-xl font-bold text-gray-900">Importing Term Base...</h2>
-            <p className="text-sm text-gray-500 mt-1">{progress.message || 'Processing rows...'}</p>
+            <p className="text-sm text-gray-500 mt-1">{progressMessage}</p>
           </div>
 
           <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-emerald-100">
             <div
-              style={{ width: `${percent}%` }}
+              style={{ width: `${clampedProgress}%` }}
               className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-emerald-500 transition-all duration-300"
             />
           </div>
-          <p className="text-[10px] text-gray-400 font-medium">
-            {hasKnownTotal
-              ? `${progress.current.toLocaleString()} / ${progress.total.toLocaleString()} rows processed`
-              : 'Initializing import...'}
-          </p>
+          <p className="text-[10px] text-gray-400 font-medium">Job ID: {jobId}</p>
         </div>
       </div>
     );
@@ -73,11 +114,18 @@ export function TBImportWizard({ isOpen, onClose, onConfirm, previewData }: TBIm
         <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
           <div>
             <h2 className="text-xl font-bold text-gray-900">Import Terms from File</h2>
-            <p className="text-sm text-gray-500 mt-1">Map source/target columns to build your term base.</p>
+            <p className="text-sm text-gray-500 mt-1">
+              Map source/target columns to build your term base.
+            </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -91,8 +139,10 @@ export function TBImportWizard({ isOpen, onClose, onConfirm, previewData }: TBIm
                 onChange={(e) => setSourceCol(parseInt(e.target.value))}
                 className="mt-2 w-full p-2.5 bg-white border border-gray-200 rounded-lg text-sm"
               >
-                {colIndexes.map(i => (
-                  <option key={i} value={i}>Column {XLSX_COL_NAME(i)}</option>
+                {colIndexes.map((i) => (
+                  <option key={i} value={i}>
+                    Column {XLSX_COL_NAME(i)}
+                  </option>
                 ))}
               </select>
             </div>
@@ -103,8 +153,10 @@ export function TBImportWizard({ isOpen, onClose, onConfirm, previewData }: TBIm
                 onChange={(e) => setTargetCol(parseInt(e.target.value))}
                 className="mt-2 w-full p-2.5 bg-white border border-gray-200 rounded-lg text-sm"
               >
-                {colIndexes.map(i => (
-                  <option key={i} value={i}>Column {XLSX_COL_NAME(i)}</option>
+                {colIndexes.map((i) => (
+                  <option key={i} value={i}>
+                    Column {XLSX_COL_NAME(i)}
+                  </option>
                 ))}
               </select>
             </div>
@@ -119,8 +171,10 @@ export function TBImportWizard({ isOpen, onClose, onConfirm, previewData }: TBIm
                 className="mt-2 w-full p-2.5 bg-white border border-gray-200 rounded-lg text-sm"
               >
                 <option value={-1}>Not used</option>
-                {colIndexes.map(i => (
-                  <option key={i} value={i}>Column {XLSX_COL_NAME(i)}</option>
+                {colIndexes.map((i) => (
+                  <option key={i} value={i}>
+                    Column {XLSX_COL_NAME(i)}
+                  </option>
                 ))}
               </select>
             </div>
@@ -143,7 +197,9 @@ export function TBImportWizard({ isOpen, onClose, onConfirm, previewData }: TBIm
                 onChange={(e) => setOverwrite(e.target.checked)}
                 className="w-4 h-4 text-blue-600 rounded"
               />
-              <span className="text-sm font-medium text-gray-700">Overwrite existing source terms</span>
+              <span className="text-sm font-medium text-gray-700">
+                Overwrite existing source terms
+              </span>
             </label>
           </div>
 
@@ -151,8 +207,11 @@ export function TBImportWizard({ isOpen, onClose, onConfirm, previewData }: TBIm
             <table className="w-full text-sm text-left border-collapse">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  {colIndexes.map(i => (
-                    <th key={i} className="px-4 py-3 font-bold text-[11px] uppercase tracking-tight text-gray-500">
+                  {colIndexes.map((i) => (
+                    <th
+                      key={i}
+                      className="px-4 py-3 font-bold text-[11px] uppercase tracking-tight text-gray-500"
+                    >
                       Col {XLSX_COL_NAME(i)}
                     </th>
                   ))}
@@ -160,8 +219,11 @@ export function TBImportWizard({ isOpen, onClose, onConfirm, previewData }: TBIm
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {previewData.map((row, rowIndex) => (
-                  <tr key={rowIndex} className={`${hasHeader && rowIndex === 0 ? 'bg-gray-50/80 opacity-60 italic' : 'bg-white'}`}>
-                    {colIndexes.map(i => (
+                  <tr
+                    key={rowIndex}
+                    className={`${hasHeader && rowIndex === 0 ? 'bg-gray-50/80 opacity-60 italic' : 'bg-white'}`}
+                  >
+                    {colIndexes.map((i) => (
                       <td key={i} className="px-4 py-3 truncate max-w-[240px] text-xs">
                         {row[i] || '-'}
                       </td>
@@ -182,7 +244,6 @@ export function TBImportWizard({ isOpen, onClose, onConfirm, previewData }: TBIm
           </button>
           <button
             onClick={() => {
-              setProgress({ current: 0, total: 0, message: 'Starting import...' });
               onConfirm({ hasHeader, sourceCol, targetCol, noteCol, overwrite });
             }}
             className="px-8 py-2.5 bg-emerald-600 text-white font-bold text-sm rounded-lg hover:bg-emerald-700"

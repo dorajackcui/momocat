@@ -1,6 +1,14 @@
-import { Project, ProjectFile, Segment, SegmentStatus, TBMatch, TMEntry, Token } from '@cat/core';
+import { Project, Segment, SegmentStatus, TBMatch, TMEntry, Token } from '@cat/core';
+import type {
+  MountedTBRecord as DbMountedTBRecord,
+  MountedTMRecord as DbMountedTMRecord,
+  ProjectFileRecord as DbProjectFileRecord,
+  TBRecord as DbTBRecord,
+  TMRecord as DbTMRecord,
+  TMType as DbTMType,
+} from '../../../../packages/db/src/types';
 
-export type TMType = 'working' | 'main';
+export type TMType = DbTMType;
 
 export interface ImportOptions {
   hasHeader: boolean;
@@ -32,49 +40,27 @@ export type ProjectWithStats = Project & {
   fileCount: number;
 };
 
-export type ProjectFileRecord = ProjectFile & {
-  importOptionsJson?: string | null;
-};
+export type ProjectFileRecord = DbProjectFileRecord;
 
-export interface TMRecord {
-  id: string;
-  name: string;
-  srcLang: string;
-  tgtLang: string;
-  type: TMType;
-  createdAt: string;
-  updatedAt: string;
-}
+export type TMRecord = DbTMRecord;
 
 export interface TMWithStats extends TMRecord {
   stats: { entryCount: number };
 }
 
-export interface MountedTM extends TMRecord {
-  priority: number;
-  permission: string;
-  isEnabled: number;
+export type MountedTM = DbMountedTMRecord & {
   entryCount: number;
-}
+};
 
-export interface TBRecord {
-  id: string;
-  name: string;
-  srcLang: string;
-  tgtLang: string;
-  createdAt: string;
-  updatedAt: string;
-}
+export type TBRecord = DbTBRecord;
 
 export interface TBWithStats extends TBRecord {
   stats: { entryCount: number };
 }
 
-export interface MountedTB extends TBRecord {
-  priority: number;
-  isEnabled: number;
+export type MountedTB = DbMountedTBRecord & {
   stats: { entryCount: number };
-}
+};
 
 export interface TMMatch extends TMEntry {
   similarity: number;
@@ -102,6 +88,16 @@ export interface TMBatchMatchResult {
 export interface ImportExecutionResult {
   success: number;
   skipped: number;
+}
+
+export interface ImportJobResult extends ImportExecutionResult {
+  kind: 'tm-import' | 'tb-import';
+}
+
+export interface StructuredJobError {
+  code: string;
+  message: string;
+  details?: string;
 }
 
 export interface AISettings {
@@ -142,6 +138,8 @@ export interface JobProgressEvent {
   progress: number;
   status: 'running' | 'completed' | 'failed' | 'cancelled';
   message?: string;
+  result?: ImportJobResult;
+  error?: StructuredJobError;
 }
 
 export interface DialogFileFilter {
@@ -155,16 +153,33 @@ export interface DesktopApi {
   deleteProject: (projectId: number) => Promise<void>;
   getProject: (projectId: number) => Promise<Project | undefined>;
   updateProjectPrompt: (projectId: number, aiPrompt: string | null) => Promise<void>;
-  updateProjectAISettings: (projectId: number, aiPrompt: string | null, aiTemperature: number | null) => Promise<void>;
+  updateProjectAISettings: (
+    projectId: number,
+    aiPrompt: string | null,
+    aiTemperature: number | null,
+  ) => Promise<void>;
   getProjectFiles: (projectId: number) => Promise<ProjectFileRecord[]>;
   getFile: (fileId: number) => Promise<ProjectFileRecord | undefined>;
   getFilePreview: (filePath: string) => Promise<SpreadsheetPreviewData>;
   deleteFile: (fileId: number) => Promise<void>;
-  addFileToProject: (projectId: number, filePath: string, options: ImportOptions) => Promise<ProjectFileRecord>;
+  addFileToProject: (
+    projectId: number,
+    filePath: string,
+    options: ImportOptions,
+  ) => Promise<ProjectFileRecord>;
 
   getSegments: (fileId: number, offset: number, limit: number) => Promise<Segment[]>;
-  exportFile: (fileId: number, outputPath: string, options?: ImportOptions, forceExport?: boolean) => Promise<void>;
-  updateSegment: (segmentId: string, targetTokens: Token[], status: SegmentStatus) => Promise<SegmentUpdateResult>;
+  exportFile: (
+    fileId: number,
+    outputPath: string,
+    options?: ImportOptions,
+    forceExport?: boolean,
+  ) => Promise<void>;
+  updateSegment: (
+    segmentId: string,
+    targetTokens: Token[],
+    status: SegmentStatus,
+  ) => Promise<SegmentUpdateResult>;
 
   get100Match: (projectId: number, srcHash: string) => Promise<TMMatch | null>;
   getMatches: (projectId: number, segment: Segment) => Promise<TMMatch[]>;
@@ -175,12 +190,17 @@ export interface DesktopApi {
   createTM: (name: string, srcLang: string, tgtLang: string, type?: TMType) => Promise<string>;
   deleteTM: (tmId: string) => Promise<void>;
   getProjectMountedTMs: (projectId: number) => Promise<MountedTM[]>;
-  mountTMToProject: (projectId: number, tmId: string, priority?: number, permission?: string) => Promise<void>;
+  mountTMToProject: (
+    projectId: number,
+    tmId: string,
+    priority?: number,
+    permission?: string,
+  ) => Promise<void>;
   unmountTMFromProject: (projectId: number, tmId: string) => Promise<void>;
   commitToMainTM: (tmId: string, fileId: number) => Promise<number>;
   matchFileWithTM: (fileId: number, tmId: string) => Promise<TMBatchMatchResult>;
   getTMImportPreview: (filePath: string) => Promise<SpreadsheetPreviewData>;
-  importTMEntries: (tmId: string, filePath: string, options: TMImportOptions) => Promise<ImportExecutionResult>;
+  importTMEntries: (tmId: string, filePath: string, options: TMImportOptions) => Promise<string>;
 
   listTBs: () => Promise<TBWithStats[]>;
   createTB: (name: string, srcLang: string, tgtLang: string) => Promise<string>;
@@ -189,7 +209,7 @@ export interface DesktopApi {
   mountTBToProject: (projectId: number, tbId: string, priority?: number) => Promise<void>;
   unmountTBFromProject: (projectId: number, tbId: string) => Promise<void>;
   getTBImportPreview: (filePath: string) => Promise<SpreadsheetPreviewData>;
-  importTBEntries: (tbId: string, filePath: string, options: TBImportOptions) => Promise<ImportExecutionResult>;
+  importTBEntries: (tbId: string, filePath: string, options: TBImportOptions) => Promise<string>;
 
   getAISettings: () => Promise<AISettings>;
   setAIKey: (apiKey: string) => Promise<void>;

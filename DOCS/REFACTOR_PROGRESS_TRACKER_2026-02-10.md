@@ -121,3 +121,17 @@
   - 正确性 DoD 验证：`npx tsc -p apps/desktop/tsconfig.json --noEmit`、`npx vitest run` 均通过
 - 待完成：
   - 进入下一阶段改造（建议更新 4.4 / 新里程碑）
+
+### 2026-02-11
+
+- 已完成（功能开发前 P0 Gate 全部收口）：
+  - Gate-01：移除 `1000000` 魔法值读取，建立分页/批处理基线（含大文件分页 smoke）。
+  - Gate-02：TM/TB/Project 契约收敛到单一来源，新增契约一致性测试。
+  - Gate-03：TM/TB 导入链路统一 Job 化，进度与失败走统一事件模型。
+  - Gate-04：主入口反馈机制统一，清理 renderer 层散落 `alert/confirm`。
+  - Gate-05：新增架构守卫（`gate:arch`）限制 `ProjectService/CATDatabase` 继续膨胀。
+  - Gate-06：`gate:check` 门禁固化并纳入开发指南。
+- 已验证：
+  - `npm run gate:check` 通过（`typecheck + gate:arch + lint + gate:smoke:large-file`）。
+- 阶段结论：
+  - 已满足进入功能开发的退出条件，后续不再新增“顺手重构”范围；非阻塞问题转入功能迭代并行治理。

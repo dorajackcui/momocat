@@ -1,0 +1,77 @@
+{
+  "projectService": {
+    "allowedDelegateFields": [
+      "projectModule",
+      "tmModule",
+      "tbModule",
+      "aiModule",
+      "segmentService"
+    ],
+    "delegationExceptions": [
+      "onProgress",
+      "onSegmentsUpdated"
+    ]
+  },
+  "catDatabase": {
+    "publicMethods": [
+      "bulkInsertSegments",
+      "close",
+      "createFile",
+      "createProject",
+      "createTM",
+      "createTermBase",
+      "deleteFile",
+      "deleteProject",
+      "deleteTM",
+      "deleteTermBase",
+      "findTMEntryByHash",
+      "findTMEntryMetaByHash",
+      "getFile",
+      "getProject",
+      "getProjectIdByFileId",
+      "getProjectMountedTMs",
+      "getProjectMountedTermBases",
+      "getProjectSegmentsByHash",
+      "getProjectStats",
+      "getSegment",
+      "getSegmentsPage",
+      "getSetting",
+      "getTM",
+      "getTMStats",
+      "getTermBase",
+      "getTermBaseStats",
+      "incrementTBUsage",
+      "insertTBEntryIfAbsentBySrcTerm",
+      "insertTMEntryIfAbsentBySrcHash",
+      "insertTMFts",
+      "listFiles",
+      "listProjectTermEntries",
+      "listProjects",
+      "listTBEntries",
+      "listTMs",
+      "listTermBases",
+      "mountTMToProject",
+      "mountTermBaseToProject",
+      "replaceTMFts",
+      "runInTransaction",
+      "searchConcordance",
+      "setSetting",
+      "unmountTMFromProject",
+      "unmountTermBaseFromProject",
+      "updateFileStats",
+      "updateProjectAISettings",
+      "updateProjectPrompt",
+      "updateSegmentTarget",
+      "upsertTBEntryBySrcTerm",
+      "upsertTMEntry",
+      "upsertTMEntryBySrcHash"
+    ],
+    "legacyMultiRepoMethods": [
+      "createProject",
+      "listProjects"
+    ],
+    "allowedDirectDbMethods": [
+      "close"
+    ]
+  }
+}

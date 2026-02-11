@@ -16,15 +16,15 @@ describe('IPC handler registration smoke', () => {
     const jobManager = {} as JobManager;
 
     registerProjectHandlers({ ipcMain, projectService });
-    registerTMHandlers({ ipcMain, projectService });
-    registerTBHandlers({ ipcMain, projectService });
+    registerTMHandlers({ ipcMain, projectService, jobManager });
+    registerTBHandlers({ ipcMain, projectService, jobManager });
     registerAIHandlers({ ipcMain, projectService, jobManager });
     registerDialogHandlers({
       ipcMain,
       dialog: {
         showOpenDialog: vi.fn(),
-        showSaveDialog: vi.fn()
-      }
+        showSaveDialog: vi.fn(),
+      },
     });
 
     const registeredChannels = new Set(handle.mock.calls.map((call) => call[0] as string));
@@ -36,7 +36,7 @@ describe('IPC handler registration smoke', () => {
       ...Object.values(IPC_CHANNELS.tm),
       ...Object.values(IPC_CHANNELS.tb),
       ...Object.values(IPC_CHANNELS.ai),
-      ...Object.values(IPC_CHANNELS.dialog)
+      ...Object.values(IPC_CHANNELS.dialog),
     ];
 
     expect(registeredChannels.size).toBe(expectedChannels.length);

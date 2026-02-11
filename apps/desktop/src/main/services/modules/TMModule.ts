@@ -9,7 +9,7 @@ import {
   computeSrcHash,
   computeTagsSignature,
   parseDisplayTextToTokens,
-  serializeTokensToDisplayText
+  serializeTokensToDisplayText,
 } from '@cat/core';
 import { extractSheetRows } from '../../filters/sheetRows';
 import {
@@ -19,17 +19,19 @@ import {
   TMConcordanceRecord,
   TMRepository,
   TransactionManager,
-  SpreadsheetPreviewData
+  SpreadsheetPreviewData,
 } from '../ports';
 import { TMService } from '../TMService';
 import { SegmentService } from '../SegmentService';
+import type { TMImportOptions } from '../../../shared/ipc';
 
-export interface TMImportOptions {
-  sourceCol: number;
-  targetCol: number;
-  hasHeader: boolean;
-  overwrite: boolean;
+export interface ImportProgress {
+  current: number;
+  total: number;
+  message?: string;
 }
+
+type ImportProgressCallback = (progress: ImportProgress) => void;
 
 interface TMImportWorkerProgressMessage {
   type: 'progress';
@@ -48,9 +50,14 @@ interface TMImportWorkerErrorMessage {
   error?: string;
 }
 
-type TMImportWorkerMessage = TMImportWorkerProgressMessage | TMImportWorkerDoneMessage | TMImportWorkerErrorMessage;
+type TMImportWorkerMessage =
+  | TMImportWorkerProgressMessage
+  | TMImportWorkerDoneMessage
+  | TMImportWorkerErrorMessage;
 
 export class TMModule {
+  private static readonly SEGMENT_PAGE_SIZE = 2000;
+
   constructor(
     private readonly projectRepo: ProjectRepository,
     private readonly segmentRepo: SegmentRepository,
@@ -59,7 +66,7 @@ export class TMModule {
     private readonly tmService: TMService,
     private readonly segmentService: SegmentService,
     private readonly dbPath: string,
-    private readonly emitProgress: ProgressEmitter
+    private readonly emitProgress: ProgressEmitter,
   ) {}
 
   public async get100Match(projectId: number, srcHash: string) {
@@ -72,27 +79,34 @@ export class TMModule {
 
   public async searchConcordance(projectId: number, query: string): Promise<TMConcordanceRecord[]> {
     const entries = this.tmRepo.searchConcordance(projectId, query);
-    const mountedById = new Map(this.tmRepo.getProjectMountedTMs(projectId).map((tm) => [tm.id, tm] as const));
+    const mountedById = new Map(
+      this.tmRepo.getProjectMountedTMs(projectId).map((tm) => [tm.id, tm] as const),
+    );
 
     return entries.map((entry) => {
       const tm = mountedById.get(entry.tmId);
       return {
         ...entry,
         tmName: tm?.name ?? 'Unknown TM',
-        tmType: tm?.type ?? 'main'
+        tmType: tm?.type ?? 'main',
       };
     });
   }
 
   public async listTMs(type?: 'working' | 'main') {
     const tms = this.tmRepo.listTMs(type);
-    return tms.map(tm => ({
+    return tms.map((tm) => ({
       ...tm,
-      stats: this.tmRepo.getTMStats(tm.id)
+      stats: this.tmRepo.getTMStats(tm.id),
     }));
   }
 
-  public async createTM(name: string, srcLang: string, tgtLang: string, type: 'working' | 'main' = 'main') {
+  public async createTM(
+    name: string,
+    srcLang: string,
+    tgtLang: string,
+    type: 'working' | 'main' = 'main',
+  ) {
     return this.tmRepo.createTM(name, srcLang, tgtLang, type);
   }
 
@@ -102,13 +116,18 @@ export class TMModule {
 
   public async getProjectMountedTMs(projectId: number) {
     const mounted = this.tmRepo.getProjectMountedTMs(projectId);
-    return mounted.map(tm => ({
+    return mounted.map((tm) => ({
       ...tm,
-      entryCount: this.tmRepo.getTMStats(tm.id).entryCount
+      entryCount: this.tmRepo.getTMStats(tm.id).entryCount,
     }));
   }
 
-  public async mountTMToProject(projectId: number, tmId: string, priority?: number, permission?: string) {
+  public async mountTMToProject(
+    projectId: number,
+    tmId: string,
+    priority?: number,
+    permission?: string,
+  ) {
     this.tmRepo.mountTMToProject(projectId, tmId, priority, permission);
   }
 
@@ -123,24 +142,30 @@ export class TMModule {
     return extractSheetRows(worksheet, { maxRows: 10 }).map((row) => row.cells);
   }
 
-  public async importTMEntries(tmId: string, filePath: string, options: TMImportOptions): Promise<{ success: number; skipped: number }> {
+  public async importTMEntries(
+    tmId: string,
+    filePath: string,
+    options: TMImportOptions,
+    onProgress?: ImportProgressCallback,
+  ): Promise<{ success: number; skipped: number }> {
     try {
-      return await this.importTMEntriesInWorker(tmId, filePath, options);
+      return await this.importTMEntriesInWorker(tmId, filePath, options, onProgress);
     } catch (error) {
       console.error('[TMModule] TM import worker failed, falling back to main thread:', error);
-      return this.importTMEntriesInMainThread(tmId, filePath, options);
+      return this.importTMEntriesInMainThread(tmId, filePath, options, onProgress);
     }
   }
 
   private async importTMEntriesInWorker(
     tmId: string,
     filePath: string,
-    options: TMImportOptions
+    options: TMImportOptions,
+    onProgress?: ImportProgressCallback,
   ): Promise<{ success: number; skipped: number }> {
     const candidatePaths = [
       join(__dirname, 'tmImportWorker.js'),
       join(__dirname, '../tmImportWorker.js'),
-      join(__dirname, '../../tmImportWorker.js')
+      join(__dirname, '../../tmImportWorker.js'),
     ];
     const workerPath = await this.resolveWorkerPath(candidatePaths);
     if (!workerPath) {
@@ -153,8 +178,8 @@ export class TMModule {
           dbPath: this.dbPath,
           tmId,
           filePath,
-          options
-        }
+          options,
+        },
       });
       let settled = false;
 
@@ -168,12 +193,14 @@ export class TMModule {
         if (!message || typeof message !== 'object') return;
 
         if (message.type === 'progress') {
-          this.emitProgress({
-            type: 'tm-import',
-            current: Number(message.current) || 0,
-            total: Number(message.total) || 0,
-            message: typeof message.message === 'string' ? message.message : undefined
-          });
+          this.emitImportProgress(
+            {
+              current: Number(message.current) || 0,
+              total: Number(message.total) || 0,
+              message: typeof message.message === 'string' ? message.message : undefined,
+            },
+            onProgress,
+          );
           return;
         }
 
@@ -204,18 +231,26 @@ export class TMModule {
   private async importTMEntriesInMainThread(
     tmId: string,
     filePath: string,
-    options: TMImportOptions
+    options: TMImportOptions,
+    onProgress?: ImportProgressCallback,
   ): Promise<{ success: number; skipped: number }> {
     const tm = this.tmRepo.getTM(tmId);
     if (!tm) throw new Error('Target TM not found');
 
-    this.emitProgress({ type: 'tm-import', current: 0, total: 1, message: 'Reading spreadsheet...' });
+    this.emitImportProgress(
+      {
+        current: 0,
+        total: 1,
+        message: 'Reading spreadsheet...',
+      },
+      onProgress,
+    );
 
     const workbook = XLSX.read(await readFile(filePath), { type: 'buffer' });
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
     const sourceRows = extractSheetRows(worksheet, {
-      columnIndexes: [options.sourceCol, options.targetCol]
+      columnIndexes: [options.sourceCol, options.targetCol],
     });
     const rows = options.hasHeader ? sourceRows.slice(1) : sourceRows;
 
@@ -228,7 +263,14 @@ export class TMModule {
     }
 
     const chunkSize = totalRows >= 100000 ? 1500 : 800;
-    this.emitProgress({ type: 'tm-import', current: 0, total: totalRows, message: 'Preparing import...' });
+    this.emitImportProgress(
+      {
+        current: 0,
+        total: totalRows,
+        message: 'Preparing import...',
+      },
+      onProgress,
+    );
 
     for (let i = 0; i < rows.length; i += chunkSize) {
       const end = Math.min(i + chunkSize, rows.length);
@@ -237,8 +279,10 @@ export class TMModule {
         for (let j = i; j < end; j++) {
           const row = rows[j].cells;
 
-          const sourceText = row[options.sourceCol] !== undefined ? String(row[options.sourceCol]).trim() : '';
-          const targetText = row[options.targetCol] !== undefined ? String(row[options.targetCol]).trim() : '';
+          const sourceText =
+            row[options.sourceCol] !== undefined ? String(row[options.sourceCol]).trim() : '';
+          const targetText =
+            row[options.targetCol] !== undefined ? String(row[options.targetCol]).trim() : '';
 
           if (!sourceText || !targetText) {
             skipped++;
@@ -265,7 +309,7 @@ export class TMModule {
             targetTokens,
             usageCount: 1,
             createdAt: now,
-            updatedAt: now
+            updatedAt: now,
           };
 
           if (options.overwrite) {
@@ -287,14 +331,16 @@ export class TMModule {
       });
 
       const processedRows = end;
-      this.emitProgress({
-        type: 'tm-import',
-        current: processedRows,
-        total: totalRows,
-        message: `Imported ${processedRows} of ${totalRows} rows...`
-      });
+      this.emitImportProgress(
+        {
+          current: processedRows,
+          total: totalRows,
+          message: `Imported ${processedRows} of ${totalRows} rows...`,
+        },
+        onProgress,
+      );
 
-      await new Promise<void>(resolve => setImmediate(resolve));
+      await new Promise<void>((resolve) => setImmediate(resolve));
     }
 
     return { success, skipped };
@@ -312,14 +358,26 @@ export class TMModule {
     return undefined;
   }
 
+  private emitImportProgress(progress: ImportProgress, onProgress?: ImportProgressCallback) {
+    this.emitProgress({
+      type: 'tm-import',
+      current: progress.current,
+      total: progress.total,
+      message: progress.message,
+    });
+    onProgress?.(progress);
+  }
+
   public async commitToMainTM(tmId: string, fileId: number) {
     const tm = this.tmRepo.getTM(tmId);
     if (!tm) throw new Error('Target TM not found');
 
-    const segments = this.segmentRepo.getSegmentsPage(fileId, 0, 1000000);
-    const confirmedSegments = segments.filter(s => s.status === 'confirmed');
+    let confirmedCount = 0;
 
-    for (const seg of confirmedSegments) {
+    this.forEachFileSegment(fileId, (seg) => {
+      if (seg.status !== 'confirmed') return;
+      confirmedCount += 1;
+
       const entryId = this.tmRepo.upsertTMEntryBySrcHash({
         id: randomUUID(),
         tmId,
@@ -334,23 +392,23 @@ export class TMModule {
         originSegmentId: seg.segmentId,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        usageCount: 1
+        usageCount: 1,
       });
 
       this.tmRepo.replaceTMFts(
         tmId,
         serializeTokensToDisplayText(seg.sourceTokens),
         serializeTokensToDisplayText(seg.targetTokens),
-        entryId
+        entryId,
       );
-    }
+    });
 
-    return confirmedSegments.length;
+    return confirmedCount;
   }
 
   public async batchMatchFileWithTM(
     fileId: number,
-    tmId: string
+    tmId: string,
   ): Promise<{ total: number; matched: number; applied: number; skipped: number }> {
     const file = this.projectRepo.getFile(fileId);
     if (!file) throw new Error('File not found');
@@ -359,41 +417,60 @@ export class TMModule {
     if (!tm) throw new Error('TM not found');
 
     const mountedTMs = this.tmRepo.getProjectMountedTMs(file.projectId);
-    if (!mountedTMs.some(mounted => mounted.id === tmId)) {
+    if (!mountedTMs.some((mounted) => mounted.id === tmId)) {
       throw new Error('TM is not mounted to this file project');
     }
 
-    const segments = this.segmentRepo.getSegmentsPage(fileId, 0, 1000000);
+    let total = 0;
     let matched = 0;
     let skipped = 0;
-    const updates: Array<{ segmentId: string; targetTokens: Segment['targetTokens']; status: 'confirmed' }> = [];
+    const updates: Array<{
+      segmentId: string;
+      targetTokens: Segment['targetTokens'];
+      status: 'confirmed';
+    }> = [];
 
-    for (const seg of segments) {
+    this.forEachFileSegment(fileId, (seg) => {
+      total += 1;
       const match = this.tmRepo.findTMEntryByHash(tmId, seg.srcHash);
-      if (!match) continue;
+      if (!match) return;
 
       matched += 1;
       if (seg.status === 'confirmed') {
         skipped += 1;
-        continue;
+        return;
       }
 
       updates.push({
         segmentId: seg.segmentId,
         targetTokens: match.targetTokens,
-        status: 'confirmed'
+        status: 'confirmed',
       });
-    }
+    });
 
     if (updates.length > 0) {
       await this.segmentService.updateSegmentsAtomically(updates);
     }
 
     return {
-      total: segments.length,
+      total,
       matched,
       applied: updates.length,
-      skipped
+      skipped,
     };
+  }
+
+  private forEachFileSegment(fileId: number, visitor: (segment: Segment) => void): void {
+    let offset = 0;
+
+    while (true) {
+      const page = this.segmentRepo.getSegmentsPage(fileId, offset, TMModule.SEGMENT_PAGE_SIZE);
+      if (page.length === 0) break;
+      for (const segment of page) {
+        visitor(segment);
+      }
+      if (page.length < TMModule.SEGMENT_PAGE_SIZE) break;
+      offset += TMModule.SEGMENT_PAGE_SIZE;
+    }
   }
 }

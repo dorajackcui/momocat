@@ -1,29 +1,29 @@
-import { Project, ProjectFile, Segment, SegmentStatus, TBEntry, TMEntry, Token } from '@cat/core';
+import { Project, Segment, SegmentStatus, TBEntry, TMEntry, Token } from '@cat/core';
+import type {
+  MountedTBRecord as DbMountedTBRecord,
+  MountedTMRecord as DbMountedTMRecord,
+  ProjectFileRecord as DbProjectFileRecord,
+  TBRecord as DbTBRecord,
+  TMRecord as DbTMRecord,
+  TMType as DbTMType,
+} from '../../../../../packages/db/src/types';
+import type {
+  ImportOptions as SharedImportOptions,
+  ProjectWithStats,
+  SpreadsheetPreviewData as SharedSpreadsheetPreviewData,
+} from '../../shared/ipc';
 
-export type TMType = 'working' | 'main';
-export type SpreadsheetPreviewCell = string | number | boolean | null | undefined;
-export type SpreadsheetPreviewData = SpreadsheetPreviewCell[][];
+export type TMType = DbTMType;
+export type SpreadsheetPreviewData = SharedSpreadsheetPreviewData;
 
 export type ProjectRecord = Project;
-export type ProjectListRecord = Project & { progress: number; fileCount: number };
+export type ProjectListRecord = ProjectWithStats;
 
-export type ProjectFileRecord = ProjectFile & { importOptionsJson?: string | null };
+export type ProjectFileRecord = DbProjectFileRecord;
 
-export interface TMRecord {
-  id: string;
-  name: string;
-  srcLang: string;
-  tgtLang: string;
-  type: TMType;
-  createdAt: string;
-  updatedAt: string;
-}
+export type TMRecord = DbTMRecord;
 
-export interface MountedTMRecord extends TMRecord {
-  priority: number;
-  permission: string;
-  isEnabled: number;
-}
+export type MountedTMRecord = DbMountedTMRecord;
 
 export type TMEntryWithTmId = TMEntry & {
   tmId: string;
@@ -34,26 +34,20 @@ export type TMConcordanceRecord = TMEntryWithTmId & {
   tmType: TMType;
 };
 
-export interface TBRecord {
-  id: string;
-  name: string;
-  srcLang: string;
-  tgtLang: string;
-  createdAt: string;
-  updatedAt: string;
-}
+export type TBRecord = DbTBRecord;
 
-export interface MountedTBRecord extends TBRecord {
-  priority: number;
-  isEnabled: number;
-}
+export type MountedTBRecord = DbMountedTBRecord;
 
 export interface ProjectRepository {
   createProject(name: string, srcLang: string, tgtLang: string): number;
   listProjects(): ProjectListRecord[];
   getProject(id: number): ProjectRecord | undefined;
   updateProjectPrompt(projectId: number, aiPrompt: string | null): void;
-  updateProjectAISettings(projectId: number, aiPrompt: string | null, aiTemperature: number | null): void;
+  updateProjectAISettings(
+    projectId: number,
+    aiPrompt: string | null,
+    aiTemperature: number | null,
+  ): void;
   deleteProject(id: number): void;
 
   createFile(projectId: number, name: string, importOptionsJson?: string): number;
@@ -128,7 +122,8 @@ export interface TransactionManager {
 
 // Backward-compatible aggregate type for incremental migration.
 export interface DatabaseGateway
-  extends ProjectRepository,
+  extends
+    ProjectRepository,
     SegmentRepository,
     TMRepository,
     TBRepository,
@@ -136,17 +131,22 @@ export interface DatabaseGateway
     TransactionManager {}
 
 export interface SpreadsheetGateway {
-  import(filePath: string, projectId: number, fileId: number, options: ImportOptions): Promise<Segment[]>;
-  export(originalFilePath: string, segments: Segment[], options: ImportOptions, outputPath: string): Promise<void>;
+  import(
+    filePath: string,
+    projectId: number,
+    fileId: number,
+    options: ImportOptions,
+  ): Promise<Segment[]>;
+  export(
+    originalFilePath: string,
+    segments: Segment[],
+    options: ImportOptions,
+    outputPath: string,
+  ): Promise<void>;
   getPreview(filePath: string, rowLimit?: number): Promise<SpreadsheetPreviewData>;
 }
 
-export interface ImportOptions {
-  hasHeader: boolean;
-  sourceCol: number;
-  targetCol: number;
-  contextCol?: number;
-}
+export type ImportOptions = SharedImportOptions;
 
 export interface ProgressPayload {
   type: string;

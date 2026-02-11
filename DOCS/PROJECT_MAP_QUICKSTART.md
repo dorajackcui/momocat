@@ -1,6 +1,6 @@
 # 项目上手地图（快速定位版）
 
-最后更新：2026-02-10
+最后更新：2026-02-11
 
 这份文档的目标不是“讲全”，而是帮你在改功能时 1-2 分钟内找到入口，不再迷路。
 
@@ -43,7 +43,8 @@ Renderer (React 组件 + Hooks)
 - `index.ts`：`window.api` typed bridge，把 IPC 能力安全暴露给 renderer。
 
 ### `apps/desktop/src/main`
-- `index.ts`：Electron 启动 + 所有 IPC 注册。
+- `index.ts`：Electron 启动与模块装配（不再承载全部 IPC 实现）。
+- `ipc/*.ts`：按领域拆分的 IPC 注册与 handler 实现（project/tm/tb/ai/dialog/import-job）。
 - `services/ProjectService.ts`：应用服务编排入口（main 的总门面）。
 - `services/modules/`：按业务拆分：
   - `ProjectFileModule`：项目/文件导入导出
@@ -52,7 +53,7 @@ Renderer (React 组件 + Hooks)
   - `AIModule`：AI 配置、测试翻译、批量 AI 预翻译
 - `services/SegmentService.ts`：段落更新、确认后传播、事件广播。
 - `filters/SpreadsheetFilter.ts`：CSV/XLSX 导入导出（文件过滤器）。
-- `JobManager.ts`：长任务进度（AI 翻译）事件。
+- `JobManager.ts`：长任务进度（AI 翻译 + TM/TB 导入）统一事件中心。
 
 ### `packages/core/src`
 - 领域类型和算法（Token、Segment、TM/TB、Tag 编解码与校验）。
@@ -147,6 +148,17 @@ AI Translate File:
   -> SegmentService.updateSegment(status=translated)
 ```
 
+### 3.6 TM/TB 导入任务（Job 化）
+
+```text
+TMImportWizard / TBImportWizard
+  -> apiClient.importTM / importTB
+  -> ipc: tm-import / tb-import（立即返回 jobId）
+  -> JobManager 推送统一 job-progress
+  -> TMModule / TBModule 执行导入
+  -> UI 基于 onJobProgress 渲染 running/success/failed
+```
+
 ---
 
 ## 4) 按任务找文件（最实用索引）
@@ -178,8 +190,9 @@ AI Translate File:
 
 ### 4.6 想改“IPC 契约/参数类型”
 - `apps/desktop/src/shared/ipc.ts`
-- `apps/desktop/src/preload/index.ts`
-- `apps/desktop/src/main/index.ts`
+- `apps/desktop/src/shared/ipcChannels.ts`
+- `apps/desktop/src/preload/api/createDesktopApi.ts`
+- `apps/desktop/src/main/ipc/*.ts`
 
 ### 4.7 想改“数据库 schema 或 SQL”
 - `packages/db/src/migration/runMigrations.ts`
@@ -226,6 +239,7 @@ AI Translate File:
 - 要看“完整结构定义”：`DOCS/PROJECT_STRUCTURE.md`
 - 要看“数据库细节”：`DOCS/DATABASE_SCHEMA.md`
 - 要看“开发约束”：`DOCS/DEVELOPMENT_GUIDE.md`
+- 要看“功能开发门槛与收口结论”：`DOCS/PRE_FEATURE_GATES_2026-02-11.md`
 - 要看“改造优先级”：`DOCS/REFACTOR_PROGRESS_TRACKER_2026-02-10.md`
 
 本文档定位是快速上手导航，不替代上述规范文档。

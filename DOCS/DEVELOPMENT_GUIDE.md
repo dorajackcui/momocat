@@ -1,10 +1,16 @@
-# 开发指南（更新于 2026-02-10）
+# 开发指南（更新于 2026-02-11）
 
 本指南面向当前改造阶段，目标是：
 
 1. 保证正确性（避免半状态）
 2. 推进解耦（可替换 TM/TB/AI/DB）
 3. 收紧类型边界（减少 `any`）
+
+## 0. 当前阶段定义
+
+1. 当前阶段为“功能开发优先（Feature-First）”。
+2. 架构治理继续执行，但仅作为功能开发配套，不再独立扩面。
+3. 任何触达核心边界的改动都必须通过 gate 门禁并补测试。
 
 ## 1. 关键原则
 
@@ -58,3 +64,32 @@ npx vitest run
 1. 改造进度统一记录在 `DOCS/REFACTOR_PROGRESS_TRACKER_2026-02-10.md`。
 2. 路线调整同步更新 `DOCS/ROADMAP.md`。
 3. 历史排障文档放入 `DOCS/archive/`，不作为当前规范。
+4. 功能开发前后门槛统一记录在 `DOCS/PRE_FEATURE_GATES_2026-02-11.md`。
+
+## 6. Gate 门禁流程（持续执行）
+
+### 6.1 必过命令
+
+```bash
+npm run gate:check
+```
+
+`gate:check` 当前包含：
+
+1. `npm run typecheck --workspace=apps/desktop`
+2. `npm run gate:arch`
+3. `npm run lint`
+4. `npm run gate:smoke:large-file`
+
+### 6.2 失败处理规则
+
+1. 任一命令失败，禁止进入新功能分支开发。
+2. 允许先修复门禁失败项，再重新执行 `npm run gate:check`。
+3. 禁止跳过 smoke 检查直接合并；如需临时豁免，必须在 PR 说明风险与回补日期。
+4. 当前 lint 为 warning 基线（无 error）；warning 压降按功能迭代持续推进，不阻塞 gate。
+
+## 7. 架构硬约束（Gate-05）
+
+1. `ProjectService` 仅允许做编排，不承载业务分支/循环等控制流；业务逻辑必须落在 `services/modules/*`。
+2. `CATDatabase` 只作为 repo 聚合与事务入口，不新增跨 repo 业务编排方法。
+3. 架构守卫配置在 `DOCS/architecture/GATE05_GUARDRAILS.json`，由 `npm run gate:arch` 强制校验。

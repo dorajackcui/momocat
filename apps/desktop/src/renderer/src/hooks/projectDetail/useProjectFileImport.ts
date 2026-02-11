@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ImportOptions, SpreadsheetPreviewData } from '../../../../shared/ipc';
 import { apiClient } from '../../services/apiClient';
+import { feedbackService } from '../../services/feedbackService';
 
 interface UseProjectFileImportParams {
   projectId: number;
@@ -19,14 +20,16 @@ interface UseProjectFileImportResult {
 export function useProjectFileImport({
   projectId,
   loadData,
-  runMutation
+  runMutation,
 }: UseProjectFileImportParams): UseProjectFileImportResult {
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [pendingFilePath, setPendingFilePath] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<SpreadsheetPreviewData>([]);
 
   const openFileImport = async () => {
-    const filePath = await apiClient.openFileDialog([{ name: 'Spreadsheets', extensions: ['xlsx', 'csv'] }]);
+    const filePath = await apiClient.openFileDialog([
+      { name: 'Spreadsheets', extensions: ['xlsx', 'csv'] },
+    ]);
     if (!filePath) return;
 
     try {
@@ -37,7 +40,9 @@ export function useProjectFileImport({
         setIsSelectorOpen(true);
       });
     } catch (error) {
-      alert(`Failed to read file: ${error instanceof Error ? error.message : String(error)}`);
+      feedbackService.error(
+        `Failed to read file: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   };
 
@@ -55,7 +60,9 @@ export function useProjectFileImport({
         setPendingFilePath(null);
       });
     } catch (error) {
-      alert(`Failed to add file: ${error instanceof Error ? error.message : String(error)}`);
+      feedbackService.error(
+        `Failed to add file: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   };
 
@@ -64,6 +71,6 @@ export function useProjectFileImport({
     previewData,
     openFileImport,
     closeSelector,
-    confirmImport
+    confirmImport,
   };
 }

@@ -1,9 +1,14 @@
+import { randomUUID } from 'crypto';
 import type { Segment } from '@cat/core';
-import type { TBImportOptions } from '../../shared/ipc';
+import type { StructuredJobError, TBImportOptions } from '../../shared/ipc';
 import { IPC_CHANNELS } from '../../shared/ipcChannels';
-import type { MainHandlerDeps } from './types';
+import type { JobBackedHandlerDeps } from './types';
 
-export function registerTBHandlers({ ipcMain, projectService }: MainHandlerDeps): void {
+export function registerTBHandlers({
+  ipcMain,
+  projectService,
+  jobManager,
+}: JobBackedHandlerDeps): void {
   ipcMain.handle(IPC_CHANNELS.tb.getMatches, (_event, ...args) => {
     const [projectId, segment] = args as [number, Segment];
     return projectService.findTermMatches(projectId, segment);
@@ -43,6 +48,54 @@ export function registerTBHandlers({ ipcMain, projectService }: MainHandlerDeps)
 
   ipcMain.handle(IPC_CHANNELS.tb.importExecute, (_event, ...args) => {
     const [tbId, filePath, options] = args as [string, string, TBImportOptions];
-    return projectService.importTBEntries(tbId, filePath, options);
+    const jobId = randomUUID();
+    jobManager.startJob(jobId, 'TB import started');
+
+    void projectService
+      .importTBEntries(tbId, filePath, options, (data) => {
+        const progress = data.total === 0 ? 0 : Math.round((data.current / data.total) * 100);
+        jobManager.updateProgress(jobId, {
+          progress,
+          message: data.message,
+        });
+      })
+      .then((result) => {
+        jobManager.updateProgress(jobId, {
+          progress: 100,
+          status: 'completed',
+          message: `TB import completed: ${result.success} imported, ${result.skipped} skipped`,
+          result: {
+            kind: 'tb-import',
+            success: result.success,
+            skipped: result.skipped,
+          },
+        });
+      })
+      .catch((error) => {
+        const structuredError = toStructuredJobError(error, 'TB_IMPORT_FAILED');
+        jobManager.updateProgress(jobId, {
+          progress: 100,
+          status: 'failed',
+          message: structuredError.message,
+          error: structuredError,
+        });
+      });
+
+    return jobId;
   });
+}
+
+function toStructuredJobError(error: unknown, code: string): StructuredJobError {
+  if (error instanceof Error) {
+    return {
+      code,
+      message: error.message,
+      details: error.stack,
+    };
+  }
+
+  return {
+    code,
+    message: String(error),
+  };
 }

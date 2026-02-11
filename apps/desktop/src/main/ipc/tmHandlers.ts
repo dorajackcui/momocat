@@ -1,9 +1,14 @@
+import { randomUUID } from 'crypto';
 import type { Segment } from '@cat/core';
-import type { TMImportOptions, TMType } from '../../shared/ipc';
+import type { StructuredJobError, TMImportOptions, TMType } from '../../shared/ipc';
 import { IPC_CHANNELS } from '../../shared/ipcChannels';
-import type { MainHandlerDeps } from './types';
+import type { JobBackedHandlerDeps } from './types';
 
-export function registerTMHandlers({ ipcMain, projectService }: MainHandlerDeps): void {
+export function registerTMHandlers({
+  ipcMain,
+  projectService,
+  jobManager,
+}: JobBackedHandlerDeps): void {
   ipcMain.handle(IPC_CHANNELS.tm.get100Match, (_event, ...args) => {
     const [projectId, srcHash] = args as [number, string];
     return projectService.get100Match(projectId, srcHash);
@@ -40,7 +45,12 @@ export function registerTMHandlers({ ipcMain, projectService }: MainHandlerDeps)
   });
 
   ipcMain.handle(IPC_CHANNELS.tm.mount, (_event, ...args) => {
-    const [projectId, tmId, priority, permission] = args as [number, string, number | undefined, string | undefined];
+    const [projectId, tmId, priority, permission] = args as [
+      number,
+      string,
+      number | undefined,
+      string | undefined,
+    ];
     return projectService.mountTMToProject(projectId, tmId, priority, permission);
   });
 
@@ -66,6 +76,54 @@ export function registerTMHandlers({ ipcMain, projectService }: MainHandlerDeps)
 
   ipcMain.handle(IPC_CHANNELS.tm.importExecute, (_event, ...args) => {
     const [tmId, filePath, options] = args as [string, string, TMImportOptions];
-    return projectService.importTMEntries(tmId, filePath, options);
+    const jobId = randomUUID();
+    jobManager.startJob(jobId, 'TM import started');
+
+    void projectService
+      .importTMEntries(tmId, filePath, options, (data) => {
+        const progress = data.total === 0 ? 0 : Math.round((data.current / data.total) * 100);
+        jobManager.updateProgress(jobId, {
+          progress,
+          message: data.message,
+        });
+      })
+      .then((result) => {
+        jobManager.updateProgress(jobId, {
+          progress: 100,
+          status: 'completed',
+          message: `TM import completed: ${result.success} imported, ${result.skipped} skipped`,
+          result: {
+            kind: 'tm-import',
+            success: result.success,
+            skipped: result.skipped,
+          },
+        });
+      })
+      .catch((error) => {
+        const structuredError = toStructuredJobError(error, 'TM_IMPORT_FAILED');
+        jobManager.updateProgress(jobId, {
+          progress: 100,
+          status: 'failed',
+          message: structuredError.message,
+          error: structuredError,
+        });
+      });
+
+    return jobId;
   });
+}
+
+function toStructuredJobError(error: unknown, code: string): StructuredJobError {
+  if (error instanceof Error) {
+    return {
+      code,
+      message: error.message,
+      details: error.stack,
+    };
+  }
+
+  return {
+    code,
+    message: String(error),
+  };
 }

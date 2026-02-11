@@ -1,14 +1,19 @@
 import { Segment, SegmentStatus, Token } from '@cat/core';
 import { CATDatabase } from '@cat/db';
-import { SpreadsheetFilter, ImportOptions } from '../filters/SpreadsheetFilter';
+import { SpreadsheetFilter } from '../filters/SpreadsheetFilter';
 import { TMService } from './TMService';
 import { SegmentService } from './SegmentService';
 import { TBService } from './TBService';
-import { AITransport, SegmentsUpdatedPayload, SpreadsheetGateway, SpreadsheetPreviewData } from './ports';
+import {
+  AITransport,
+  SegmentsUpdatedPayload,
+  SpreadsheetGateway,
+  SpreadsheetPreviewData,
+} from './ports';
 import { OpenAITransport } from './providers/OpenAITransport';
 import { ProjectFileModule } from './modules/ProjectFileModule';
-import { TMImportOptions, TMModule } from './modules/TMModule';
-import { TBImportOptions, TBModule } from './modules/TBModule';
+import { TMModule } from './modules/TMModule';
+import { TBModule } from './modules/TBModule';
 import { AIModule } from './modules/AIModule';
 import { SqliteProjectRepository } from './adapters/SqliteProjectRepository';
 import { SqliteSegmentRepository } from './adapters/SqliteSegmentRepository';
@@ -16,6 +21,7 @@ import { SqliteTMRepository } from './adapters/SqliteTMRepository';
 import { SqliteTBRepository } from './adapters/SqliteTBRepository';
 import { SqliteSettingsRepository } from './adapters/SqliteSettingsRepository';
 import { SqliteTransactionManager } from './adapters/SqliteTransactionManager';
+import type { ImportOptions, TBImportOptions, TMImportOptions } from '../../shared/ipc';
 
 interface ProjectServiceDependencies {
   filter?: SpreadsheetGateway;
@@ -29,15 +35,31 @@ interface ProjectServiceDependencies {
   aiModule?: AIModule;
 }
 
+interface ImportProgress {
+  current: number;
+  total: number;
+  message?: string;
+}
+
 export class ProjectService {
   private readonly segmentService: SegmentService;
   private readonly projectModule: ProjectFileModule;
   private readonly tmModule: TMModule;
   private readonly tbModule: TBModule;
   private readonly aiModule: AIModule;
-  private progressCallbacks: ((data: { type: string; current: number; total: number; message?: string }) => void)[] = [];
+  private progressCallbacks: ((data: {
+    type: string;
+    current: number;
+    total: number;
+    message?: string;
+  }) => void)[] = [];
 
-  constructor(db: CATDatabase, projectsDir: string, dbPath: string, deps: ProjectServiceDependencies = {}) {
+  constructor(
+    db: CATDatabase,
+    projectsDir: string,
+    dbPath: string,
+    deps: ProjectServiceDependencies = {},
+  ) {
     const projectRepo = new SqliteProjectRepository(db);
     const segmentRepo = new SqliteSegmentRepository(db);
     const tmRepo = new SqliteTMRepository(db);
@@ -50,17 +72,35 @@ export class ProjectService {
     const tbService = deps.tbService ?? new TBService(tbRepo);
     this.segmentService = deps.segmentService ?? new SegmentService(segmentRepo, tmService, tx);
 
-    const emitProgress = (payload: { type: string; current: number; total: number; message?: string }) => {
+    const emitProgress = (payload: {
+      type: string;
+      current: number;
+      total: number;
+      message?: string;
+    }) => {
       this.emitProgress(payload.type, payload.current, payload.total, payload.message);
     };
 
-    this.projectModule = deps.projectModule ?? new ProjectFileModule(projectRepo, segmentRepo, filter, projectsDir);
+    this.projectModule =
+      deps.projectModule ?? new ProjectFileModule(projectRepo, segmentRepo, filter, projectsDir);
     this.tmModule =
-      deps.tmModule ?? new TMModule(projectRepo, segmentRepo, tmRepo, tx, tmService, this.segmentService, dbPath, emitProgress);
+      deps.tmModule ??
+      new TMModule(
+        projectRepo,
+        segmentRepo,
+        tmRepo,
+        tx,
+        tmService,
+        this.segmentService,
+        dbPath,
+        emitProgress,
+      );
     this.tbModule = deps.tbModule ?? new TBModule(tbRepo, tx, tbService, emitProgress);
 
     const aiTransport = deps.aiTransport ?? new OpenAITransport();
-    this.aiModule = deps.aiModule ?? new AIModule(projectRepo, segmentRepo, settingsRepo, this.segmentService, aiTransport);
+    this.aiModule =
+      deps.aiModule ??
+      new AIModule(projectRepo, segmentRepo, settingsRepo, this.segmentService, aiTransport);
   }
 
   public async createProject(name: string, srcLang: string, tgtLang: string) {
@@ -91,7 +131,11 @@ export class ProjectService {
     this.projectModule.updateProjectPrompt(projectId, aiPrompt);
   }
 
-  public updateProjectAISettings(projectId: number, aiPrompt: string | null, aiTemperature: number | null) {
+  public updateProjectAISettings(
+    projectId: number,
+    aiPrompt: string | null,
+    aiTemperature: number | null,
+  ) {
     this.projectModule.updateProjectAISettings(projectId, aiPrompt, aiTemperature);
   }
 
@@ -120,15 +164,17 @@ export class ProjectService {
     return () => this.segmentService.off('segments-updated', callback);
   }
 
-  public onProgress(callback: (data: { type: string; current: number; total: number; message?: string }) => void) {
+  public onProgress(
+    callback: (data: { type: string; current: number; total: number; message?: string }) => void,
+  ) {
     this.progressCallbacks.push(callback);
     return () => {
-      this.progressCallbacks = this.progressCallbacks.filter(c => c !== callback);
+      this.progressCallbacks = this.progressCallbacks.filter((c) => c !== callback);
     };
   }
 
   private emitProgress(type: string, current: number, total: number, message?: string) {
-    this.progressCallbacks.forEach(cb => cb({ type, current, total, message }));
+    this.progressCallbacks.forEach((cb) => cb({ type, current, total, message }));
   }
 
   public async get100Match(projectId: number, srcHash: string) {
@@ -151,7 +197,12 @@ export class ProjectService {
     return this.tmModule.listTMs(type);
   }
 
-  public async createTM(name: string, srcLang: string, tgtLang: string, type: 'working' | 'main' = 'main') {
+  public async createTM(
+    name: string,
+    srcLang: string,
+    tgtLang: string,
+    type: 'working' | 'main' = 'main',
+  ) {
     return this.tmModule.createTM(name, srcLang, tgtLang, type);
   }
 
@@ -163,7 +214,12 @@ export class ProjectService {
     return this.tmModule.getProjectMountedTMs(projectId);
   }
 
-  public async mountTMToProject(projectId: number, tmId: string, priority?: number, permission?: string) {
+  public async mountTMToProject(
+    projectId: number,
+    tmId: string,
+    priority?: number,
+    permission?: string,
+  ) {
     return this.tmModule.mountTMToProject(projectId, tmId, priority, permission);
   }
 
@@ -199,16 +255,26 @@ export class ProjectService {
     return this.tmModule.getTMImportPreview(filePath);
   }
 
-  public async importTMEntries(tmId: string, filePath: string, options: TMImportOptions): Promise<{ success: number; skipped: number }> {
-    return this.tmModule.importTMEntries(tmId, filePath, options);
+  public async importTMEntries(
+    tmId: string,
+    filePath: string,
+    options: TMImportOptions,
+    onProgress?: (progress: ImportProgress) => void,
+  ): Promise<{ success: number; skipped: number }> {
+    return this.tmModule.importTMEntries(tmId, filePath, options, onProgress);
   }
 
   public async getTBImportPreview(filePath: string): Promise<SpreadsheetPreviewData> {
     return this.tbModule.getTBImportPreview(filePath);
   }
 
-  public async importTBEntries(tbId: string, filePath: string, options: TBImportOptions): Promise<{ success: number; skipped: number }> {
-    return this.tbModule.importTBEntries(tbId, filePath, options);
+  public async importTBEntries(
+    tbId: string,
+    filePath: string,
+    options: TBImportOptions,
+    onProgress?: (progress: ImportProgress) => void,
+  ): Promise<{ success: number; skipped: number }> {
+    return this.tbModule.importTBEntries(tbId, filePath, options, onProgress);
   }
 
   public async commitToMainTM(tmId: string, fileId: number) {
@@ -217,12 +283,17 @@ export class ProjectService {
 
   public async batchMatchFileWithTM(
     fileId: number,
-    tmId: string
+    tmId: string,
   ): Promise<{ total: number; matched: number; applied: number; skipped: number }> {
     return this.tmModule.batchMatchFileWithTM(fileId, tmId);
   }
 
-  public async exportFile(fileId: number, outputPath: string, options?: ImportOptions, forceExport: boolean = false) {
+  public async exportFile(
+    fileId: number,
+    outputPath: string,
+    options?: ImportOptions,
+    forceExport: boolean = false,
+  ) {
     return this.projectModule.exportFile(fileId, outputPath, options, forceExport);
   }
 
@@ -247,7 +318,7 @@ export class ProjectService {
     options?: {
       model?: string;
       onProgress?: (data: { current: number; total: number; message?: string }) => void;
-    }
+    },
   ) {
     return this.aiModule.aiTranslateFile(fileId, options);
   }

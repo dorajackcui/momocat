@@ -5,6 +5,7 @@ import { useEditor } from '../hooks/useEditor';
 import { TMPanel } from './TMPanel';
 import { ConcordancePanel } from './ConcordancePanel';
 import { apiClient } from '../services/apiClient';
+import { feedbackService } from '../services/feedbackService';
 
 interface EditorProps {
   fileId: number;
@@ -24,19 +25,19 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
 
   const SIDEBAR_MIN_WIDTH = 220;
 
-  const { 
-    segments, 
-    activeSegmentId, 
+  const {
+    segments,
+    activeSegmentId,
     activeMatches,
     activeTerms,
     segmentSaveErrors,
-    loading, 
-    setActiveSegmentId, 
+    loading,
+    setActiveSegmentId,
     handleTranslationChange,
     confirmSegment,
     handleApplyMatch,
     handleApplyTerm,
-    projectId
+    projectId,
   } = useEditor({ activeFileId: fileId });
 
   const totalSegments = segments.length;
@@ -62,7 +63,10 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
   useEffect(() => {
     const getSelectedTextForConcordance = (): string => {
       const activeElement = document.activeElement;
-      if (activeElement instanceof HTMLTextAreaElement || activeElement instanceof HTMLInputElement) {
+      if (
+        activeElement instanceof HTMLTextAreaElement ||
+        activeElement instanceof HTMLInputElement
+      ) {
         const start = activeElement.selectionStart ?? 0;
         const end = activeElement.selectionEnd ?? 0;
         if (end > start) {
@@ -135,35 +139,37 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
 
   const handleExport = async () => {
     if (!file) return;
-    
+
     const defaultPath = file.name.replace(/(\.xlsx|\.csv)$/i, '_translated$1');
     const outputPath = await apiClient.saveFileDialog(defaultPath, [
-      { name: 'Spreadsheets', extensions: ['xlsx', 'csv'] }
+      { name: 'Spreadsheets', extensions: ['xlsx', 'csv'] },
     ]);
 
     if (outputPath) {
       try {
         await apiClient.exportFile(fileId, outputPath);
-        alert('Export successful');
+        feedbackService.success('Export successful');
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        
+
         // Check if this is a QA error that can be forced
         if (errorMessage.includes('Export blocked by QA errors')) {
-          const forceExport = confirm(
-            `${errorMessage}\n\nDo you want to force export despite these errors?`
+          const forceExport = await feedbackService.confirm(
+            `${errorMessage}\n\nDo you want to force export despite these errors?`,
           );
-          
+
           if (forceExport) {
             try {
               await apiClient.exportFile(fileId, outputPath, undefined, true);
-              alert('Export successful (forced despite QA errors)');
+              feedbackService.success('Export successful (forced despite QA errors)');
             } catch (forceError) {
-              alert('Export failed: ' + (forceError instanceof Error ? forceError.message : String(forceError)));
+              feedbackService.error(
+                `Export failed: ${forceError instanceof Error ? forceError.message : String(forceError)}`,
+              );
             }
           }
         } else {
-          alert('Export failed: ' + errorMessage);
+          feedbackService.error(`Export failed: ${errorMessage}`);
         }
       }
     }
@@ -191,7 +197,12 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
             title="Back to Project"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
             </svg>
           </button>
           <div>
@@ -199,9 +210,13 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
               {file?.name || 'Loading...'}
             </h2>
             <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-[10px] text-blue-600 font-bold uppercase tracking-wider">{project?.name}</span>
+              <span className="text-[10px] text-blue-600 font-bold uppercase tracking-wider">
+                {project?.name}
+              </span>
               <span className="text-[10px] text-gray-300">•</span>
-              <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wider">{project?.srcLang} → {project?.tgtLang}</span>
+              <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wider">
+                {project?.srcLang} → {project?.tgtLang}
+              </span>
             </div>
           </div>
         </div>
@@ -213,13 +228,15 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
             </div>
           )}
           <div className="flex items-center gap-3">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Progress</span>
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+              Progress
+            </span>
             <div className="px-2.5 py-1 bg-gray-100 rounded-md text-[11px] font-bold text-gray-700">
               {confirmedSegments}/{totalSegments}
             </div>
           </div>
           <div className="h-4 w-[1px] bg-gray-200" />
-          <button 
+          <button
             onClick={handleExport}
             className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded-lg shadow-sm transition-all active:scale-95"
           >
@@ -234,10 +251,14 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
           <div className="min-w-[800px]">
             {/* Column Headers */}
             <div className="grid grid-cols-2 bg-gray-50/80 border-b border-gray-200 px-4 py-2 sticky top-0 z-10 backdrop-blur-sm">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2">Source Text</div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2 border-l border-gray-200">Target Translation</div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2">
+                Source Text
+              </div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2 border-l border-gray-200">
+                Target Translation
+              </div>
             </div>
-            
+
             {segments.map((segment, index) => (
               <EditorRow
                 key={segment.segmentId}
@@ -250,7 +271,7 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
                 saveError={segmentSaveErrors[segment.segmentId]}
               />
             ))}
-            
+
             <div className="h-64 bg-gray-50/30" />
           </div>
         </div>
@@ -277,7 +298,9 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
             <button
               onClick={() => setActiveTab('tm')}
               className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider transition-colors ${
-                activeTab === 'tm' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-400 hover:text-gray-600'
+                activeTab === 'tm'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-400 hover:text-gray-600'
               }`}
             >
               CAT
@@ -286,7 +309,9 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
               onClick={() => setActiveTab('concordance')}
               title="Concordance (Ctrl/Cmd+K)"
               className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider transition-colors ${
-                activeTab === 'concordance' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-400 hover:text-gray-600'
+                activeTab === 'concordance'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-400 hover:text-gray-600'
               }`}
             >
               Concordance

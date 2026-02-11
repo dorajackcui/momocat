@@ -21,9 +21,7 @@ app.commandLine.appendSwitch('no-sandbox');
 app.commandLine.appendSwitch('disable-gpu');
 
 // Set UserData path early to avoid permission issues with Chromium cache
-const userDataPath = is.dev 
-  ? join(app.getAppPath(), '../../.cat_data') 
-  : app.getPath('userData');
+const userDataPath = is.dev ? join(app.getAppPath(), '../../.cat_data') : app.getPath('userData');
 
 if (is.dev) {
   app.setPath('userData', userDataPath);
@@ -34,7 +32,12 @@ async function loadProxyEnvFromFile(filePath: string) {
   try {
     content = await readFile(filePath, 'utf-8');
   } catch (error) {
-    if (typeof error === 'object' && error !== null && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      (error as NodeJS.ErrnoException).code === 'ENOENT'
+    ) {
       return;
     }
     throw error;
@@ -108,7 +111,7 @@ app.whenReady().then(async () => {
   const projectsDir = join(userDataPath, 'projects');
   const proxyEnvPath = join(userDataPath, 'proxy.env');
   const fallbackProxyEnvPath = join(app.getAppPath(), 'proxy.env');
-  
+
   try {
     await mkdir(userDataPath, { recursive: true });
     await mkdir(projectsDir, { recursive: true });
@@ -121,7 +124,7 @@ app.whenReady().then(async () => {
   await loadProxyEnvFromFile(proxyEnvPath);
   await loadProxyEnvFromFile(fallbackProxyEnvPath);
   setupProxy();
-  
+
   let db: CATDatabase;
   try {
     db = new CATDatabase(dbPath);
@@ -134,8 +137,8 @@ app.whenReady().then(async () => {
   const jobManager = new JobManager();
 
   registerProjectHandlers({ ipcMain, projectService });
-  registerTMHandlers({ ipcMain, projectService });
-  registerTBHandlers({ ipcMain, projectService });
+  registerTMHandlers({ ipcMain, projectService, jobManager });
+  registerTBHandlers({ ipcMain, projectService, jobManager });
   registerAIHandlers({ ipcMain, projectService, jobManager });
   registerDialogHandlers({ ipcMain, dialog });
 
@@ -148,14 +151,14 @@ app.whenReady().then(async () => {
 
   // Listen for segment updates and broadcast to all windows
   projectService.onSegmentsUpdated((data) => {
-    BrowserWindow.getAllWindows().forEach(win => {
+    BrowserWindow.getAllWindows().forEach((win) => {
       win.webContents.send(IPC_CHANNELS.events.segmentsUpdated, data);
     });
   });
 
   // IPC: Job Management
   jobManager.on('progress', (progress) => {
-    BrowserWindow.getAllWindows().forEach(win => {
+    BrowserWindow.getAllWindows().forEach((win) => {
       win.webContents.send(IPC_CHANNELS.events.jobProgress, progress);
     });
   });

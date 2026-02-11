@@ -1,9 +1,10 @@
 import {
+  Segment,
   Token,
   TagValidator,
   parseEditorTextToTokens,
   serializeTokensToDisplayText,
-  serializeTokensToEditorText
+  serializeTokensToEditorText,
 } from '@cat/core';
 import { AITransport, ProjectRepository, SegmentRepository, SettingsRepository } from '../ports';
 import { SegmentService } from '../SegmentService';
@@ -18,6 +19,7 @@ interface TranslateDebugMeta {
 }
 
 export class AIModule {
+  private static readonly SEGMENT_PAGE_SIZE = 1000;
   private readonly tagValidator = new TagValidator();
 
   constructor(
@@ -25,7 +27,7 @@ export class AIModule {
     private readonly segmentRepo: SegmentRepository,
     private readonly settingsRepo: SettingsRepository,
     private readonly segmentService: SegmentService,
-    private readonly transport: AITransport
+    private readonly transport: AITransport,
   ) {}
 
   public getAISettings(): { apiKeySet: boolean; apiKeyLast4?: string } {
@@ -57,7 +59,7 @@ export class AIModule {
     options?: {
       model?: string;
       onProgress?: (data: { current: number; total: number; message?: string }) => void;
-    }
+    },
   ) {
     const file = this.projectRepo.getFile(fileId);
     if (!file) throw new Error('File not found');
@@ -72,44 +74,28 @@ export class AIModule {
 
     const model = options?.model || 'gpt-4o-mini';
     const temperature = this.resolveTemperature(project.aiTemperature);
-    const segments = this.segmentRepo.getSegmentsPage(fileId, 0, 1000000);
-
-    const segmentsToTranslate: typeof segments = [];
-    let emptySourceStreak = 0;
-
-    for (const seg of segments) {
-      const sourceText = serializeTokensToDisplayText(seg.sourceTokens).trim();
-      if (!sourceText) {
-        emptySourceStreak += 1;
-        if (emptySourceStreak >= 3) continue;
-        continue;
-      }
-
-      emptySourceStreak = 0;
-
-      if (seg.status === 'confirmed') continue;
-      const existing = serializeTokensToDisplayText(seg.targetTokens).trim();
-      if (existing.length > 0) continue;
-
-      segmentsToTranslate.push(seg);
-    }
-
-    const total = segmentsToTranslate.length;
+    const totalSegments = this.countFileSegments(fileId);
+    const total = this.countTranslatableSegments(fileId);
     let current = 0;
     let translated = 0;
-    let skipped = segments.length - total;
+    const skipped = totalSegments - total;
     let failed = 0;
 
-    for (const seg of segmentsToTranslate) {
+    for (const seg of this.iterateFileSegments(fileId)) {
+      if (!this.isTranslatableSegment(seg)) continue;
+
       current += 1;
       options?.onProgress?.({
         current,
         total,
-        message: `Translating segment ${current} of ${total}`
+        message: `Translating segment ${current} of ${total}`,
       });
 
       const sourceText = serializeTokensToDisplayText(seg.sourceTokens);
-      const sourceTagPreservedText = serializeTokensToEditorText(seg.sourceTokens, seg.sourceTokens);
+      const sourceTagPreservedText = serializeTokensToEditorText(
+        seg.sourceTokens,
+        seg.sourceTokens,
+      );
       const context = seg.meta?.context ? String(seg.meta.context).trim() : '';
 
       try {
@@ -123,7 +109,7 @@ export class AIModule {
           sourceTokens: seg.sourceTokens,
           sourceText,
           sourceTagPreservedText,
-          context
+          context,
         });
 
         await this.segmentService.updateSegment(seg.segmentId, targetTokens, 'translated');
@@ -132,10 +118,10 @@ export class AIModule {
         failed += 1;
       }
 
-      await new Promise(resolve => setTimeout(resolve, 40));
+      await new Promise((resolve) => setTimeout(resolve, 40));
     }
 
-    return { translated, skipped, failed, total: segments.length };
+    return { translated, skipped, failed, total: totalSegments };
   }
 
   public async aiTestTranslate(projectId: number, sourceText: string) {
@@ -150,7 +136,11 @@ export class AIModule {
     const model = 'gpt-4o-mini';
     const temperature = this.resolveTemperature(project.aiTemperature);
     const source = sourceText.trim();
-    const promptUsed = this.buildSystemPrompt(project.srcLang, project.tgtLang, project.aiPrompt || '');
+    const promptUsed = this.buildSystemPrompt(
+      project.srcLang,
+      project.tgtLang,
+      project.aiPrompt || '',
+    );
     const userMessage = [`Source (${project.srcLang}):`, source].join('\n');
     const debug: TranslateDebugMeta = {};
 
@@ -164,7 +154,7 @@ export class AIModule {
         tgtLang: project.tgtLang,
         sourceText: source,
         debug,
-        allowUnchanged: true
+        allowUnchanged: true,
       });
 
       const unchanged = translatedText.trim() === source && project.srcLang !== project.tgtLang;
@@ -179,7 +169,7 @@ export class AIModule {
         endpoint: debug.endpoint,
         model: debug.model,
         rawResponseText: debug.rawResponseText,
-        responseContent: debug.responseContent
+        responseContent: debug.responseContent,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -194,7 +184,7 @@ export class AIModule {
         endpoint: debug.endpoint,
         model: debug.model,
         rawResponseText: debug.rawResponseText,
-        responseContent: debug.responseContent
+        responseContent: debug.responseContent,
       };
     }
   }
@@ -206,7 +196,7 @@ export class AIModule {
       'Never translate, remove, reorder, renumber, or rewrite protected markers.',
       'Keep all tags, placeholders, and formatting exactly as they appear in the source.',
       'Return only the translated text, without quotes or extra commentary.',
-      'Do not copy the source text unless it is already in the target language.'
+      'Do not copy the source text unless it is already in the target language.',
     ].join('\n');
 
     const trimmed = projectPrompt?.trim();
@@ -240,25 +230,27 @@ export class AIModule {
         sourceText: params.sourceText,
         sourceTagPreservedText: params.sourceTagPreservedText,
         context: params.context,
-        validationFeedback
+        validationFeedback,
       });
 
       const targetTokens = parseEditorTextToTokens(translatedText, params.sourceTokens);
       const validationResult = this.tagValidator.validate(params.sourceTokens, targetTokens);
-      const errors = validationResult.issues.filter(issue => issue.severity === 'error');
+      const errors = validationResult.issues.filter((issue) => issue.severity === 'error');
 
       if (errors.length === 0) {
         return targetTokens;
       }
 
       if (attempt === maxAttempts) {
-        throw new Error(`Tag validation failed after ${maxAttempts} attempts: ${errors.map(e => e.message).join('; ')}`);
+        throw new Error(
+          `Tag validation failed after ${maxAttempts} attempts: ${errors.map((e) => e.message).join('; ')}`,
+        );
       }
 
       validationFeedback = [
         'Previous translation was invalid.',
-        ...errors.map(e => `- ${e.message}`),
-        'Retry by preserving marker content and sequence exactly.'
+        ...errors.map((e) => `- ${e.message}`),
+        'Retry by preserving marker content and sequence exactly.',
       ].join('\n');
     }
 
@@ -279,14 +271,19 @@ export class AIModule {
     debug?: TranslateDebugMeta;
     allowUnchanged?: boolean;
   }): Promise<string> {
-    const systemPrompt = this.buildSystemPrompt(params.srcLang, params.tgtLang, params.projectPrompt);
-    const hasProtectedMarkers = typeof params.sourceTagPreservedText === 'string' && params.sourceTagPreservedText.length > 0;
+    const systemPrompt = this.buildSystemPrompt(
+      params.srcLang,
+      params.tgtLang,
+      params.projectPrompt,
+    );
+    const hasProtectedMarkers =
+      typeof params.sourceTagPreservedText === 'string' && params.sourceTagPreservedText.length > 0;
     const sourcePayload = hasProtectedMarkers ? params.sourceTagPreservedText! : params.sourceText;
     const userParts = [
       hasProtectedMarkers
         ? `Source (${params.srcLang}, protected-marker format):`
         : `Source (${params.srcLang}):`,
-      sourcePayload
+      sourcePayload,
     ];
 
     if (params.context) {
@@ -304,7 +301,7 @@ export class AIModule {
       model: params.model,
       temperature: this.resolveTemperature(params.temperature),
       systemPrompt,
-      userPrompt: userParts.join('\n')
+      userPrompt: userParts.join('\n'),
     });
 
     if (params.debug) {
@@ -322,7 +319,11 @@ export class AIModule {
 
     const unchangedAgainstSource = trimmed === params.sourceText.trim();
     const unchangedAgainstPayload = trimmed === sourcePayload.trim();
-    if (!params.allowUnchanged && (unchangedAgainstSource || unchangedAgainstPayload) && params.srcLang !== params.tgtLang) {
+    if (
+      !params.allowUnchanged &&
+      (unchangedAgainstSource || unchangedAgainstPayload) &&
+      params.srcLang !== params.tgtLang
+    ) {
       throw new Error(`Model returned source unchanged: ${trimmed}`);
     }
 
@@ -335,5 +336,50 @@ export class AIModule {
     }
 
     return Math.max(0, Math.min(2, value));
+  }
+
+  private isTranslatableSegment(segment: Segment): boolean {
+    const sourceText = serializeTokensToDisplayText(segment.sourceTokens).trim();
+    if (!sourceText) return false;
+    if (segment.status === 'confirmed') return false;
+    const existingTarget = serializeTokensToDisplayText(segment.targetTokens).trim();
+    return existingTarget.length === 0;
+  }
+
+  private countFileSegments(fileId: number): number {
+    let count = 0;
+    let offset = 0;
+
+    while (true) {
+      const page = this.segmentRepo.getSegmentsPage(fileId, offset, AIModule.SEGMENT_PAGE_SIZE);
+      if (page.length === 0) return count;
+      count += page.length;
+      if (page.length < AIModule.SEGMENT_PAGE_SIZE) return count;
+      offset += AIModule.SEGMENT_PAGE_SIZE;
+    }
+  }
+
+  private countTranslatableSegments(fileId: number): number {
+    let count = 0;
+    for (const segment of this.iterateFileSegments(fileId)) {
+      if (this.isTranslatableSegment(segment)) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  private *iterateFileSegments(fileId: number): Generator<Segment> {
+    let offset = 0;
+
+    while (true) {
+      const page = this.segmentRepo.getSegmentsPage(fileId, offset, AIModule.SEGMENT_PAGE_SIZE);
+      if (page.length === 0) return;
+      for (const segment of page) {
+        yield segment;
+      }
+      if (page.length < AIModule.SEGMENT_PAGE_SIZE) return;
+      offset += AIModule.SEGMENT_PAGE_SIZE;
+    }
   }
 }

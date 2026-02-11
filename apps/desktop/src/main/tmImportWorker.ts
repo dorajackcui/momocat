@@ -4,19 +4,13 @@ import {
   parseDisplayTextToTokens,
   computeTagsSignature,
   computeMatchKey,
-  computeSrcHash
+  computeSrcHash,
 } from '@cat/core';
 import { randomUUID } from 'crypto';
 import { readFile } from 'fs/promises';
 import * as XLSX from 'xlsx';
 import { extractSheetRows } from './filters/sheetRows';
-
-interface TMImportOptions {
-  sourceCol: number;
-  targetCol: number;
-  hasHeader: boolean;
-  overwrite: boolean;
-}
+import type { TMImportOptions } from '../shared/ipc';
 
 interface TMImportWorkerInput {
   dbPath: string;
@@ -35,7 +29,7 @@ const emitProgress = (current: number, total: number, message?: string) => {
     type: 'progress',
     current,
     total,
-    message
+    message,
   });
 };
 
@@ -54,7 +48,7 @@ const run = async () => {
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
     const sourceRows = extractSheetRows(worksheet, {
-      columnIndexes: [input.options.sourceCol, input.options.targetCol]
+      columnIndexes: [input.options.sourceCol, input.options.targetCol],
     });
     const rows = input.options.hasHeader ? sourceRows.slice(1) : sourceRows;
 
@@ -78,8 +72,14 @@ const run = async () => {
         for (let j = i; j < end; j++) {
           const row = rows[j].cells;
 
-          const sourceText = row[input.options.sourceCol] !== undefined ? String(row[input.options.sourceCol]).trim() : '';
-          const targetText = row[input.options.targetCol] !== undefined ? String(row[input.options.targetCol]).trim() : '';
+          const sourceText =
+            row[input.options.sourceCol] !== undefined
+              ? String(row[input.options.sourceCol]).trim()
+              : '';
+          const targetText =
+            row[input.options.targetCol] !== undefined
+              ? String(row[input.options.targetCol]).trim()
+              : '';
 
           if (!sourceText || !targetText) {
             skipped++;
@@ -106,7 +106,7 @@ const run = async () => {
             targetTokens,
             usageCount: 1,
             createdAt: now,
-            updatedAt: now
+            updatedAt: now,
           };
 
           if (input.options.overwrite) {
@@ -129,7 +129,7 @@ const run = async () => {
 
       const processedRows = end;
       emitProgress(processedRows, totalRows, `Imported ${processedRows} of ${totalRows} rows...`);
-      await new Promise<void>(resolve => setImmediate(resolve));
+      await new Promise<void>((resolve) => setImmediate(resolve));
     }
 
     port.postMessage({ type: 'done', result: { success, skipped } });

@@ -1,11 +1,7 @@
 import { EventEmitter } from 'events';
+import type { JobProgressEvent } from '../shared/ipc';
 
-export interface JobProgress {
-  jobId: string;
-  progress: number; // 0-100
-  status: 'running' | 'completed' | 'failed' | 'cancelled';
-  message?: string;
-}
+export type JobProgress = JobProgressEvent;
 
 export class JobManager extends EventEmitter {
   private jobs: Map<string, JobProgress> = new Map();
@@ -15,7 +11,7 @@ export class JobManager extends EventEmitter {
       jobId,
       progress: 0,
       status: 'running',
-      message: initialMessage
+      message: initialMessage,
     };
     this.jobs.set(jobId, progress);
     this.emit('progress', progress);
