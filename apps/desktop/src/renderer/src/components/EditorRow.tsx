@@ -1,12 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Segment, Token, formatTagAsMemoQMarker, serializeTokensToEditorText } from '@cat/core';
 import { TagInsertionUI } from './TagInsertionUI';
+import { buildHighlightChunks, EditorMatchMode } from './editorFilterUtils';
 
 interface EditorRowProps {
   segment: Segment;
   rowNumber: number;
   isActive: boolean;
   saveError?: string;
+  sourceHighlightQuery?: string;
+  targetHighlightQuery?: string;
+  highlightMode?: EditorMatchMode;
   onActivate: (id: string) => void;
   onChange: (id: string, value: string) => void;
   onConfirm: (id: string) => void;
@@ -17,11 +21,13 @@ export const EditorRow: React.FC<EditorRowProps> = ({
   rowNumber,
   isActive,
   saveError,
+  sourceHighlightQuery = '',
+  targetHighlightQuery = '',
+  highlightMode = 'contains',
   onActivate,
   onChange,
-  onConfirm
+  onConfirm,
 }) => {
-  const sourceTextareaRef = useRef<HTMLTextAreaElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isContextExpanded, setIsContextExpanded] = useState(false);
   const [showTagInsertionUI, setShowTagInsertionUI] = useState(false);
@@ -29,8 +35,8 @@ export const EditorRow: React.FC<EditorRowProps> = ({
   const [isSourceHovered, setIsSourceHovered] = useState(false);
 
   const qaIssues = segment.qaIssues || [];
-  const hasError = qaIssues.some(issue => issue.severity === 'error');
-  const hasWarning = qaIssues.some(issue => issue.severity === 'warning');
+  const hasError = qaIssues.some((issue) => issue.severity === 'error');
+  const hasWarning = qaIssues.some((issue) => issue.severity === 'warning');
 
   const sourceTags = useMemo(() => {
     const seen = new Set<string>();
@@ -43,13 +49,19 @@ export const EditorRow: React.FC<EditorRowProps> = ({
   }, [segment.sourceTokens]);
 
   const sourceEditorText = useMemo(
-    () => serializeTokensToEditorText(segment.sourceTokens, segment.sourceTokens).replace(/\r\n/g, '\n').replace(/\r/g, '\n'),
-    [segment.sourceTokens]
+    () =>
+      serializeTokensToEditorText(segment.sourceTokens, segment.sourceTokens)
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n'),
+    [segment.sourceTokens],
   );
 
   const targetEditorText = useMemo(
-    () => serializeTokensToEditorText(segment.targetTokens, segment.sourceTokens).replace(/\r\n/g, '\n').replace(/\r/g, '\n'),
-    [segment.targetTokens, segment.sourceTokens]
+    () =>
+      serializeTokensToEditorText(segment.targetTokens, segment.sourceTokens)
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n'),
+    [segment.targetTokens, segment.sourceTokens],
   );
 
   const resizeTextarea = useCallback((el: HTMLTextAreaElement | null) => {
@@ -72,10 +84,6 @@ export const EditorRow: React.FC<EditorRowProps> = ({
   }, [isActive]);
 
   useEffect(() => {
-    resizeTextarea(sourceTextareaRef.current);
-  }, [sourceEditorText, resizeTextarea]);
-
-  useEffect(() => {
     resizeTextarea(textareaRef.current);
   }, [draftText, resizeTextarea]);
 
@@ -85,7 +93,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
       onChange(segment.segmentId, nextText);
       requestAnimationFrame(() => resizeTextarea(textareaRef.current));
     },
-    [onChange, segment.segmentId, resizeTextarea]
+    [onChange, segment.segmentId, resizeTextarea],
   );
 
   const insertAtSelection = useCallback(
@@ -107,7 +115,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
         textareaRef.current.setSelectionRange(nextCursor, nextCursor);
       });
     },
-    [emitTranslationChange]
+    [emitTranslationChange],
   );
 
   const handleInsertTag = useCallback(
@@ -117,7 +125,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
       insertAtSelection(marker);
       setShowTagInsertionUI(false);
     },
-    [insertAtSelection, sourceTags]
+    [insertAtSelection, sourceTags],
   );
 
   const handleInsertAllTags = useCallback(() => {
@@ -131,6 +139,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
 
   const handleCopySourceToTarget = (e: React.MouseEvent) => {
     e.stopPropagation();
+    onActivate(segment.segmentId);
     emitTranslationChange(sourceEditorText);
     requestAnimationFrame(() => {
       textareaRef.current?.focus();
@@ -158,12 +167,15 @@ export const EditorRow: React.FC<EditorRowProps> = ({
     }
   };
 
-  const statusLine =
-    hasError ? 'bg-red-500' :
-    hasWarning ? 'bg-amber-500' :
-    segment.status === 'confirmed' ? 'bg-green-500' :
-    segment.status === 'draft' ? 'bg-yellow-500' :
-    'bg-gray-400';
+  const statusLine = hasError
+    ? 'bg-red-500'
+    : hasWarning
+      ? 'bg-amber-500'
+      : segment.status === 'confirmed'
+        ? 'bg-green-500'
+        : segment.status === 'draft'
+          ? 'bg-yellow-500'
+          : 'bg-gray-400';
 
   const statusTitle = hasError
     ? `Status: ${segment.status} (QA error)`
@@ -173,9 +185,31 @@ export const EditorRow: React.FC<EditorRowProps> = ({
 
   const contextText = segment.meta?.context || '';
   const isLongContext = contextText.length > 120;
-  const displayContext = isContextExpanded || !isLongContext
-    ? contextText
-    : `${contextText.substring(0, 110)}...`;
+  const displayContext =
+    isContextExpanded || !isLongContext ? contextText : `${contextText.substring(0, 110)}...`;
+
+  const sourceHighlightChunks = useMemo(
+    () => buildHighlightChunks(sourceEditorText, sourceHighlightQuery, highlightMode),
+    [sourceEditorText, sourceHighlightQuery, highlightMode],
+  );
+  const targetHighlightChunks = useMemo(
+    () => buildHighlightChunks(draftText, targetHighlightQuery, highlightMode),
+    [draftText, targetHighlightQuery, highlightMode],
+  );
+
+  const renderChunks = useCallback(
+    (chunks: ReturnType<typeof buildHighlightChunks>) =>
+      chunks.map((chunk, index) =>
+        chunk.isMatch ? (
+          <mark key={index} className="bg-yellow-200/80 text-inherit rounded-[2px] px-[1px]">
+            {chunk.text}
+          </mark>
+        ) : (
+          <span key={index}>{chunk.text}</span>
+        ),
+      ),
+    [],
+  );
 
   return (
     <div
@@ -193,14 +227,10 @@ export const EditorRow: React.FC<EditorRowProps> = ({
         onMouseEnter={() => setIsSourceHovered(true)}
         onMouseLeave={() => setIsSourceHovered(false)}
       >
-        <textarea
-          ref={sourceTextareaRef}
-          value={sourceEditorText}
-          readOnly
-          spellCheck={false}
-          className="w-full min-h-[44px] px-1 pr-3 py-1 text-[14px] text-gray-700 bg-transparent leading-relaxed resize-none overflow-hidden select-text cursor-text focus:outline-none"
-        />
-        {(isSourceHovered) && (
+        <div className="w-full min-h-[44px] px-1 pr-3 py-1 text-[14px] text-gray-700 leading-relaxed whitespace-pre-wrap break-words select-text">
+          {renderChunks(sourceHighlightChunks)}
+        </div>
+        {isSourceHovered && (
           <div className="absolute top-2 right-2">
             <button
               onClick={handleCopySourceToTarget}
@@ -209,7 +239,12 @@ export const EditorRow: React.FC<EditorRowProps> = ({
               aria-label="Copy source to target"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 5l7 7-7 7M5 5l7 7-7 7"
+                />
               </svg>
             </button>
           </div>
@@ -221,7 +256,9 @@ export const EditorRow: React.FC<EditorRowProps> = ({
         title={statusTitle}
       >
         <div className="absolute left-1/2  -translate-x-1/2 w-[4px]  bg-gray-300/45" />
-        <div className={`absolute left-1/2 top-0.5 bottom-0.5 -translate-x-1/2 w-[4px] ${statusLine}`} />
+        <div
+          className={`absolute left-1/2 top-0.5 bottom-0.5 -translate-x-1/2 w-[4px] ${statusLine}`}
+        />
       </div>
 
       <div
@@ -232,13 +269,22 @@ export const EditorRow: React.FC<EditorRowProps> = ({
         <textarea
           ref={textareaRef}
           value={draftText}
+          readOnly={!isActive}
           onFocus={() => onActivate(segment.segmentId)}
           onChange={(e) => emitTranslationChange(e.target.value)}
           onKeyDown={handleTargetKeyDown}
           onDoubleClick={(e) => e.currentTarget.select()}
           spellCheck={false}
-          className="w-full min-h-[44px] px-1 pr-3 py-1 text-[14px] text-gray-800 leading-relaxed bg-transparent outline-none resize-none overflow-hidden whitespace-pre-wrap"
+          className={`relative z-10 w-full min-h-[44px] px-1 pr-3 py-1 text-[14px] leading-relaxed bg-transparent outline-none resize-none overflow-hidden whitespace-pre-wrap ${
+            isActive ? 'text-gray-800' : 'text-transparent caret-transparent'
+          }`}
         />
+
+        {!isActive && (
+          <div className="pointer-events-none absolute inset-0 px-3 py-3 text-[14px] text-gray-800 leading-relaxed whitespace-pre-wrap break-words">
+            {renderChunks(targetHighlightChunks)}
+          </div>
+        )}
 
         {isActive && sourceTags.length > 0 && (
           <div className="absolute top-2 right-2">
@@ -252,7 +298,12 @@ export const EditorRow: React.FC<EditorRowProps> = ({
               aria-label="Toggle tag insertion menu"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
+                />
               </svg>
             </button>
           </div>
@@ -271,7 +322,9 @@ export const EditorRow: React.FC<EditorRowProps> = ({
               <div
                 key={idx}
                 className={`text-[10px] flex items-center gap-1.5 px-2 py-0.5 rounded ${
-                  issue.severity === 'error' ? 'bg-red-50 text-red-600' : 'bg-yellow-50 text-yellow-700'
+                  issue.severity === 'error'
+                    ? 'bg-red-50 text-red-600'
+                    : 'bg-yellow-50 text-yellow-700'
                 }`}
               >
                 <span className="font-bold uppercase text-[8px]">{issue.severity}:</span>
