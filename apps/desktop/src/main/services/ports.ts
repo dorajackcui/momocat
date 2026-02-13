@@ -1,4 +1,4 @@
-import { Project, Segment, SegmentStatus, TBEntry, TMEntry, Token } from '@cat/core';
+import { Project, ProjectType, Segment, SegmentStatus, TBEntry, TMEntry, Token } from '@cat/core';
 import type {
   MountedTBRecord as DbMountedTBRecord,
   MountedTMRecord as DbMountedTMRecord,
@@ -39,7 +39,12 @@ export type TBRecord = DbTBRecord;
 export type MountedTBRecord = DbMountedTBRecord;
 
 export interface ProjectRepository {
-  createProject(name: string, srcLang: string, tgtLang: string): number;
+  createProject(
+    name: string,
+    srcLang: string,
+    tgtLang: string,
+    projectType?: ProjectType,
+  ): number;
   listProjects(): ProjectListRecord[];
   getProject(id: number): ProjectRecord | undefined;
   updateProjectPrompt(projectId: number, aiPrompt: string | null): void;

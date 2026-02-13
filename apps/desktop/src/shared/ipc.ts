@@ -1,4 +1,4 @@
-import { Project, Segment, SegmentStatus, TBMatch, TMEntry, Token } from '@cat/core';
+import { Project, ProjectType as CoreProjectType, Segment, SegmentStatus, TBMatch, TMEntry, Token } from '@cat/core';
 import type {
   MountedTBRecord as DbMountedTBRecord,
   MountedTMRecord as DbMountedTMRecord,
@@ -9,6 +9,7 @@ import type {
 } from '../../../../packages/db/src/types';
 
 export type TMType = DbTMType;
+export type ProjectType = CoreProjectType;
 
 export interface ImportOptions {
   hasHeader: boolean;
@@ -149,7 +150,12 @@ export interface DialogFileFilter {
 
 export interface DesktopApi {
   listProjects: () => Promise<ProjectWithStats[]>;
-  createProject: (name: string, srcLang: string, tgtLang: string) => Promise<Project>;
+  createProject: (
+    name: string,
+    srcLang: string,
+    tgtLang: string,
+    projectType?: ProjectType,
+  ) => Promise<Project>;
   deleteProject: (projectId: number) => Promise<void>;
   getProject: (projectId: number) => Promise<Project | undefined>;
   updateProjectPrompt: (projectId: number, aiPrompt: string | null) => Promise<void>;

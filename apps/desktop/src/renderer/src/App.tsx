@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ProjectType } from '@cat/core';
 import { Dashboard } from './components/Dashboard';
 import { ProjectDetail } from './components/ProjectDetail';
 import { Editor } from './components/Editor';
@@ -40,8 +41,13 @@ function App(): JSX.Element {
     setActiveFileId(null);
   };
 
-  const handleCreateProject = async (name: string, srcLang: string, tgtLang: string) => {
-    const newProject = await createProject(name, srcLang, tgtLang);
+  const handleCreateProject = async (
+    name: string,
+    srcLang: string,
+    tgtLang: string,
+    projectType: ProjectType,
+  ) => {
+    const newProject = await createProject(name, srcLang, tgtLang, projectType);
     if (newProject && newProject.id) {
       handleOpenProject(newProject.id);
     }

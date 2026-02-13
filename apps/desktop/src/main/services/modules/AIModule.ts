@@ -1,5 +1,7 @@
 import {
+  ProjectType,
   Segment,
+  SegmentStatus,
   Token,
   TagValidator,
   parseEditorTextToTokens,
@@ -16,6 +18,14 @@ interface TranslateDebugMeta {
   model?: string;
   rawResponseText?: string;
   responseContent?: string;
+}
+
+interface UserPromptBuildParams {
+  srcLang: string;
+  sourcePayload: string;
+  hasProtectedMarkers: boolean;
+  context?: string;
+  validationFeedback?: string;
 }
 
 export class AIModule {
@@ -72,7 +82,8 @@ export class AIModule {
       throw new Error('AI API key is not configured');
     }
 
-    const model = options?.model || 'gpt-4o-mini';
+    const model = options?.model || 'gpt-4o';
+    const projectType = project.projectType || 'translation';
     const temperature = this.resolveTemperature(project.aiTemperature);
     const totalSegments = this.countFileSegments(fileId);
     const total = this.countTranslatableSegments(fileId);
@@ -88,7 +99,9 @@ export class AIModule {
       options?.onProgress?.({
         current,
         total,
-        message: `Translating segment ${current} of ${total}`,
+        message: `${
+          projectType === 'review' ? 'Reviewing' : 'Translating'
+        } segment ${current} of ${total}`,
       });
 
       const sourceText = serializeTokensToDisplayText(seg.sourceTokens);
@@ -97,12 +110,14 @@ export class AIModule {
         seg.sourceTokens,
       );
       const context = seg.meta?.context ? String(seg.meta.context).trim() : '';
+      const aiStatus: SegmentStatus = projectType === 'review' ? 'reviewed' : 'translated';
 
       try {
         const targetTokens = await this.translateSegment({
           apiKey,
           model,
           projectPrompt: project.aiPrompt || '',
+          projectType,
           temperature,
           srcLang: project.srcLang,
           tgtLang: project.tgtLang,
@@ -112,7 +127,7 @@ export class AIModule {
           context,
         });
 
-        await this.segmentService.updateSegment(seg.segmentId, targetTokens, 'translated');
+        await this.segmentService.updateSegment(seg.segmentId, targetTokens, aiStatus);
         translated += 1;
       } catch {
         failed += 1;
@@ -133,13 +148,14 @@ export class AIModule {
       throw new Error('AI API key is not configured');
     }
 
-    const model = 'gpt-4o-mini';
+    const model = 'gpt-4o';
     const temperature = this.resolveTemperature(project.aiTemperature);
     const source = sourceText.trim();
     const promptUsed = this.buildSystemPrompt(
       project.srcLang,
       project.tgtLang,
       project.aiPrompt || '',
+      project.projectType || 'translation',
     );
     const userMessage = [`Source (${project.srcLang}):`, source].join('\n');
     const debug: TranslateDebugMeta = {};
@@ -149,6 +165,7 @@ export class AIModule {
         apiKey,
         model,
         projectPrompt: project.aiPrompt || '',
+        projectType: project.projectType || 'translation',
         temperature,
         srcLang: project.srcLang,
         tgtLang: project.tgtLang,
@@ -157,7 +174,10 @@ export class AIModule {
         allowUnchanged: true,
       });
 
-      const unchanged = translatedText.trim() === source && project.srcLang !== project.tgtLang;
+      const unchanged =
+        translatedText.trim() === source &&
+        project.srcLang !== project.tgtLang &&
+        project.projectType !== 'review';
       return {
         ok: !unchanged,
         error: unchanged ? `Model returned source unchanged: ${translatedText}` : undefined,
@@ -189,25 +209,80 @@ export class AIModule {
     }
   }
 
-  private buildSystemPrompt(srcLang: string, tgtLang: string, projectPrompt?: string) {
-    const base = [
+  private buildSystemPrompt(
+    srcLang: string,
+    tgtLang: string,
+    projectPrompt?: string,
+    projectType: ProjectType = 'translation',
+  ) {
+    const normalizedType = this.normalizeProjectType(projectType);
+    if (normalizedType === 'review') {
+      return this.buildReviewSystemPrompt(srcLang, tgtLang, projectPrompt);
+    }
+    return this.buildTranslationSystemPrompt(srcLang, tgtLang, projectPrompt);
+  }
+
+  private normalizeProjectType(projectType?: ProjectType): ProjectType {
+    return projectType === 'review' ? 'review' : 'translation';
+  }
+
+  private buildTranslationSystemPrompt(
+    srcLang: string,
+    tgtLang: string,
+    projectPrompt?: string,
+  ): string {
+    const trimmed = projectPrompt?.trim();
+    const base = this.buildTranslationBasePromptRules(srcLang, tgtLang).join('\n');
+    if (!trimmed) {
+      return `You are a professional translator.\n${base}`;
+    }
+    return `${trimmed}\n${base}`;
+  }
+
+  private buildReviewSystemPrompt(
+    srcLang: string,
+    tgtLang: string,
+    projectPrompt?: string,
+  ): string {
+    const trimmed = projectPrompt?.trim();
+    if (trimmed) {
+      return `${this.buildReviewLanguageInstruction(srcLang, tgtLang)}\n${trimmed}`;
+    }
+    const base = this.buildReviewBasePromptRules(srcLang, tgtLang).join('\n');
+    return `You are a professional reviewer.\n${base}`;
+  }
+
+  private buildReviewLanguageInstruction(srcLang: string, tgtLang: string): string {
+    return `Original text language: ${srcLang}. Translation text language: ${tgtLang}.`;
+  }
+
+  private buildTranslationBasePromptRules(srcLang: string, tgtLang: string): string[] {
+    return [
       `Translate from ${srcLang} to ${tgtLang}.`,
       'The source can include protected markers such as {1>, <2}, {3}.',
       'Never translate, remove, reorder, renumber, or rewrite protected markers.',
       'Keep all tags, placeholders, and formatting exactly as they appear in the source.',
       'Return only the translated text, without quotes or extra commentary.',
       'Do not copy the source text unless it is already in the target language.',
-    ].join('\n');
+    ];
+  }
 
-    const trimmed = projectPrompt?.trim();
-    if (!trimmed) return `You are a professional translator.\n${base}`;
-    return `${trimmed}\n${base}`;
+  private buildReviewBasePromptRules(srcLang: string, tgtLang: string): string[] {
+    return [
+      `Review and improve the provided ${tgtLang} text, using ${srcLang} as source language.`,
+      'The source can include protected markers such as {1>, <2}, {3}.',
+      'Never translate, remove, reorder, renumber, or rewrite protected markers.',
+      'Keep all tags, placeholders, and formatting exactly as they appear in the source.',
+      'Return only the reviewed text, without quotes or extra commentary.',
+      'If no edit is needed, returning the original text is allowed.',
+    ];
   }
 
   private async translateSegment(params: {
     apiKey: string;
     model: string;
     projectPrompt?: string;
+    projectType?: ProjectType;
     temperature?: number;
     srcLang: string;
     tgtLang: string;
@@ -220,10 +295,12 @@ export class AIModule {
     let validationFeedback: string | undefined;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const normalizedType = this.normalizeProjectType(params.projectType);
       const translatedText = await this.translateText({
         apiKey: params.apiKey,
         model: params.model,
         projectPrompt: params.projectPrompt,
+        projectType: normalizedType,
         temperature: params.temperature,
         srcLang: params.srcLang,
         tgtLang: params.tgtLang,
@@ -231,6 +308,7 @@ export class AIModule {
         sourceTagPreservedText: params.sourceTagPreservedText,
         context: params.context,
         validationFeedback,
+        allowUnchanged: normalizedType === 'review',
       });
 
       const targetTokens = parseEditorTextToTokens(translatedText, params.sourceTokens);
@@ -261,6 +339,7 @@ export class AIModule {
     apiKey: string;
     model: string;
     projectPrompt?: string;
+    projectType?: ProjectType;
     temperature?: number;
     srcLang: string;
     tgtLang: string;
@@ -271,28 +350,23 @@ export class AIModule {
     debug?: TranslateDebugMeta;
     allowUnchanged?: boolean;
   }): Promise<string> {
+    const normalizedType = this.normalizeProjectType(params.projectType);
     const systemPrompt = this.buildSystemPrompt(
       params.srcLang,
       params.tgtLang,
       params.projectPrompt,
+      normalizedType,
     );
     const hasProtectedMarkers =
       typeof params.sourceTagPreservedText === 'string' && params.sourceTagPreservedText.length > 0;
     const sourcePayload = hasProtectedMarkers ? params.sourceTagPreservedText! : params.sourceText;
-    const userParts = [
-      hasProtectedMarkers
-        ? `Source (${params.srcLang}, protected-marker format):`
-        : `Source (${params.srcLang}):`,
+    const userPrompt = this.buildUserPrompt({
+      srcLang: params.srcLang,
       sourcePayload,
-    ];
-
-    if (params.context) {
-      userParts.push('', `Context: ${params.context}`);
-    }
-
-    if (params.validationFeedback) {
-      userParts.push('', 'Validation feedback from previous attempt:', params.validationFeedback);
-    }
+      hasProtectedMarkers,
+      context: params.context,
+      validationFeedback: params.validationFeedback,
+    });
 
     params.debug && (params.debug.model = params.model);
 
@@ -301,7 +375,7 @@ export class AIModule {
       model: params.model,
       temperature: this.resolveTemperature(params.temperature),
       systemPrompt,
-      userPrompt: userParts.join('\n'),
+      userPrompt,
     });
 
     if (params.debug) {
@@ -319,8 +393,9 @@ export class AIModule {
 
     const unchangedAgainstSource = trimmed === params.sourceText.trim();
     const unchangedAgainstPayload = trimmed === sourcePayload.trim();
+    const allowUnchanged = Boolean(params.allowUnchanged) || normalizedType === 'review';
     if (
-      !params.allowUnchanged &&
+      !allowUnchanged &&
       (unchangedAgainstSource || unchangedAgainstPayload) &&
       params.srcLang !== params.tgtLang
     ) {
@@ -328,6 +403,27 @@ export class AIModule {
     }
 
     return trimmed;
+  }
+
+  private buildSourceHeader(srcLang: string, hasProtectedMarkers: boolean): string {
+    return hasProtectedMarkers
+      ? `Source (${srcLang}, protected-marker format):`
+      : `Source (${srcLang}):`;
+  }
+
+  private buildUserPrompt(params: UserPromptBuildParams): string {
+    const userParts = [
+      this.buildSourceHeader(params.srcLang, params.hasProtectedMarkers),
+      params.sourcePayload,
+    ];
+    const contextText = typeof params.context === 'string' ? params.context.trim() : '';
+    userParts.push('', `Context: ${contextText}`);
+
+    if (params.validationFeedback) {
+      userParts.push('', 'Validation feedback from previous attempt:', params.validationFeedback);
+    }
+
+    return userParts.join('\n');
   }
 
   private resolveTemperature(value: number | null | undefined): number {

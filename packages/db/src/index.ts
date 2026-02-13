@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { Project, ProjectFile, Segment, SegmentStatus, TBEntry, TMEntry, Token } from '@cat/core';
+import { Project, ProjectFile, ProjectType, Segment, SegmentStatus, TBEntry, TMEntry, Token } from '@cat/core';
 import {
   MountedTBRecord,
   MountedTMRecord,
@@ -44,8 +44,13 @@ export class CATDatabase {
     this.tmRepo = new TMRepo(this.db);
   }
 
-  public createProject(name: string, srcLang: string, tgtLang: string): number {
-    const projectId = this.projectRepo.createProject(name, srcLang, tgtLang);
+  public createProject(
+    name: string,
+    srcLang: string,
+    tgtLang: string,
+    projectType: ProjectType = 'translation',
+  ): number {
+    const projectId = this.projectRepo.createProject(name, srcLang, tgtLang, projectType);
 
     const workingTmId = this.tmRepo.createTM(`${name} (Working TM)`, srcLang, tgtLang, 'working');
     this.tmRepo.mountTMToProject(projectId, workingTmId, 0, 'readwrite');

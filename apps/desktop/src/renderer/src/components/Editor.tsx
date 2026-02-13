@@ -29,7 +29,11 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
   const [project, setProject] = useState<Project | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const [isSearchInputFocused, setIsSearchInputFocused] = useState(false);
+  const [manualActivationSegmentId, setManualActivationSegmentId] = useState<string | null>(null);
   const layoutRef = useRef<HTMLDivElement>(null);
+  const sourceSearchInputRef = useRef<HTMLInputElement>(null);
+  const targetSearchInputRef = useRef<HTMLInputElement>(null);
 
   const SIDEBAR_MIN_WIDTH = 220;
 
@@ -87,6 +91,30 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
     activeSegmentId,
     setActiveSegmentId,
   });
+
+  const syncSearchInputFocus = () => {
+    const active = document.activeElement;
+    setIsSearchInputFocused(
+      active === sourceSearchInputRef.current || active === targetSearchInputRef.current,
+    );
+  };
+
+  const handleSearchInputFocus = () => {
+    setIsSearchInputFocused(true);
+  };
+
+  const handleSearchInputBlur = () => {
+    requestAnimationFrame(syncSearchInputFocus);
+  };
+
+  const handleRowActivate = (segmentId: string) => {
+    setManualActivationSegmentId(segmentId);
+    setActiveSegmentId(segmentId);
+  };
+
+  const handleRowAutoFocus = (segmentId: string) => {
+    setManualActivationSegmentId((prev) => (prev === segmentId ? null : prev));
+  };
 
   useEffect(() => {
     const loadInfo = async () => {
@@ -291,7 +319,10 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
 
       <div ref={layoutRef} className="flex-1 flex min-h-0">
         {/* Main Editor Area */}
-        <div className="flex-1 overflow-y-auto bg-white custom-scrollbar">
+        <div
+          className="flex-1 overflow-y-auto bg-white custom-scrollbar"
+          style={{ scrollbarGutter: 'stable' }}
+        >
           <div className="min-w-[800px]">
             <div className="sticky top-0 z-20 bg-white border-b border-gray-200 shadow-sm">
               <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-50/80 backdrop-blur-sm">
@@ -355,8 +386,11 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
 
                 <label className="relative flex-1 min-w-0">
                   <input
+                    ref={sourceSearchInputRef}
                     value={sourceQueryInput}
                     onChange={(e) => setSourceQueryInput(e.target.value)}
+                    onFocus={handleSearchInputFocus}
+                    onBlur={handleSearchInputBlur}
                     placeholder="Filter source text"
                     className="w-full rounded-xl border border-gray-200 bg-white pl-8 pr-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-100"
                   />
@@ -374,8 +408,11 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
 
                 <label className="relative flex-1 min-w-0">
                   <input
+                    ref={targetSearchInputRef}
                     value={targetQueryInput}
                     onChange={(e) => setTargetQueryInput(e.target.value)}
+                    onFocus={handleSearchInputFocus}
+                    onBlur={handleSearchInputBlur}
                     placeholder="Filter target text"
                     className="w-full rounded-xl border border-gray-200 bg-white pl-8 pr-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-100"
                   />
@@ -559,7 +596,11 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
                 segment={item.segment}
                 rowNumber={item.segment.meta?.rowRef || item.originalIndex + 1}
                 isActive={item.segment.segmentId === activeSegmentId}
-                onActivate={setActiveSegmentId}
+                disableAutoFocus={
+                  isSearchInputFocused && manualActivationSegmentId !== item.segment.segmentId
+                }
+                onActivate={handleRowActivate}
+                onAutoFocus={handleRowAutoFocus}
                 onChange={handleTranslationChange}
                 onConfirm={confirmSegment}
                 saveError={segmentSaveErrors[item.segment.segmentId]}

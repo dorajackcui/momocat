@@ -159,11 +159,14 @@ export interface Project {
   name: string;
   srcLang: string;
   tgtLang: string;
+  projectType?: ProjectType;
   aiPrompt?: string | null;
   aiTemperature?: number | null;
   createdAt: string;
   updatedAt: string;
 }
+
+export type ProjectType = 'translation' | 'review';
 
 /**
  * Serialize tokens to plain text for display in non-token-aware contexts

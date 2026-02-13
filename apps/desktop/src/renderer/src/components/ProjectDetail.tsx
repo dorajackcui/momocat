@@ -197,6 +197,7 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
         onClose={fileImport.closeSelector}
         onConfirm={fileImport.confirmImport}
         previewData={fileImport.previewData}
+        projectType={project?.projectType || 'translation'}
       />
 
       <ProjectCommitModal
@@ -249,9 +250,18 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
               {loading ? 'Loading...' : project?.name || 'Project Not Found'}
             </h2>
             {project && (
-              <p className="text-xs text-gray-500">
-                {project.srcLang} → {project.tgtLang}
-              </p>
+              <div className="text-xs text-gray-500 flex items-center gap-2">
+                <span>{project.srcLang} → {project.tgtLang}</span>
+                <span
+                  className={`px-1.5 py-0.5 rounded font-semibold ${
+                    project.projectType === 'review'
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-blue-100 text-blue-700'
+                  }`}
+                >
+                  {project.projectType === 'review' ? 'Review' : 'Translation'}
+                </span>
+              </div>
             )}
           </div>
         </div>
@@ -329,6 +339,7 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
             onDeleteFile={handleDeleteFile}
             onExportFile={handleExportFile}
             ai={ai}
+            projectType={project.projectType || 'translation'}
           />
         ) : activeTab === 'tm' ? (
           <ProjectTMPane

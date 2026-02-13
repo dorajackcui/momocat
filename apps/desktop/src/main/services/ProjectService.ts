@@ -1,4 +1,4 @@
-import { Segment, SegmentStatus, Token } from '@cat/core';
+import { ProjectType, Segment, SegmentStatus, Token } from '@cat/core';
 import { CATDatabase } from '@cat/db';
 import { SpreadsheetFilter } from '../filters/SpreadsheetFilter';
 import { TMService } from './TMService';
@@ -103,8 +103,13 @@ export class ProjectService {
       new AIModule(projectRepo, segmentRepo, settingsRepo, this.segmentService, aiTransport);
   }
 
-  public async createProject(name: string, srcLang: string, tgtLang: string) {
-    return this.projectModule.createProject(name, srcLang, tgtLang);
+  public async createProject(
+    name: string,
+    srcLang: string,
+    tgtLang: string,
+    projectType: ProjectType = 'translation',
+  ) {
+    return this.projectModule.createProject(name, srcLang, tgtLang, projectType);
   }
 
   public async addFileToProject(projectId: number, filePath: string, options: ImportOptions) {

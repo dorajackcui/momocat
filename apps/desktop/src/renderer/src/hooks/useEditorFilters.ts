@@ -23,6 +23,8 @@ export const FILTER_STATUS_OPTIONS: Array<{ value: EditorStatusFilter; label: st
   { value: 'all', label: 'All' },
   { value: 'new', label: 'New' },
   { value: 'draft', label: 'Draft' },
+  { value: 'translated', label: 'AI Translated' },
+  { value: 'reviewed', label: 'AI Reviewed' },
   { value: 'confirmed', label: 'Confirmed' },
 ];
 
@@ -160,6 +162,24 @@ export function buildSearchableEditorSegments(
       hasIssue,
     };
   });
+}
+
+export function resolveActiveSegmentIdForFilteredList(params: {
+  activeSegmentId: string | null;
+  segments: Segment[];
+  filteredSegments: SearchableEditorSegment[];
+}): string | null {
+  const { activeSegmentId, segments, filteredSegments } = params;
+  if (filteredSegments.length === 0) return null;
+
+  const fallbackId = filteredSegments[0].segment.segmentId;
+  if (!activeSegmentId) return fallbackId;
+
+  const activeStillExists = segments.some((segment) => segment.segmentId === activeSegmentId);
+  if (!activeStillExists) return fallbackId;
+
+  // Keep current active segment even if it is filtered out.
+  return activeSegmentId;
 }
 
 export function useEditorFilters({
@@ -377,16 +397,15 @@ export function useEditorFilters({
   }, [fileId, filterState]);
 
   useEffect(() => {
-    if (filteredSegments.length === 0) return;
-    if (
-      activeSegmentId &&
-      filteredSegments.some((item) => item.segment.segmentId === activeSegmentId)
-    ) {
-      return;
-    }
-
-    setActiveSegmentId(filteredSegments[0].segment.segmentId);
-  }, [activeSegmentId, filteredSegments, setActiveSegmentId]);
+    const nextActiveSegmentId = resolveActiveSegmentIdForFilteredList({
+      activeSegmentId,
+      segments,
+      filteredSegments,
+    });
+    if (!nextActiveSegmentId) return;
+    if (nextActiveSegmentId === activeSegmentId) return;
+    setActiveSegmentId(nextActiveSegmentId);
+  }, [activeSegmentId, filteredSegments, segments, setActiveSegmentId]);
 
   return {
     sourceQueryInput: filterState.sourceQuery,

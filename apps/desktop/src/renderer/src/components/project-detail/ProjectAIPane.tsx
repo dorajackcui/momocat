@@ -1,10 +1,13 @@
+import { ProjectType } from '@cat/core';
 import { ProjectAIController } from '../../hooks/projectDetail/useProjectAI';
 
 interface ProjectAIPaneProps {
   ai: ProjectAIController;
+  projectType?: ProjectType;
 }
 
-export function ProjectAIPane({ ai }: ProjectAIPaneProps) {
+export function ProjectAIPane({ ai, projectType = 'translation' }: ProjectAIPaneProps) {
+  const isReviewProject = projectType === 'review';
   return (
     <div className="mb-8 bg-gray-50 border border-gray-200 rounded-xl p-5">
       <div className="flex items-center justify-between mb-3">
@@ -56,18 +59,32 @@ export function ProjectAIPane({ ai }: ProjectAIPaneProps) {
         value={ai.promptDraft}
         onChange={(event) => ai.setPromptDraft(event.target.value)}
         rows={4}
-        placeholder="Optional. Add project-specific translation instructions (tone, terminology, style)."
+        placeholder={
+          isReviewProject
+            ? 'Optional. Add project-specific review instructions (accuracy, fluency, style, severity rules).'
+            : 'Optional. Add project-specific translation instructions (tone, terminology, style).'
+        }
         className="w-full text-sm bg-white border border-gray-200 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
       />
-      <p className="mt-2 text-[11px] text-gray-500">This prompt will be appended to the default translation rules.</p>
+      <p className="mt-2 text-[11px] text-gray-500">
+        {isReviewProject
+          ? 'This prompt will be appended to the default AI review rules.'
+          : 'This prompt will be appended to the default translation rules.'}
+      </p>
       <div className="mt-4 pt-4 border-t border-gray-200">
-        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Test Source</label>
+        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
+          {isReviewProject ? 'Test Text' : 'Test Source'}
+        </label>
         <div className="flex gap-2">
           <input
             type="text"
             value={ai.testSource}
             onChange={(event) => ai.setTestSource(event.target.value)}
-            placeholder="Enter a short sentence to test AI translation"
+            placeholder={
+              isReviewProject
+                ? 'Enter a short sentence to test AI review'
+                : 'Enter a short sentence to test AI translation'
+            }
             className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <button
@@ -79,7 +96,9 @@ export function ProjectAIPane({ ai }: ProjectAIPaneProps) {
         </div>
         {ai.testResult && (
           <div className="mt-2">
-            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Translated Text</div>
+            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+              {isReviewProject ? 'Reviewed Text' : 'Translated Text'}
+            </div>
             <div className="text-xs text-gray-600 bg-white border border-gray-200 rounded-lg px-3 py-2">{ai.testResult}</div>
           </div>
         )}

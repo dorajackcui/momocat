@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ProjectType } from '@cat/core';
 import { CreateProjectModal } from './CreateProjectModal';
 import { ProjectWithStats } from '../hooks/useProjects';
 
@@ -6,7 +7,7 @@ interface DashboardProps {
   projects: ProjectWithStats[];
   loading?: boolean;
   onOpenProject: (id: number) => void;
-  onCreateProject: (name: string, srcLang: string, tgtLang: string) => void;
+  onCreateProject: (name: string, srcLang: string, tgtLang: string, projectType: ProjectType) => void;
   onDeleteProject: (id: number) => void;
 }
 
@@ -19,8 +20,13 @@ export function Dashboard({
 }: DashboardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const handleConfirmCreate = async (name: string, srcLang: string, tgtLang: string) => {
-    await onCreateProject(name, srcLang, tgtLang);
+  const handleConfirmCreate = async (
+    name: string,
+    srcLang: string,
+    tgtLang: string,
+    projectType: ProjectType,
+  ) => {
+    await onCreateProject(name, srcLang, tgtLang, projectType);
     setIsModalOpen(false);
   };
 
@@ -70,6 +76,15 @@ export function Dashboard({
                     </span>
                     <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded font-bold">
                       {project.fileCount || 0} Files
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded font-bold ${
+                        project.projectType === 'review'
+                          ? 'bg-amber-50 text-amber-700'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {project.projectType === 'review' ? 'Review' : 'Translation'}
                     </span>
                   </div>
                 </div>

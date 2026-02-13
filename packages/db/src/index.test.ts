@@ -20,6 +20,13 @@ describe('CATDatabase', () => {
     expect(project?.name).toBe('Test Project');
     expect(project?.srcLang).toBe('en-US');
     expect(project?.tgtLang).toBe('zh-CN');
+    expect(project?.projectType).toBe('translation');
+  });
+
+  it('should persist review project type', () => {
+    const projectId = db.createProject('Review Project', 'en-US', 'zh-CN', 'review');
+    const project = db.getProject(projectId);
+    expect(project?.projectType).toBe('review');
   });
 
   it('should list projects with correct stats', () => {
@@ -122,6 +129,46 @@ describe('CATDatabase', () => {
     expect(file?.confirmedSegments).toBe(1);
   });
 
+  it('should normalize invalid segment status values when reading', () => {
+    const projectId = db.createProject('Status Normalize Project', 'en', 'zh');
+    const fileId = db.createFile(projectId, 'normalize.xlsx');
+
+    db.bulkInsertSegments([
+      {
+        segmentId: 'invalid-empty-target',
+        fileId,
+        orderIndex: 0,
+        sourceTokens: [{ type: 'text', content: 'A' }],
+        targetTokens: [],
+        status: '' as any,
+        tagsSignature: '',
+        matchKey: 'a',
+        srcHash: 'status-hash-1',
+        meta: { updatedAt: new Date().toISOString() }
+      },
+      {
+        segmentId: 'invalid-has-target',
+        fileId,
+        orderIndex: 1,
+        sourceTokens: [{ type: 'text', content: 'B' }],
+        targetTokens: [{ type: 'text', content: '已有内容' }],
+        status: '' as any,
+        tagsSignature: '',
+        matchKey: 'b',
+        srcHash: 'status-hash-2',
+        meta: { updatedAt: new Date().toISOString() }
+      }
+    ] as any);
+
+    const segments = db.getSegmentsPage(fileId, 0, 10);
+    expect(segments.find((segment) => segment.segmentId === 'invalid-empty-target')?.status).toBe(
+      'new',
+    );
+    expect(segments.find((segment) => segment.segmentId === 'invalid-has-target')?.status).toBe(
+      'draft',
+    );
+  });
+
   describe('Multi-TM Architecture (v5)', () => {
     it('should automatically create and mount a Working TM when a project is created', () => {
       const projectId = db.createProject('Auto TM Project', 'en', 'zh');
@@ -144,8 +191,8 @@ describe('CATDatabase', () => {
       
       const mainTM = mounted.find(m => m.type === 'main');
       expect(mainTM).toBeDefined();
-      expect(mainTM.name).toBe('Global Main TM');
-      expect(mainTM.permission).toBe('read');
+      expect(mainTM!.name).toBe('Global Main TM');
+      expect(mainTM!.permission).toBe('read');
     });
 
     it('should search concordance across multiple mounted TMs', () => {

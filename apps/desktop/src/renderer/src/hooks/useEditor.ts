@@ -59,6 +59,13 @@ export function createSegmentPersistor(deps: SegmentPersistorDeps): SegmentPersi
 export function useEditor({ activeFileId }: UseEditorProps) {
   const SEGMENT_PAGE_SIZE = 1000;
   const MATCH_REQUEST_DEBOUNCE_MS = 150;
+  const VALID_SEGMENT_STATUSES: Set<SegmentStatus> = new Set([
+    'new',
+    'draft',
+    'translated',
+    'confirmed',
+    'reviewed',
+  ]);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [projectId, setProjectId] = useState<number | null>(null);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
@@ -87,6 +94,16 @@ export function useEditor({ activeFileId }: UseEditorProps) {
       console.warn(`[useEditor] ${context} tokens contained invalid entries`, tokens);
     }
     return cleaned;
+  };
+
+  const normalizeStatus = (status: unknown, targetTokens: Token[]): SegmentStatus => {
+    if (typeof status === 'string' && VALID_SEGMENT_STATUSES.has(status as SegmentStatus)) {
+      return status as SegmentStatus;
+    }
+    const hasTargetContent = targetTokens.some(
+      (token) => token.content.trim().length > 0,
+    );
+    return hasTargetContent ? 'draft' : 'new';
   };
 
   const setSegmentSaveError = useCallback((segmentId: string, message: string) => {
@@ -157,13 +174,18 @@ export function useEditor({ activeFileId }: UseEditorProps) {
         offset += SEGMENT_PAGE_SIZE;
       }
 
-      const normalized = segmentsArray.map((seg) => ({
-        ...seg,
-        sourceTokens: normalizeTokens(seg.sourceTokens, `segment ${seg.segmentId} source`),
-        targetTokens: normalizeTokens(seg.targetTokens, `segment ${seg.segmentId} target`),
-        qaIssues: undefined,
-        autoFixSuggestions: undefined
-      }));
+      const normalized = segmentsArray.map((seg) => {
+        const sourceTokens = normalizeTokens(seg.sourceTokens, `segment ${seg.segmentId} source`);
+        const targetTokens = normalizeTokens(seg.targetTokens, `segment ${seg.segmentId} target`);
+        return {
+          ...seg,
+          sourceTokens,
+          targetTokens,
+          status: normalizeStatus(seg.status, targetTokens),
+          qaIssues: undefined,
+          autoFixSuggestions: undefined
+        };
+      });
       setSegments(normalized);
       setSegmentSaveErrors({});
       segmentPersistorRef.current?.clear();
@@ -208,7 +230,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
           if (seg.segmentId === data.segmentId) {
             changed = true;
             const targetTokens = normalizeTokens(data.targetTokens, `segment ${seg.segmentId} target (update)`);
-            const nextStatus: SegmentStatus = data.status;
+            const nextStatus = normalizeStatus(data.status, targetTokens);
             return { 
               ...seg, 
               targetTokens,

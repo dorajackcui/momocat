@@ -1,4 +1,4 @@
-import { ProjectFile } from '@cat/core';
+import { ProjectFile, ProjectType } from '@cat/core';
 import { ProjectAIController } from '../../hooks/projectDetail/useProjectAI';
 import { ProjectAIPane } from './ProjectAIPane';
 
@@ -10,6 +10,7 @@ interface ProjectFilesPaneProps {
   onDeleteFile: (fileId: number, fileName: string) => Promise<void>;
   onExportFile: (fileId: number, fileName: string) => Promise<void>;
   ai: ProjectAIController;
+  projectType?: ProjectType;
 }
 
 export function ProjectFilesPane({
@@ -19,11 +20,13 @@ export function ProjectFilesPane({
   onOpenMatchModal,
   onDeleteFile,
   onExportFile,
-  ai
+  ai,
+  projectType = 'translation',
 }: ProjectFilesPaneProps) {
+  const isReviewProject = projectType === 'review';
   return (
     <div className="max-w-4xl mx-auto">
-      <ProjectAIPane ai={ai} />
+      <ProjectAIPane ai={ai} projectType={projectType} />
 
       <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-6">Files</h3>
 
@@ -85,7 +88,13 @@ export function ProjectFilesPane({
                     disabled={jobRunning}
                     className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-bold hover:bg-emerald-100 disabled:opacity-50"
                   >
-                    {jobRunning ? 'AI Translating...' : 'AI Translate'}
+                    {jobRunning
+                      ? isReviewProject
+                        ? 'AI Reviewing...'
+                        : 'AI Translating...'
+                      : isReviewProject
+                        ? 'AI Review'
+                        : 'AI Translate'}
                   </button>
                   <button
                     onClick={() => onOpenFile(file.id)}

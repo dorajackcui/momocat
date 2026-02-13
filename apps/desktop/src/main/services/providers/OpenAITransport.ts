@@ -1,13 +1,24 @@
 import { AITransport } from '../ports';
 
 export class OpenAITransport implements AITransport {
+  private getProxyHint(): string {
+    const proxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || process.env.ALL_PROXY;
+    return proxy ? ` (proxy=${proxy})` : '';
+  }
+
   public async testConnection(apiKey: string): Promise<{ ok: true }> {
-    const response = await fetch('https://api.openai.com/v1/models', {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${apiKey}`
-      }
-    });
+    let response: Response;
+    try {
+      response = await fetch('https://api.openai.com/v1/models', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${apiKey}`
+        }
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`OpenAI network request failed: ${message}${this.getProxyHint()}`);
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -31,21 +42,29 @@ export class OpenAITransport implements AITransport {
     rawResponseText?: string;
   }> {
     const endpoint = 'https://api.openai.com/v1/chat/completions';
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${params.apiKey}`
-      },
-      body: JSON.stringify({
-        model: params.model,
-        temperature: params.temperature,
-        messages: [
-          { role: 'system', content: params.systemPrompt },
-          { role: 'user', content: params.userPrompt }
-        ]
-      })
-    });
+    let response: Response;
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${params.apiKey}`
+        },
+        body: JSON.stringify({
+          model: params.model,
+          temperature: params.temperature,
+          messages: [
+            { role: 'system', content: params.systemPrompt },
+            { role: 'user', content: params.userPrompt }
+          ]
+        })
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `OpenAI network request failed: ${message}${this.getProxyHint()} endpoint=${endpoint}`,
+      );
+    }
 
     const requestId = response.headers.get('x-request-id') || response.headers.get('x-openai-request-id') || undefined;
     const rawBody = await response.text();

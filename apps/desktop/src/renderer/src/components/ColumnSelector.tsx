@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { ProjectType } from '@cat/core';
 import type { ImportOptions, SpreadsheetPreviewData } from '../../../shared/ipc';
 
 interface ColumnSelectorProps {
@@ -6,18 +7,40 @@ interface ColumnSelectorProps {
   onClose: () => void;
   onConfirm: (options: ImportOptions) => void;
   previewData: SpreadsheetPreviewData;
+  projectType?: ProjectType;
 }
 
-export function ColumnSelector({ isOpen, onClose, onConfirm, previewData }: ColumnSelectorProps) {
+export function ColumnSelector({
+  isOpen,
+  onClose,
+  onConfirm,
+  previewData,
+  projectType = 'translation',
+}: ColumnSelectorProps) {
   const [hasHeader, setHasHeader] = useState(true);
   const [sourceCol, setSourceCol] = useState(0);
   const [targetCol, setTargetCol] = useState(1);
   const [contextCol, setContextCol] = useState<number | undefined>(undefined);
 
-  if (!isOpen) return null;
+  const isReviewProject = projectType === 'review';
+  const sourceLabel = isReviewProject ? 'Translation Column' : 'Source Column';
+  const targetLabel = isReviewProject ? 'Review Output Column' : 'Target Column';
+  const contextLabel = isReviewProject ? 'Original Column' : 'Comment/Context Column';
+  const sourceTagLabel = isReviewProject ? 'Translation' : 'Source';
+  const targetTagLabel = isReviewProject ? 'Review Output' : 'Target';
+  const contextTagLabel = isReviewProject ? 'Original' : 'Comment';
 
   const maxCols = previewData.length > 0 ? previewData[0].length : 0;
   const colIndexes = Array.from({ length: maxCols }, (_, i) => i);
+
+  useEffect(() => {
+    if (!isOpen || !isReviewProject) return;
+    if (contextCol === undefined && colIndexes.length > 0) {
+      setContextCol(0);
+    }
+  }, [colIndexes.length, contextCol, isOpen, isReviewProject]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] backdrop-blur-sm">
@@ -25,7 +48,11 @@ export function ColumnSelector({ isOpen, onClose, onConfirm, previewData }: Colu
         <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
           <div>
             <h2 className="text-xl font-bold text-gray-900">Import Configuration</h2>
-            <p className="text-sm text-gray-500 mt-1">Select the columns to import from your spreadsheet</p>
+            <p className="text-sm text-gray-500 mt-1">
+              {isReviewProject
+                ? 'Select translation/original/output columns for AI review'
+                : 'Select the columns to import from your spreadsheet'}
+            </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -39,7 +66,7 @@ export function ColumnSelector({ isOpen, onClose, onConfirm, previewData }: Colu
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
                 <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                Source Column
+                {sourceLabel}
               </label>
               <select 
                 value={sourceCol}
@@ -55,7 +82,7 @@ export function ColumnSelector({ isOpen, onClose, onConfirm, previewData }: Colu
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
                 <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                Target Column
+                {targetLabel}
               </label>
               <select 
                 value={targetCol}
@@ -71,17 +98,27 @@ export function ColumnSelector({ isOpen, onClose, onConfirm, previewData }: Colu
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
                 <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
-                Comment/Context Column
+                {contextLabel}
               </label>
               <select 
-                value={contextCol === undefined ? -1 : contextCol}
+                value={
+                  contextCol === undefined
+                    ? isReviewProject
+                      ? (colIndexes[0] ?? 0)
+                      : -1
+                    : contextCol
+                }
                 onChange={(e) => {
                   const val = parseInt(e.target.value);
-                  setContextCol(val === -1 ? undefined : val);
+                  if (!isReviewProject && val === -1) {
+                    setContextCol(undefined);
+                    return;
+                  }
+                  setContextCol(val);
                 }}
                 className="w-full p-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all"
               >
-                <option value={-1}>None (Ignore)</option>
+                {!isReviewProject && <option value={-1}>None (Ignore)</option>}
                 {colIndexes.map(i => (
                   <option key={i} value={i}>Column {XLSX_COL_NAME(i)}</option>
                 ))}
@@ -116,9 +153,9 @@ export function ColumnSelector({ isOpen, onClose, onConfirm, previewData }: Colu
                         'text-gray-500'
                       }`}>
                         Col {XLSX_COL_NAME(i)}
-                        {i === sourceCol && <span className="block text-[9px] mt-0.5">Source</span>}
-                        {i === targetCol && <span className="block text-[9px] mt-0.5">Target</span>}
-                        {i === contextCol && <span className="block text-[9px] mt-0.5">Comment</span>}
+                        {i === sourceCol && <span className="block text-[9px] mt-0.5">{sourceTagLabel}</span>}
+                        {i === targetCol && <span className="block text-[9px] mt-0.5">{targetTagLabel}</span>}
+                        {i === contextCol && <span className="block text-[9px] mt-0.5">{contextTagLabel}</span>}
                       </th>
                     ))}
                   </tr>
@@ -152,7 +189,14 @@ export function ColumnSelector({ isOpen, onClose, onConfirm, previewData }: Colu
             Cancel
           </button>
           <button
-            onClick={() => onConfirm({ hasHeader, sourceCol, targetCol, contextCol })}
+            onClick={() =>
+              onConfirm({
+                hasHeader,
+                sourceCol,
+                targetCol,
+                contextCol: isReviewProject ? contextCol ?? 0 : contextCol,
+              })
+            }
             className="px-8 py-2.5 bg-blue-600 text-white font-bold text-sm rounded-lg hover:bg-blue-700 shadow-md shadow-blue-200 transition-all hover:-translate-y-0.5"
           >
             Start Import

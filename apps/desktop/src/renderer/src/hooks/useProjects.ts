@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Project } from '@cat/core';
+import { Project, ProjectType } from '@cat/core';
 import { apiClient } from '../services/apiClient';
 import { feedbackService } from '../services/feedbackService';
 
@@ -25,12 +25,17 @@ export function useProjects() {
     loadProjects();
   }, [loadProjects]);
 
-  const createProject = async (name: string, srcLang: string, tgtLang: string) => {
+  const createProject = async (
+    name: string,
+    srcLang: string,
+    tgtLang: string,
+    projectType: ProjectType = 'translation',
+  ) => {
     console.log('[useProjects] createProject triggered:', name);
 
     setLoading(true);
     try {
-      const newProject = await apiClient.createProject(name, srcLang, tgtLang);
+      const newProject = await apiClient.createProject(name, srcLang, tgtLang, projectType);
       await loadProjects();
       return newProject;
     } catch (error) {

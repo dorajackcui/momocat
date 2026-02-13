@@ -7,7 +7,7 @@ interface SegmentRow {
   orderIndex: number;
   sourceTokensJson: string;
   targetTokensJson: string;
-  status: SegmentStatus;
+  status: SegmentStatus | string;
   tagsSignature: string;
   matchKey: string;
   srcHash: string;
@@ -15,6 +15,14 @@ interface SegmentRow {
 }
 
 export class SegmentRepo {
+  private static readonly VALID_SEGMENT_STATUSES: Set<SegmentStatus> = new Set([
+    'new',
+    'draft',
+    'translated',
+    'confirmed',
+    'reviewed',
+  ]);
+
   constructor(
     private readonly db: Database.Database,
     private readonly updateFileStats: (fileId: number) => void
@@ -88,11 +96,12 @@ export class SegmentRepo {
   }
 
   public updateSegmentTarget(segmentId: string, targetTokens: Token[], status: SegmentStatus) {
+    const normalizedStatus = this.normalizeStatus(status, targetTokens);
     this.db
       .prepare(
         "UPDATE segments SET targetTokensJson = ?, status = ?, updatedAt = (strftime('%Y-%m-%dT%H:%M:%fZ','now')) WHERE segmentId = ?"
       )
-      .run(JSON.stringify(targetTokens), status, segmentId);
+      .run(JSON.stringify(targetTokens), normalizedStatus, segmentId);
 
     const row = this.db.prepare('SELECT fileId FROM segments WHERE segmentId = ?').get(segmentId) as
       | { fileId: number }
@@ -121,17 +130,34 @@ export class SegmentRepo {
   }
 
   private mapRowToSegment(row: SegmentRow): Segment {
+    const sourceTokens = JSON.parse(row.sourceTokensJson) as Token[];
+    const targetTokens = JSON.parse(row.targetTokensJson) as Token[];
+    const status = this.normalizeStatus(row.status, targetTokens);
     return {
       segmentId: row.segmentId,
       fileId: row.fileId,
       orderIndex: row.orderIndex,
-      sourceTokens: JSON.parse(row.sourceTokensJson),
-      targetTokens: JSON.parse(row.targetTokensJson),
-      status: row.status as SegmentStatus,
+      sourceTokens,
+      targetTokens,
+      status,
       tagsSignature: row.tagsSignature,
       matchKey: row.matchKey,
       srcHash: row.srcHash,
       meta: JSON.parse(row.metaJson)
     };
+  }
+
+  private normalizeStatus(rawStatus: unknown, targetTokens: Token[]): SegmentStatus {
+    if (
+      typeof rawStatus === 'string' &&
+      SegmentRepo.VALID_SEGMENT_STATUSES.has(rawStatus as SegmentStatus)
+    ) {
+      return rawStatus as SegmentStatus;
+    }
+
+    const hasTargetContent = targetTokens.some(
+      (token) => token.content.trim().length > 0
+    );
+    return hasTargetContent ? 'draft' : 'new';
   }
 }

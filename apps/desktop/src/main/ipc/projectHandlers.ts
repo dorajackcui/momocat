@@ -1,4 +1,4 @@
-import type { SegmentStatus, Token } from '@cat/core';
+import type { ProjectType, SegmentStatus, Token } from '@cat/core';
 import type { ImportOptions } from '../../shared/ipc';
 import { IPC_CHANNELS } from '../../shared/ipcChannels';
 import type { MainHandlerDeps } from './types';
@@ -7,8 +7,8 @@ export function registerProjectHandlers({ ipcMain, projectService }: MainHandler
   ipcMain.handle(IPC_CHANNELS.project.list, () => projectService.listProjects());
 
   ipcMain.handle(IPC_CHANNELS.project.create, (_event, ...args) => {
-    const [name, srcLang, tgtLang] = args as [string, string, string];
-    return projectService.createProject(name, srcLang, tgtLang);
+    const [name, srcLang, tgtLang, projectType] = args as [string, string, string, ProjectType | undefined];
+    return projectService.createProject(name, srcLang, tgtLang, projectType);
   });
 
   ipcMain.handle(IPC_CHANNELS.project.get, (_event, ...args) => {

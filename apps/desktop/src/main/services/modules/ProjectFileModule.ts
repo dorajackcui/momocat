@@ -1,6 +1,6 @@
 import { basename, join } from 'path';
 import { copyFile, mkdir, rm, unlink } from 'fs/promises';
-import { Segment, validateSegmentTags } from '@cat/core';
+import { ProjectType, Segment, validateSegmentTags } from '@cat/core';
 import {
   ImportOptions,
   ProjectRepository,
@@ -32,9 +32,14 @@ export class ProjectFileModule {
     );
   }
 
-  public async createProject(name: string, srcLang: string, tgtLang: string) {
+  public async createProject(
+    name: string,
+    srcLang: string,
+    tgtLang: string,
+    projectType: ProjectType = 'translation',
+  ) {
     await this.ensureDirectory(this.projectsDir);
-    const projectId = this.projectRepo.createProject(name, srcLang, tgtLang);
+    const projectId = this.projectRepo.createProject(name, srcLang, tgtLang, projectType);
 
     const projectDir = join(this.projectsDir, projectId.toString());
     await this.ensureDirectory(projectDir);

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
+import { ProjectType } from '@cat/core';
 
 interface CreateProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (name: string, srcLang: string, tgtLang: string) => void;
+  onConfirm: (name: string, srcLang: string, tgtLang: string, projectType: ProjectType) => void;
   loading: boolean;
 }
 
@@ -23,6 +24,7 @@ const LANGUAGE_OPTIONS = [
 
 export function CreateProjectModal({ isOpen, onClose, onConfirm, loading }: CreateProjectModalProps) {
   const [name, setName] = useState('');
+  const [projectType, setProjectType] = useState<ProjectType>('translation');
   const [srcLang, setSrcLang] = useState('zh-CN');
   const [tgtLang, setTgtLang] = useState('en-US');
 
@@ -34,7 +36,7 @@ export function CreateProjectModal({ isOpen, onClose, onConfirm, loading }: Crea
     const trimmedSrcLang = srcLang.trim();
     const trimmedTgtLang = tgtLang.trim();
     if (trimmedName && trimmedSrcLang && trimmedTgtLang) {
-      onConfirm(trimmedName, trimmedSrcLang, trimmedTgtLang);
+      onConfirm(trimmedName, trimmedSrcLang, trimmedTgtLang, projectType);
     }
   };
 
@@ -54,6 +56,36 @@ export function CreateProjectModal({ isOpen, onClose, onConfirm, loading }: Crea
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+              Project Type
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setProjectType('translation')}
+                className={`px-3 py-2 rounded-lg border text-sm font-bold transition-colors ${
+                  projectType === 'translation'
+                    ? 'border-blue-300 bg-blue-50 text-blue-700'
+                    : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                Translation
+              </button>
+              <button
+                type="button"
+                onClick={() => setProjectType('review')}
+                className={`px-3 py-2 rounded-lg border text-sm font-bold transition-colors ${
+                  projectType === 'review'
+                    ? 'border-amber-300 bg-amber-50 text-amber-700'
+                    : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                Review
+              </button>
+            </div>
+          </div>
+
           <div>
             <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Project Name</label>
             <input

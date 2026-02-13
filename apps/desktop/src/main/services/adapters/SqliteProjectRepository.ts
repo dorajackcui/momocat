@@ -1,11 +1,17 @@
+import { ProjectType } from '@cat/core';
 import { CATDatabase } from '@cat/db';
 import { ProjectRepository, ProjectFileRecord, ProjectListRecord, ProjectRecord } from '../ports';
 
 export class SqliteProjectRepository implements ProjectRepository {
   constructor(private readonly db: CATDatabase) {}
 
-  createProject(name: string, srcLang: string, tgtLang: string): number {
-    return this.db.createProject(name, srcLang, tgtLang);
+  createProject(
+    name: string,
+    srcLang: string,
+    tgtLang: string,
+    projectType: ProjectType = 'translation',
+  ): number {
+    return this.db.createProject(name, srcLang, tgtLang, projectType);
   }
 
   listProjects(): ProjectListRecord[] {

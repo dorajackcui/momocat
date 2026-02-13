@@ -21,8 +21,8 @@ type ProjectApiKeys =
 export function createProjectApi(ipcRenderer: IpcRendererLike): DesktopApiSlice<ProjectApiKeys> {
   return {
     listProjects: () => ipcRenderer.invoke(IPC_CHANNELS.project.list) as ReturnType<DesktopApi['listProjects']>,
-    createProject: (name, srcLang, tgtLang) =>
-      ipcRenderer.invoke(IPC_CHANNELS.project.create, name, srcLang, tgtLang) as ReturnType<DesktopApi['createProject']>,
+    createProject: (name, srcLang, tgtLang, projectType) =>
+      ipcRenderer.invoke(IPC_CHANNELS.project.create, name, srcLang, tgtLang, projectType) as ReturnType<DesktopApi['createProject']>,
     deleteProject: (projectId) =>
       ipcRenderer.invoke(IPC_CHANNELS.project.remove, projectId) as ReturnType<DesktopApi['deleteProject']>,
     getProject: (projectId) =>

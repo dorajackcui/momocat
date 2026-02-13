@@ -1,16 +1,21 @@
 import Database from 'better-sqlite3';
-import { Project } from '@cat/core';
+import { Project, ProjectType } from '@cat/core';
 import { randomUUID } from 'crypto';
 import type { ProjectFileRecord } from '../types';
 
 export class ProjectRepo {
   constructor(private readonly db: Database.Database) {}
 
-  public createProject(name: string, srcLang: string, tgtLang: string): number {
-    console.log(`[DB] Creating project: ${name} (${srcLang} -> ${tgtLang})`);
+  public createProject(
+    name: string,
+    srcLang: string,
+    tgtLang: string,
+    projectType: ProjectType = 'translation',
+  ): number {
+    console.log(`[DB] Creating project: ${name} (${srcLang} -> ${tgtLang}, ${projectType})`);
     const result = this.db
-      .prepare('INSERT INTO projects (uuid, name, srcLang, tgtLang) VALUES (?, ?, ?, ?)')
-      .run(randomUUID(), name, srcLang, tgtLang);
+      .prepare('INSERT INTO projects (uuid, name, srcLang, tgtLang, projectType) VALUES (?, ?, ?, ?, ?)')
+      .run(randomUUID(), name, srcLang, tgtLang, projectType);
     return result.lastInsertRowid as number;
   }
 

@@ -475,4 +475,26 @@ export function runMigrations(db: Database.Database) {
       db.prepare('UPDATE schema_version SET version = 10').run();
     })();
   }
+
+  if (currentVersion < 11) {
+    console.log('[DB] Upgrading schema to v11 (Project type)...');
+    db.transaction(() => {
+      const columns = db.prepare('PRAGMA table_info(projects)').all() as Array<{ name: string }>;
+      const hasProjectType = columns.some((column) => column.name === 'projectType');
+
+      if (!hasProjectType) {
+        db.exec(`
+          ALTER TABLE projects ADD COLUMN projectType TEXT NOT NULL DEFAULT 'translation';
+        `);
+      }
+
+      db.exec(`
+        UPDATE projects
+        SET projectType = 'translation'
+        WHERE projectType IS NULL OR TRIM(projectType) = '';
+      `);
+
+      db.prepare('UPDATE schema_version SET version = 11').run();
+    })();
+  }
 }

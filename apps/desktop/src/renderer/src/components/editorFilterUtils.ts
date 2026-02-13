@@ -1,6 +1,6 @@
 import { Segment } from '@cat/core';
 
-export type EditorStatusFilter = 'all' | 'new' | 'draft' | 'confirmed';
+export type EditorStatusFilter = 'all' | 'new' | 'draft' | 'translated' | 'reviewed' | 'confirmed';
 export type EditorMatchMode = 'contains' | 'exact' | 'regex';
 export type EditorQualityFilter = 'qa_error' | 'qa_warning' | 'save_error';
 export type EditorQuickPreset = 'none' | 'untranslated' | 'confirmed' | 'issues';

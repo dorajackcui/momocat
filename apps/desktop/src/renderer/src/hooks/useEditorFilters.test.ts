@@ -3,6 +3,7 @@ import { Segment } from '@cat/core';
 import {
   buildEditorFilterStorageKey,
   buildSearchableEditorSegments,
+  resolveActiveSegmentIdForFilteredList,
   sanitizePersistedEditorFilterState,
 } from './useEditorFilters';
 
@@ -98,5 +99,34 @@ describe('useEditorFilters helpers', () => {
       hasSaveError: true,
       hasIssue: true,
     });
+  });
+
+  it('keeps active segment when it still exists but is filtered out', () => {
+    const segments: Segment[] = [
+      createSegment({ id: 's1', source: 'Alpha' }),
+      createSegment({ id: 's2', source: 'Beta' }),
+    ];
+    const filteredSegments = buildSearchableEditorSegments([segments[0]], {});
+
+    const next = resolveActiveSegmentIdForFilteredList({
+      activeSegmentId: 's2',
+      segments,
+      filteredSegments,
+    });
+
+    expect(next).toBe('s2');
+  });
+
+  it('falls back to first filtered segment when active segment no longer exists', () => {
+    const segments: Segment[] = [createSegment({ id: 's1', source: 'Alpha' })];
+    const filteredSegments = buildSearchableEditorSegments(segments, {});
+
+    const next = resolveActiveSegmentIdForFilteredList({
+      activeSegmentId: 'removed',
+      segments,
+      filteredSegments,
+    });
+
+    expect(next).toBe('s1');
   });
 });

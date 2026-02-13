@@ -7,11 +7,13 @@ interface EditorRowProps {
   segment: Segment;
   rowNumber: number;
   isActive: boolean;
+  disableAutoFocus?: boolean;
   saveError?: string;
   sourceHighlightQuery?: string;
   targetHighlightQuery?: string;
   highlightMode?: EditorMatchMode;
   onActivate: (id: string) => void;
+  onAutoFocus?: (id: string) => void;
   onChange: (id: string, value: string) => void;
   onConfirm: (id: string) => void;
 }
@@ -20,19 +22,23 @@ export const EditorRow: React.FC<EditorRowProps> = ({
   segment,
   rowNumber,
   isActive,
+  disableAutoFocus = false,
   saveError,
   sourceHighlightQuery = '',
   targetHighlightQuery = '',
   highlightMode = 'contains',
   onActivate,
+  onAutoFocus,
   onChange,
   onConfirm,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isContextExpanded, setIsContextExpanded] = useState(false);
+  const [contextCopied, setContextCopied] = useState(false);
   const [showTagInsertionUI, setShowTagInsertionUI] = useState(false);
   const [draftText, setDraftText] = useState('');
   const [isSourceHovered, setIsSourceHovered] = useState(false);
+  const contextCopiedTimerRef = useRef<number | null>(null);
 
   const qaIssues = segment.qaIssues || [];
   const hasError = qaIssues.some((issue) => issue.severity === 'error');
@@ -75,13 +81,22 @@ export const EditorRow: React.FC<EditorRowProps> = ({
   }, [targetEditorText, segment.segmentId]);
 
   useEffect(() => {
-    if (isActive && textareaRef.current) {
+    if (isActive && !disableAutoFocus && textareaRef.current) {
       textareaRef.current.focus();
+      onAutoFocus?.(segment.segmentId);
     }
     if (!isActive) {
       setShowTagInsertionUI(false);
     }
-  }, [isActive]);
+  }, [disableAutoFocus, isActive, onAutoFocus, segment.segmentId]);
+
+  useEffect(() => {
+    return () => {
+      if (contextCopiedTimerRef.current !== null) {
+        window.clearTimeout(contextCopiedTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     resizeTextarea(textareaRef.current);
@@ -173,6 +188,10 @@ export const EditorRow: React.FC<EditorRowProps> = ({
       ? 'bg-amber-500'
       : segment.status === 'confirmed'
         ? 'bg-green-500'
+        : segment.status === 'reviewed'
+          ? 'bg-teal-500'
+          : segment.status === 'translated'
+            ? 'bg-blue-500'
         : segment.status === 'draft'
           ? 'bg-yellow-500'
           : 'bg-gray-400';
@@ -188,6 +207,54 @@ export const EditorRow: React.FC<EditorRowProps> = ({
   const displayContext =
     isContextExpanded || !isLongContext ? contextText : `${contextText.substring(0, 110)}...`;
 
+  const copyContextText = useCallback(async (text: string): Promise<boolean> => {
+    if (!text) return false;
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch {
+      // fallback below
+    }
+
+    try {
+      const temp = document.createElement('textarea');
+      temp.value = text;
+      temp.setAttribute('readonly', 'true');
+      temp.style.position = 'fixed';
+      temp.style.opacity = '0';
+      temp.style.pointerEvents = 'none';
+      document.body.appendChild(temp);
+      temp.select();
+      const copied = document.execCommand('copy');
+      document.body.removeChild(temp);
+      return copied;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const handleCopyContext = useCallback(
+    async (event: React.MouseEvent) => {
+      event.stopPropagation();
+      const normalized = contextText.trim();
+      if (!normalized) return;
+      const copied = await copyContextText(contextText);
+      if (!copied) return;
+
+      setContextCopied(true);
+      if (contextCopiedTimerRef.current !== null) {
+        window.clearTimeout(contextCopiedTimerRef.current);
+      }
+      contextCopiedTimerRef.current = window.setTimeout(() => {
+        setContextCopied(false);
+      }, 1200);
+    },
+    [contextText, copyContextText],
+  );
+
   const sourceHighlightChunks = useMemo(
     () => buildHighlightChunks(sourceEditorText, sourceHighlightQuery, highlightMode),
     [sourceEditorText, sourceHighlightQuery, highlightMode],
@@ -196,6 +263,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
     () => buildHighlightChunks(draftText, targetHighlightQuery, highlightMode),
     [draftText, targetHighlightQuery, highlightMode],
   );
+  const showReadonlyHighlightOverlay = !isActive && targetHighlightQuery.trim().length > 0;
 
   const renderChunks = useCallback(
     (chunks: ReturnType<typeof buildHighlightChunks>) =>
@@ -275,12 +343,14 @@ export const EditorRow: React.FC<EditorRowProps> = ({
           onKeyDown={handleTargetKeyDown}
           onDoubleClick={(e) => e.currentTarget.select()}
           spellCheck={false}
-          className={`relative z-10 w-full min-h-[44px] px-1 pr-3 py-1 text-[14px] leading-relaxed bg-transparent outline-none resize-none overflow-hidden whitespace-pre-wrap ${
-            isActive ? 'text-gray-800' : 'text-transparent caret-transparent'
+          className={`relative z-10 w-full min-h-[44px] px-3 py-3 text-[14px] leading-relaxed bg-transparent outline-none resize-none overflow-hidden whitespace-pre-wrap break-words ${
+            showReadonlyHighlightOverlay ? 'text-transparent caret-transparent' : 'text-gray-800'
+          } ${!isActive ? 'pointer-events-none' : ''} ${
+            !isActive || showReadonlyHighlightOverlay ? 'caret-transparent' : ''
           }`}
         />
 
-        {!isActive && (
+        {showReadonlyHighlightOverlay && (
           <div className="pointer-events-none absolute inset-0 px-3 py-3 text-[14px] text-gray-800 leading-relaxed whitespace-pre-wrap break-words">
             {renderChunks(targetHighlightChunks)}
           </div>
@@ -343,7 +413,11 @@ export const EditorRow: React.FC<EditorRowProps> = ({
 
         {segment.meta?.context && (
           <div className="mt-2 px-1 flex flex-col group">
-            <div className="text-[11px] text-gray-400 italic leading-snug">
+            <div
+              onClick={(event) => void handleCopyContext(event)}
+              title="Click to copy context"
+              className="text-[11px] text-gray-400 italic leading-snug cursor-copy hover:text-gray-500 transition-colors"
+            >
               {displayContext}
               {isLongContext && (
                 <button
@@ -357,6 +431,9 @@ export const EditorRow: React.FC<EditorRowProps> = ({
                 </button>
               )}
             </div>
+            {contextCopied && (
+              <div className="mt-1 text-[10px] text-emerald-600 font-medium">Copied</div>
+            )}
           </div>
         )}
       </div>
