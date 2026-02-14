@@ -4,18 +4,28 @@
 
 本目录已按“规范 / 状态 / 导航 / 历史”分层。默认以代码为准，文档用于快速定位、统一约束、同步进度。
 
-## 单入口（Handoff）
+## 交接入口（Handoff）
 
 新 agent / 新会话统一从这里开始：
 
-1. `DOCS/HANDOFF.md`
+1. `DOCS/HANDOFF_LITE.md`（默认，1 分钟快速起步）
+2. `DOCS/HANDOFF.md`（复杂任务时使用）
 
-该文件包含完整阅读顺序、冲突优先级、任务寻路和收工更新要求。
+并行 worktree 模式额外必读：
+
+1. `DOCS/WORKTREE_PROTOCOL.md`
+2. `DOCS/worktrees/<branch>.md`
 
 ## 当前有效（Active）
 
+- `DOCS/HANDOFF_LITE.md`
+  - 轻量交接入口（新对话默认）
 - `DOCS/HANDOFF.md`
-  - 单入口交接系统（自动寻路）
+  - 完整交接系统（深度上下文）
+- `DOCS/WORKTREE_PROTOCOL.md`
+  - 并行 worktree 协议
+- `DOCS/worktrees/TEMPLATE.md`
+  - 分支任务卡模板
 - `DOCS/CURRENT_STATUS.md`
   - 当前阶段、门禁结果、阻塞项、近期优先级（实时执行面板）
 - `DOCS/PROJECT_MAP_QUICKSTART.md`
@@ -46,6 +56,7 @@
 
 ## 使用建议
 
-1. 统一先读 `DOCS/HANDOFF.md`。
-2. 执行细节按 `HANDOFF` 分发的顺序读取。
-3. 历史背景只在需要时查看 `DOCS/archive/*`。
+1. 新对话先读 `DOCS/HANDOFF_LITE.md`。
+2. 并行分支场景再读 `DOCS/WORKTREE_PROTOCOL.md` + 分支任务卡。
+3. 复杂任务再升级到 `DOCS/HANDOFF.md` 完整链路。
+4. 历史背景只在需要时查看 `DOCS/archive/*`。

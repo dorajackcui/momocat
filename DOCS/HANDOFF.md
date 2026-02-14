@@ -1,78 +1,79 @@
-# HANDOFF 操作系统（单入口）
+# HANDOFF（完整版交接系统）
 
 最后更新：2026-02-14
 
-> 目标：让任何新 agent / 新对话只读这一个文件，就能自动理解项目文档体系并开始工作。  
-> 使用方式：直接说“先读 `DOCS/HANDOFF.md` 再开始任务”。
+> 这是完整交接文档。  
+> 日常新会话建议先读轻量版：`DOCS/HANDOFF_LITE.md`。
 
-## 1. 单入口规则
+## 1. 使用场景
 
-1. 新会话只需要先读本文件。
-2. 本文件负责分发后续必读文档与执行顺序。
-3. 若本文件与其他文档冲突：以代码为准，并在交付前修正文档。
+1. 新 agent / 新对话需要建立完整项目上下文。
+2. 任务涉及跨层改动、架构边界、或多人并行 worktree。
 
-## 2. 标准阅读链路（必须按顺序）
+## 2. 双入口策略
 
-1. `DOCS/CURRENT_STATUS.md`
-作用：获取当前阶段、门禁结果、阻塞项、近期优先级。
+1. 快速起步（默认）：`DOCS/HANDOFF_LITE.md`
+2. 深度上下文（复杂任务）：`DOCS/HANDOFF.md`（本文件）
 
-2. `DOCS/DEVELOPMENT_GUIDE.md`
-作用：获取当前功能开发阶段的硬约束（必须遵守的规则）。
+## 3. 标准阅读链路（完整版）
 
-3. `DOCS/PROJECT_MAP_QUICKSTART.md`
-作用：按任务快速定位入口文件与调用链。
+1. `DOCS/CURRENT_STATUS.md`  
+当前阶段、门禁状态、全局阻塞。
 
-4. `DOCS/PROJECT_STRUCTURE.md`
-作用：确认分层边界与目录职责，避免跨层改动。
+2. `DOCS/DEVELOPMENT_GUIDE.md`  
+当前开发阶段硬规则。
 
-5. `DOCS/ARCHITECTURE.md`
-作用：理解当前实现边界与中长期演进方向（区分 As-Is / To-Be）。
+3. `DOCS/PROJECT_MAP_QUICKSTART.md`  
+任务到代码入口的快速映射。
 
-6. `DOCS/DATABASE_SCHEMA.md`（仅当触达数据层时必读）
-作用：确认 schema 与迁移事实，避免文档/迁移脚本漂移。
+4. `DOCS/PROJECT_STRUCTURE.md`  
+目录与分层边界。
 
-7. `DOCS/ROADMAP.md`（可选）
-作用：看阶段性方向，不作为实时执行面板。
+5. `DOCS/ARCHITECTURE.md`  
+As-Is / To-Be 边界与演进方向。
 
-8. `DOCS/archive/*`（按需）
-作用：只用于历史背景，不作为当前规范依据。
+6. `DOCS/DATABASE_SCHEMA.md`（触达数据层时必读）
 
-## 3. 决策优先级（冲突时）
+7. `DOCS/WORKTREE_PROTOCOL.md`（并行模式必读）
 
-1. 代码与测试结果（最高优先级）
-2. `DOCS/CURRENT_STATUS.md`（当前状态）
-3. `DOCS/DEVELOPMENT_GUIDE.md` + `DOCS/architecture/GATE05_GUARDRAILS.json`（硬规则）
-4. 其他 active 文档
-5. `DOCS/archive/*`（仅历史）
+8. `DOCS/worktrees/<branch>.md`（并行模式必读）
 
-## 4. 任务寻路表（常用）
+## 4. 冲突优先级
 
-1. 改 UI / 交互：先看 `PROJECT_MAP_QUICKSTART` 的 renderer/hook 索引，再看对应组件与 hooks。
-2. 改 IPC：先看 `shared/ipc.ts`，再看 `main/ipc/*` 与 `preload/api/*`。
-3. 改主流程：先看 `ProjectService`，再看 `services/modules/*`。
-4. 改数据库：先看 `DATABASE_SCHEMA.md`，再看 `packages/db/src/migration/runMigrations.ts` 与 repos。
-5. 改架构边界：必须同时检查 `DEVELOPMENT_GUIDE.md` 与 `GATE05_GUARDRAILS.json`。
+1. 代码与测试结果
+2. `DOCS/CURRENT_STATUS.md`
+3. `DOCS/DEVELOPMENT_GUIDE.md` + `DOCS/architecture/GATE05_GUARDRAILS.json`
+4. 其他 Active 文档
+5. `DOCS/archive/*`（仅历史参考）
 
-## 5. 开工前输出要求（agent）
+## 5. 并行 worktree 约定（摘要）
 
-agent 在开始编码前应先给出 4 点确认：
+1. 每个分支必须有任务卡：`DOCS/worktrees/<branch>.md`。
+2. 全局状态只写 `CURRENT_STATUS`；分支细节只写任务卡。
+3. 合并前按协议执行验证并更新交接信息。
 
-1. 当前阶段与门禁状态（来自 `CURRENT_STATUS.md`）。
-2. 本次任务会触达的层与文件范围。
-3. 需要遵守的硬规则（来自 `DEVELOPMENT_GUIDE.md`）。
-4. 预期验证方式（至少包含相关 lint/typecheck/test 或 gate）。
+## 6. 开工前输出要求
 
-## 6. 收工前文档更新要求
+agent 开始编码前需明确：
 
-出现以下任一情况，必须同步更新文档：
+1. 当前阶段与门禁状态。
+2. 本次触达层与文件范围。
+3. 本次硬规则约束。
+4. 验证命令与通过标准。
 
-1. 门禁状态变化：更新 `CURRENT_STATUS.md`。
-2. 新增/修改架构硬约束：更新 `DEVELOPMENT_GUIDE.md` 与 `GATE05_GUARDRAILS.json`。
-3. 结构或入口变化：更新 `PROJECT_MAP_QUICKSTART.md` / `PROJECT_STRUCTURE.md`。
-4. 路线方向调整：更新 `ROADMAP.md`。
+## 7. 收工前文档更新要求
 
-## 7. 快速指令模板（给你使用）
+1. 全局状态变化：更新 `DOCS/CURRENT_STATUS.md`。
+2. 分支进展变化：更新 `DOCS/worktrees/<branch>.md`。
+3. 规则/边界变化：更新相应规范文档。
 
-你每次开新会话可直接发这句：
+## 8. 你可直接复用的指令
 
-`请先阅读 DOCS/HANDOFF.md，并按其中的标准阅读链路完成上下文建立，再开始处理我的需求。`
+1. 快速模式：  
+`请先读 DOCS/HANDOFF_LITE.md，再开始任务。`
+
+2. 并行 worktree 模式：  
+`请先读 DOCS/HANDOFF_LITE.md，然后只读 DOCS/worktrees/<branch>.md 和关联文件，按 DOCS/WORKTREE_PROTOCOL.md 执行。`
+
+3. 深度模式：  
+`请先读 DOCS/HANDOFF.md，并按标准阅读链路建立完整上下文后再开始。`

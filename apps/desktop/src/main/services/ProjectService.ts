@@ -1,4 +1,4 @@
-import { ProjectType, Segment, SegmentStatus, Token } from '@cat/core';
+import { ProjectAIModel, ProjectType, Segment, SegmentStatus, Token } from '@cat/core';
 import { CATDatabase } from '@cat/db';
 import { SpreadsheetFilter } from '../filters/SpreadsheetFilter';
 import { TMService } from './TMService';
@@ -140,8 +140,9 @@ export class ProjectService {
     projectId: number,
     aiPrompt: string | null,
     aiTemperature: number | null,
+    aiModel: ProjectAIModel | null,
   ) {
-    this.projectModule.updateProjectAISettings(projectId, aiPrompt, aiTemperature);
+    this.projectModule.updateProjectAISettings(projectId, aiPrompt, aiTemperature, aiModel);
   }
 
   public async deleteProject(projectId: number) {

@@ -1,5 +1,6 @@
 import {
   Project,
+  ProjectAIModel as CoreProjectAIModel,
   ProjectType as CoreProjectType,
   Segment,
   SegmentStatus,
@@ -18,6 +19,7 @@ import type {
 
 export type TMType = DbTMType;
 export type ProjectType = CoreProjectType;
+export type ProjectAIModel = CoreProjectAIModel;
 
 export interface ImportOptions {
   hasHeader: boolean;
@@ -171,6 +173,7 @@ export interface DesktopApi {
     projectId: number,
     aiPrompt: string | null,
     aiTemperature: number | null,
+    aiModel: ProjectAIModel | null,
   ) => Promise<void>;
   getProjectFiles: (projectId: number) => Promise<ProjectFileRecord[]>;
   getFile: (fileId: number) => Promise<ProjectFileRecord | undefined>;

@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { Project, ProjectType } from '@cat/core';
+import { Project, ProjectAIModel, ProjectType } from '@cat/core';
 import { randomUUID } from 'crypto';
 import type { ProjectFileRecord } from '../types';
 
@@ -35,12 +35,17 @@ export class ProjectRepo {
       .run(aiPrompt, projectId);
   }
 
-  public updateProjectAISettings(projectId: number, aiPrompt: string | null, aiTemperature: number | null) {
+  public updateProjectAISettings(
+    projectId: number,
+    aiPrompt: string | null,
+    aiTemperature: number | null,
+    aiModel: ProjectAIModel | null,
+  ) {
     this.db
       .prepare(
-        "UPDATE projects SET aiPrompt = ?, aiTemperature = ?, updatedAt = (strftime('%Y-%m-%dT%H:%M:%fZ','now')) WHERE id = ?"
+        "UPDATE projects SET aiPrompt = ?, aiTemperature = ?, aiModel = ?, updatedAt = (strftime('%Y-%m-%dT%H:%M:%fZ','now')) WHERE id = ?"
       )
-      .run(aiPrompt, aiTemperature, projectId);
+      .run(aiPrompt, aiTemperature, aiModel, projectId);
   }
 
   public deleteProject(id: number) {

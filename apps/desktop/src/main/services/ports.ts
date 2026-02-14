@@ -1,4 +1,13 @@
-import { Project, ProjectType, Segment, SegmentStatus, TBEntry, TMEntry, Token } from '@cat/core';
+import {
+  Project,
+  ProjectAIModel,
+  ProjectType,
+  Segment,
+  SegmentStatus,
+  TBEntry,
+  TMEntry,
+  Token,
+} from '@cat/core';
 import type {
   MountedTBRecord as DbMountedTBRecord,
   MountedTMRecord as DbMountedTMRecord,
@@ -47,6 +56,7 @@ export interface ProjectRepository {
     projectId: number,
     aiPrompt: string | null,
     aiTemperature: number | null,
+    aiModel: ProjectAIModel | null,
   ): void;
   deleteProject(id: number): void;
 

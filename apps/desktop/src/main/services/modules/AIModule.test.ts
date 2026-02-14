@@ -145,6 +145,51 @@ describe('AIModule.aiTranslateFile', () => {
     expect(userPrompt).toContain('Context: UI button label');
   });
 
+  it('uses project-level aiModel for file translation', async () => {
+    const segments: Segment[] = [
+      createSegment({ segmentId: 'model-1', sourceText: 'Hello world' }),
+    ];
+
+    const projectRepo = {
+      getFile: vi.fn().mockReturnValue({ id: 1, projectId: 11, name: 'demo.xlsx' }),
+      getProject: vi.fn().mockReturnValue({
+        id: 11,
+        srcLang: 'en',
+        tgtLang: 'zh',
+        aiPrompt: '',
+        aiTemperature: 0.2,
+        aiModel: 'gpt-5-mini',
+      }),
+    } as unknown as ProjectRepository;
+
+    const segmentRepo = {
+      getSegmentsPage: vi.fn().mockReturnValue(segments),
+    } as unknown as SegmentRepository;
+
+    const settingsRepo = {
+      getSetting: vi.fn().mockReturnValue('test-api-key'),
+    } as unknown as SettingsRepository;
+
+    const segmentService = {
+      updateSegment: vi.fn().mockResolvedValue(undefined),
+    } as unknown as SegmentService;
+
+    const transport = {
+      testConnection: vi.fn().mockResolvedValue({ ok: true }),
+      chatCompletions: vi.fn().mockResolvedValue({
+        content: '你好世界',
+        status: 200,
+        endpoint: '/v1/chat/completions',
+      }),
+    } as unknown as AITransport;
+
+    const module = new AIModule(projectRepo, segmentRepo, settingsRepo, segmentService, transport);
+    await module.aiTranslateFile(1);
+
+    const request = (transport.chatCompletions as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(request.model).toBe('gpt-5-mini');
+  });
+
   it('keeps context field in user prompt when imported context is missing', async () => {
     const segments: Segment[] = [
       createSegment({ segmentId: 'ctx-empty-1', sourceText: 'Hello world' }),
@@ -409,6 +454,7 @@ describe('AIModule.aiTranslateFile', () => {
         projectType: 'custom',
         aiPrompt: 'Process text',
         aiTemperature: 0.2,
+        aiModel: 'gpt-5.2',
       }),
     } as unknown as ProjectRepository;
 
@@ -437,6 +483,7 @@ describe('AIModule.aiTranslateFile', () => {
     await module.aiTestTranslate(11, 'Input text', 'Additional context');
 
     const request = (transport.chatCompletions as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(request.model).toBe('gpt-5.2');
     expect(request.userPrompt).toContain('Input:');
     expect(request.userPrompt).toContain('Input text');
     expect(request.userPrompt).toContain('Context: Additional context');

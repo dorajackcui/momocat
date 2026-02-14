@@ -1,4 +1,6 @@
 import {
+  PROJECT_AI_MODELS,
+  ProjectAIModel,
   ProjectType,
   Segment,
   SegmentStatus,
@@ -28,6 +30,8 @@ interface TranslateDebugMeta {
 
 export class AIModule {
   private static readonly SEGMENT_PAGE_SIZE = 1000;
+  private static readonly DEFAULT_AI_MODEL: ProjectAIModel = 'gpt-4o';
+  private static readonly SUPPORTED_AI_MODELS = new Set<string>(PROJECT_AI_MODELS);
   private readonly tagValidator = new TagValidator();
 
   constructor(
@@ -80,7 +84,7 @@ export class AIModule {
       throw new Error('AI API key is not configured');
     }
 
-    const model = options?.model || 'gpt-4o';
+    const model = this.resolveModel(options?.model, project.aiModel);
     const projectType = project.projectType || 'translation';
     const temperature = this.resolveTemperature(project.aiTemperature);
     const totalSegments = this.countFileSegments(fileId);
@@ -144,7 +148,7 @@ export class AIModule {
       throw new Error('AI API key is not configured');
     }
 
-    const model = 'gpt-4o';
+    const model = this.resolveModel(project.aiModel);
     const temperature = this.resolveTemperature(project.aiTemperature);
     const source = sourceText.trim();
     const context = contextText?.trim() ?? '';
@@ -352,6 +356,21 @@ export class AIModule {
     }
 
     return Math.max(0, Math.min(2, value));
+  }
+
+  private resolveModel(
+    model?: string | null,
+    projectModel?: ProjectAIModel | null,
+  ): ProjectAIModel {
+    if (typeof model === 'string' && AIModule.SUPPORTED_AI_MODELS.has(model)) {
+      return model as ProjectAIModel;
+    }
+
+    if (typeof projectModel === 'string' && AIModule.SUPPORTED_AI_MODELS.has(projectModel)) {
+      return projectModel as ProjectAIModel;
+    }
+
+    return AIModule.DEFAULT_AI_MODEL;
   }
 
   private isTranslatableSegment(segment: Segment): boolean {

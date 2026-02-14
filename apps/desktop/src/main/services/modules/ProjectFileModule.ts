@@ -1,6 +1,6 @@
 import { basename, join } from 'path';
 import { copyFile, mkdir, rm, unlink } from 'fs/promises';
-import { ProjectType, Segment, validateSegmentTags } from '@cat/core';
+import { ProjectAIModel, ProjectType, Segment, validateSegmentTags } from '@cat/core';
 import {
   ImportOptions,
   ProjectRepository,
@@ -68,8 +68,9 @@ export class ProjectFileModule {
     projectId: number,
     aiPrompt: string | null,
     aiTemperature: number | null,
+    aiModel: ProjectAIModel | null,
   ) {
-    this.projectRepo.updateProjectAISettings(projectId, aiPrompt, aiTemperature);
+    this.projectRepo.updateProjectAISettings(projectId, aiPrompt, aiTemperature, aiModel);
   }
 
   public async deleteProject(projectId: number) {

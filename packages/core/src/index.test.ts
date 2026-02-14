@@ -8,6 +8,7 @@ import {
   computeTagsSignature,
   computeMatchKey,
   validateSegmentTags,
+  validateSegmentTerminology,
   getTagDisplayInfo,
   TagMetadata,
   TagType,
@@ -105,6 +106,94 @@ describe('CAT Core Tokenizer', () => {
     // @ts-ignore
     const key = computeMatchKey(tokens);
     expect(key).toBe('hello {TAG} world');
+  });
+});
+
+describe('Terminology QA', () => {
+  function buildSegment(sourceText: string, targetText: string, status: 'new' | 'draft' = 'draft') {
+    return {
+      segmentId: 'seg-term',
+      fileId: 1,
+      orderIndex: 0,
+      sourceTokens: [{ type: 'text', content: sourceText }],
+      targetTokens: targetText ? [{ type: 'text', content: targetText }] : [],
+      status,
+      tagsSignature: '',
+      matchKey: sourceText.toLowerCase(),
+      srcHash: sourceText.toLowerCase(),
+      meta: { updatedAt: new Date().toISOString() },
+    } as any;
+  }
+
+  it('creates warning when TB matched term is missing from target text', () => {
+    const segment = buildSegment('Please keep your API key secure.', 'Veuillez garder votre clé en sécurité.');
+    const termMatches = [
+      {
+        srcTerm: 'API key',
+        tgtTerm: 'clé API',
+        srcNorm: 'api key',
+        tbName: 'Main TB',
+      },
+    ] as any;
+
+    const issues = validateSegmentTerminology(segment, termMatches);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].ruleId).toBe('tb-term-missing');
+    expect(issues[0].severity).toBe('warning');
+  });
+
+  it('passes when target already contains expected latin TB term', () => {
+    const segment = buildSegment(
+      'Please keep your API key secure.',
+      'Veuillez garder votre clé API en sécurité.',
+    );
+    const termMatches = [
+      {
+        srcTerm: 'API key',
+        tgtTerm: 'clé API',
+        srcNorm: 'api key',
+        tbName: 'Main TB',
+      },
+    ] as any;
+
+    const issues = validateSegmentTerminology(segment, termMatches);
+    expect(issues).toHaveLength(0);
+  });
+
+  it('passes when target already contains expected cjk TB term', () => {
+    const segment = buildSegment('请打开设置页面。', '请打开设置页面。');
+    const termMatches = [
+      {
+        srcTerm: '设置',
+        tgtTerm: '设置',
+        srcNorm: '设置',
+        tbName: 'UI TB',
+      },
+    ] as any;
+
+    const issues = validateSegmentTerminology(segment, termMatches);
+    expect(issues).toHaveLength(0);
+  });
+
+  it('deduplicates repeated matches of the same normalized term and target term', () => {
+    const segment = buildSegment('API key is required.', '凭证是必须的。');
+    const termMatches = [
+      {
+        srcTerm: 'API key',
+        tgtTerm: 'API 密钥',
+        srcNorm: 'api key',
+        tbName: 'TB A',
+      },
+      {
+        srcTerm: 'api key',
+        tgtTerm: 'API 密钥',
+        srcNorm: 'api key',
+        tbName: 'TB B',
+      },
+    ] as any;
+
+    const issues = validateSegmentTerminology(segment, termMatches);
+    expect(issues).toHaveLength(1);
   });
 });
 

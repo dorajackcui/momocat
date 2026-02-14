@@ -1,4 +1,4 @@
-import { ProjectType } from '@cat/core';
+import { PROJECT_AI_MODELS, ProjectType } from '@cat/core';
 import { ProjectAIController } from '../../hooks/projectDetail/useProjectAI';
 
 interface ProjectAIPaneProps {
@@ -40,6 +40,22 @@ export function ProjectAIPane({ ai, projectType = 'translation' }: ProjectAIPane
               ? 'Save AI Settings'
               : 'AI Settings Saved'}
         </button>
+      </div>
+      <div className="mb-3">
+        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
+          Model
+        </label>
+        <select
+          value={ai.modelDraft}
+          onChange={(event) => ai.setModelDraft(event.target.value as typeof ai.modelDraft)}
+          className="w-52 text-sm bg-white border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          {PROJECT_AI_MODELS.map((model) => (
+            <option key={model} value={model}>
+              {model}
+            </option>
+          ))}
+        </select>
       </div>
       <div className="mb-3">
         <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">

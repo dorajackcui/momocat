@@ -2,12 +2,12 @@
 
 > 单一真相来源：`packages/db/src/migration/runMigrations.ts`
 
-本文档只描述当前有效结构（截至 schema v11），不保留历史假设。
+本文档只描述当前有效结构（截至 schema v12），不保留历史假设。
 
 ## 1. 版本信息
 
 - 版本表：`schema_version`
-- 当前目标版本：`v11`
+- 当前目标版本：`v12`
 - 迁移入口：`runMigrations(db)`
 
 ## 2. 核心业务表
@@ -21,6 +21,7 @@
   - `projectType` (`translation` / `review` / `custom`)
   - `aiPrompt` (nullable)
   - `aiTemperature` (nullable)
+  - `aiModel` (`gpt-5.2` / `gpt-5-mini` / `gpt-4o` / `gpt-4.1-mini`，默认 `gpt-4o`)
   - `createdAt`, `updatedAt`
 
 - `files`

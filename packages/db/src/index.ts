@@ -1,5 +1,15 @@
 import Database from 'better-sqlite3';
-import { Project, ProjectFile, ProjectType, Segment, SegmentStatus, TBEntry, TMEntry, Token } from '@cat/core';
+import {
+  Project,
+  ProjectAIModel,
+  ProjectFile,
+  ProjectType,
+  Segment,
+  SegmentStatus,
+  TBEntry,
+  TMEntry,
+  Token,
+} from '@cat/core';
 import {
   MountedTBRecord,
   MountedTMRecord,
@@ -84,8 +94,13 @@ export class CATDatabase {
     this.projectRepo.updateProjectPrompt(projectId, aiPrompt);
   }
 
-  public updateProjectAISettings(projectId: number, aiPrompt: string | null, aiTemperature: number | null) {
-    this.projectRepo.updateProjectAISettings(projectId, aiPrompt, aiTemperature);
+  public updateProjectAISettings(
+    projectId: number,
+    aiPrompt: string | null,
+    aiTemperature: number | null,
+    aiModel: ProjectAIModel | null,
+  ) {
+    this.projectRepo.updateProjectAISettings(projectId, aiPrompt, aiTemperature, aiModel);
   }
 
   public deleteProject(id: number) {

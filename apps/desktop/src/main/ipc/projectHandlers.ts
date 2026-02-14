@@ -1,4 +1,4 @@
-import type { ProjectType, SegmentStatus, Token } from '@cat/core';
+import type { ProjectAIModel, ProjectType, SegmentStatus, Token } from '@cat/core';
 import type { ImportOptions } from '../../shared/ipc';
 import { IPC_CHANNELS } from '../../shared/ipcChannels';
 import type { MainHandlerDeps } from './types';
@@ -27,8 +27,13 @@ export function registerProjectHandlers({ ipcMain, projectService }: MainHandler
   });
 
   ipcMain.handle(IPC_CHANNELS.project.updateAISettings, (_event, ...args) => {
-    const [projectId, aiPrompt, aiTemperature] = args as [number, string | null, number | null];
-    return projectService.updateProjectAISettings(projectId, aiPrompt, aiTemperature);
+    const [projectId, aiPrompt, aiTemperature, aiModel] = args as [
+      number,
+      string | null,
+      number | null,
+      ProjectAIModel | null,
+    ];
+    return projectService.updateProjectAISettings(projectId, aiPrompt, aiTemperature, aiModel);
   });
 
   ipcMain.handle(IPC_CHANNELS.project.remove, (_event, ...args) => {

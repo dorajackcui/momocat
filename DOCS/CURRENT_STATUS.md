@@ -2,6 +2,7 @@
 
 > 这是“执行面板”文档：记录当前阶段、门禁状态、近期优先级。  
 > 需要实时准确，过时信息优先改这里。
+> 说明：这里只记录全局状态；分支细节写入 `DOCS/worktrees/<branch>.md`。
 
 ## 1. 当前阶段
 
@@ -43,7 +44,7 @@
 
 ## 5. 使用方式（给 agent）
 
-1. 开工前先读 `DOCS/HANDOFF.md`，再按其链路读取本文件。
+1. 开工前先读 `DOCS/HANDOFF_LITE.md`，再按其链路读取本文件。
 2. 设计/编码时执行 `DOCS/DEVELOPMENT_GUIDE.md`。
 3. 定位代码入口看 `DOCS/PROJECT_MAP_QUICKSTART.md`。
 4. 完成后更新本文件中的门禁状态和优先级。

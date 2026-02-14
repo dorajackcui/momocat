@@ -497,4 +497,28 @@ export function runMigrations(db: Database.Database) {
       db.prepare('UPDATE schema_version SET version = 11').run();
     })();
   }
+
+  if (currentVersion < 12) {
+    console.log('[DB] Upgrading schema to v12 (Project AI model)...');
+    db.transaction(() => {
+      const columns = db.prepare('PRAGMA table_info(projects)').all() as Array<{ name: string }>;
+      const hasAiModel = columns.some((column) => column.name === 'aiModel');
+
+      if (!hasAiModel) {
+        db.exec(`
+          ALTER TABLE projects ADD COLUMN aiModel TEXT DEFAULT 'gpt-4o';
+        `);
+      }
+
+      db.exec(`
+        UPDATE projects
+        SET aiModel = 'gpt-4o'
+        WHERE aiModel IS NULL
+           OR TRIM(aiModel) = ''
+           OR aiModel NOT IN ('gpt-5.2', 'gpt-5-mini', 'gpt-4o', 'gpt-4.1-mini');
+      `);
+
+      db.prepare('UPDATE schema_version SET version = 12').run();
+    })();
+  }
 }

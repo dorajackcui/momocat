@@ -1,4 +1,4 @@
-import { ProjectType } from '@cat/core';
+import { ProjectAIModel, ProjectType } from '@cat/core';
 import { CATDatabase } from '@cat/db';
 import { ProjectRepository, ProjectFileRecord, ProjectListRecord, ProjectRecord } from '../ports';
 
@@ -30,8 +30,9 @@ export class SqliteProjectRepository implements ProjectRepository {
     projectId: number,
     aiPrompt: string | null,
     aiTemperature: number | null,
+    aiModel: ProjectAIModel | null,
   ): void {
-    this.db.updateProjectAISettings(projectId, aiPrompt, aiTemperature);
+    this.db.updateProjectAISettings(projectId, aiPrompt, aiTemperature, aiModel);
   }
 
   deleteProject(id: number): void {

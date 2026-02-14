@@ -1,10 +1,11 @@
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useState } from 'react';
-import { Project } from '@cat/core';
+import { PROJECT_AI_MODELS, Project, ProjectAIModel } from '@cat/core';
 import type { JobProgressEvent } from '../../../../shared/ipc';
 import { apiClient } from '../../services/apiClient';
 import { feedbackService } from '../../services/feedbackService';
 
 export const DEFAULT_AI_TEMPERATURE = 0.2;
+export const DEFAULT_PROJECT_AI_MODEL: ProjectAIModel = 'gpt-4o';
 
 export function normalizeTemperatureValue(value: number): number {
   return Math.max(0, Math.min(2, Number(value.toFixed(2))));
@@ -22,11 +23,22 @@ export function parseTemperatureInput(input: string): number | null {
   return normalizeTemperatureValue(parsed);
 }
 
+const PROJECT_AI_MODEL_SET = new Set<string>(PROJECT_AI_MODELS);
+
+export function normalizeProjectAIModel(value: string | null | undefined): ProjectAIModel {
+  if (typeof value === 'string' && PROJECT_AI_MODEL_SET.has(value)) {
+    return value as ProjectAIModel;
+  }
+  return DEFAULT_PROJECT_AI_MODEL;
+}
+
 export interface ProjectAIFlagsInput {
   promptDraft: string;
   savedPromptValue: string;
   temperatureDraft: string;
   savedTemperatureValue: string;
+  modelDraft: ProjectAIModel;
+  savedModelValue: ProjectAIModel;
   testMeta: string | null;
   testUserMessage: string | null;
   testPromptUsed: string | null;
@@ -49,6 +61,7 @@ export function deriveProjectAIFlags(input: ProjectAIFlagsInput): ProjectAIFlags
   const normalizedTemperatureDraft = parseTemperatureInput(input.temperatureDraft);
   const normalizedSavedTemperature = parseTemperatureInput(input.savedTemperatureValue);
   const hasUnsavedTemperatureChanges = normalizedTemperatureDraft !== normalizedSavedTemperature;
+  const hasUnsavedModelChanges = input.modelDraft !== input.savedModelValue;
 
   return {
     normalizedPromptDraft,
@@ -56,7 +69,9 @@ export function deriveProjectAIFlags(input: ProjectAIFlagsInput): ProjectAIFlags
     normalizedTemperatureDraft,
     normalizedSavedTemperature,
     hasUnsavedPromptChanges:
-      normalizedPromptDraft !== normalizedSavedPrompt || hasUnsavedTemperatureChanges,
+      normalizedPromptDraft !== normalizedSavedPrompt ||
+      hasUnsavedTemperatureChanges ||
+      hasUnsavedModelChanges,
     hasInvalidTemperature: normalizedTemperatureDraft === null,
     hasTestDetails: Boolean(
       input.testMeta || input.testUserMessage || input.testPromptUsed || input.testRawResponse,
@@ -87,6 +102,8 @@ export interface TrackedAIJob extends JobProgressEvent {
 }
 
 export interface ProjectAIController {
+  modelDraft: ProjectAIModel;
+  setModelDraft: Dispatch<SetStateAction<ProjectAIModel>>;
   promptDraft: string;
   setPromptDraft: Dispatch<SetStateAction<string>>;
   temperatureDraft: string;
@@ -129,6 +146,8 @@ export function useProjectAI({
 }: UseProjectAIParams): ProjectAIController {
   const [promptDraft, setPromptDraft] = useState('');
   const [savedPromptValue, setSavedPromptValue] = useState('');
+  const [modelDraft, setModelDraft] = useState<ProjectAIModel>(DEFAULT_PROJECT_AI_MODEL);
+  const [savedModelValue, setSavedModelValue] = useState<ProjectAIModel>(DEFAULT_PROJECT_AI_MODEL);
   const [temperatureDraft, setTemperatureDraft] = useState(
     formatTemperature(DEFAULT_AI_TEMPERATURE),
   );
@@ -152,6 +171,7 @@ export function useProjectAI({
   useEffect(() => {
     if (!project) return;
     const promptValue = project.aiPrompt || '';
+    const modelValue = normalizeProjectAIModel(project.aiModel);
     const temperatureValue =
       typeof project.aiTemperature === 'number' && Number.isFinite(project.aiTemperature)
         ? formatTemperature(project.aiTemperature)
@@ -159,6 +179,8 @@ export function useProjectAI({
 
     setPromptDraft(promptValue);
     setSavedPromptValue(promptValue);
+    setModelDraft(modelValue);
+    setSavedModelValue(modelValue);
     setTemperatureDraft(temperatureValue);
     setSavedTemperatureValue(temperatureValue);
   }, [project]);
@@ -188,6 +210,8 @@ export function useProjectAI({
     savedPromptValue,
     temperatureDraft,
     savedTemperatureValue,
+    modelDraft,
+    savedModelValue,
     testMeta,
     testUserMessage,
     testPromptUsed,
@@ -211,7 +235,8 @@ export function useProjectAI({
     if (
       normalizedPromptDraft === normalizedSavedPrompt &&
       normalizedSavedTemperature !== null &&
-      parsedTemperature === normalizedSavedTemperature
+      parsedTemperature === normalizedSavedTemperature &&
+      modelDraft === savedModelValue
     ) {
       return;
     }
@@ -220,12 +245,23 @@ export function useProjectAI({
     try {
       await runMutation(async () => {
         const promptValue = normalizedPromptDraft.length > 0 ? normalizedPromptDraft : null;
-        await apiClient.updateProjectAISettings(project.id, promptValue, parsedTemperature);
+        await apiClient.updateProjectAISettings(
+          project.id,
+          promptValue,
+          parsedTemperature,
+          modelDraft,
+        );
         setProject((prev) => {
           if (!prev) return prev;
-          return { ...prev, aiPrompt: promptValue, aiTemperature: parsedTemperature };
+          return {
+            ...prev,
+            aiPrompt: promptValue,
+            aiTemperature: parsedTemperature,
+            aiModel: modelDraft,
+          };
         });
         setSavedPromptValue(normalizedPromptDraft);
+        setSavedModelValue(modelDraft);
         const normalizedTemperature = formatTemperature(parsedTemperature);
         setTemperatureDraft(normalizedTemperature);
         setSavedTemperatureValue(normalizedTemperature);
@@ -240,8 +276,10 @@ export function useProjectAI({
     normalizedPromptDraft,
     normalizedSavedPrompt,
     normalizedSavedTemperature,
+    modelDraft,
     project,
     runMutation,
+    savedModelValue,
     setProject,
     temperatureDraft,
   ]);
@@ -324,6 +362,8 @@ export function useProjectAI({
     () => ({
       promptDraft,
       setPromptDraft,
+      modelDraft,
+      setModelDraft,
       temperatureDraft,
       setTemperatureDraft,
       promptSavedAt,
@@ -350,12 +390,14 @@ export function useProjectAI({
     }),
     [
       getFileJob,
+      modelDraft,
       hasInvalidTemperature,
       hasTestDetails,
       hasUnsavedPromptChanges,
       promptDraft,
       promptSavedAt,
       savePrompt,
+      setModelDraft,
       savingPrompt,
       showTestDetails,
       startAITranslateFile,

@@ -77,6 +77,7 @@ npm run gate:check
 
 ## 4. 文档联动要求
 
-1. 开发前先读：`DOCS/HANDOFF.md`（由它分发其他必读文档）。
+1. 开发前先读：`DOCS/HANDOFF_LITE.md`（复杂任务再读 `DOCS/HANDOFF.md`）。
 2. 若改动边界/规则：同步更新本文件与 `DOCS/architecture/GATE05_GUARDRAILS.json`。
 3. 文档与代码冲突时，以代码为准，并在本次改动补齐文档。
+4. 并行 worktree 模式：遵循 `DOCS/WORKTREE_PROTOCOL.md`，并维护 `DOCS/worktrees/<branch>.md`。
