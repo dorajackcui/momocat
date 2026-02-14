@@ -1,5 +1,5 @@
 import { CATDatabase } from '@cat/db';
-import { Segment, SegmentStatus, Token } from '@cat/core';
+import { ProjectType, Segment, SegmentStatus, Token } from '@cat/core';
 import { SegmentRepository } from '../ports';
 
 export class SqliteSegmentRepository implements SegmentRepository {
@@ -19,6 +19,10 @@ export class SqliteSegmentRepository implements SegmentRepository {
 
   getProjectIdByFileId(fileId: number): number | undefined {
     return this.db.getProjectIdByFileId(fileId);
+  }
+
+  getProjectTypeByFileId(fileId: number): ProjectType | undefined {
+    return this.db.getProjectTypeByFileId(fileId);
   }
 
   getProjectSegmentsByHash(projectId: number, srcHash: string): Segment[] {

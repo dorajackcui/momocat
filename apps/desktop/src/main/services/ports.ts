@@ -66,6 +66,7 @@ export interface SegmentRepository {
   getSegmentsPage(fileId: number, offset: number, limit: number): Segment[];
   getSegment(segmentId: string): Segment | undefined;
   getProjectIdByFileId(fileId: number): number | undefined;
+  getProjectTypeByFileId(fileId: number): ProjectType | undefined;
   getProjectSegmentsByHash(projectId: number, srcHash: string): Segment[];
   updateSegmentTarget(segmentId: string, targetTokens: Token[], status: SegmentStatus): void;
 }

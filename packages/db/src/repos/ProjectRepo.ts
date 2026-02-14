@@ -99,4 +99,19 @@ export class ProjectRepo {
       | undefined;
     return row?.projectId;
   }
+
+  public getProjectTypeByFileId(fileId: number): ProjectType | undefined {
+    const row = this.db
+      .prepare(
+        `
+          SELECT p.projectType as projectType
+          FROM files f
+          JOIN projects p ON p.id = f.projectId
+          WHERE f.id = ?
+        `,
+      )
+      .get(fileId) as { projectType?: ProjectType } | undefined;
+
+    return row?.projectType;
+  }
 }

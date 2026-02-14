@@ -49,6 +49,10 @@ class FailingSegmentRepository implements SegmentRepository {
     return this.delegate.getProjectIdByFileId(fileId);
   }
 
+  getProjectTypeByFileId(fileId: number) {
+    return this.delegate.getProjectTypeByFileId(fileId);
+  }
+
   getProjectSegmentsByHash(projectId: number, srcHash: string): Segment[] {
     return this.delegate.getProjectSegmentsByHash(projectId, srcHash);
   }

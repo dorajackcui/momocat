@@ -95,6 +95,8 @@ export interface ProjectAIController {
   savingPrompt: boolean;
   testSource: string;
   setTestSource: Dispatch<SetStateAction<string>>;
+  testContext: string;
+  setTestContext: Dispatch<SetStateAction<string>>;
   testResult: string | null;
   testPromptUsed: string | null;
   testUserMessage: string | null;
@@ -136,6 +138,7 @@ export function useProjectAI({
   const [promptSavedAt, setPromptSavedAt] = useState<string | null>(null);
   const [savingPrompt, setSavingPrompt] = useState(false);
   const [testSource, setTestSource] = useState('');
+  const [testContext, setTestContext] = useState('');
   const [testResult, setTestResult] = useState<string | null>(null);
   const [testPromptUsed, setTestPromptUsed] = useState<string | null>(null);
   const [testUserMessage, setTestUserMessage] = useState<string | null>(null);
@@ -259,7 +262,7 @@ export function useProjectAI({
       setTestUserMessage(null);
       setTestRawResponse(null);
 
-      const result = await apiClient.aiTestTranslate(project.id, source);
+      const result = await apiClient.aiTestTranslate(project.id, source, testContext.trim() || undefined);
       setTestResult(result.translatedText || null);
       setTestPromptUsed(result.promptUsed);
       setTestUserMessage(result.userMessage);
@@ -273,11 +276,15 @@ export function useProjectAI({
       setTestError(message);
       setShowTestDetails(true);
     }
-  }, [project, testSource]);
+  }, [project, testContext, testSource]);
 
   const startAITranslateFile = useCallback(async (fileId: number, fileName: string) => {
+    const projectType = project?.projectType || 'translation';
+    const actionLabel =
+      projectType === 'review' ? 'review' : projectType === 'custom' ? 'processing' : 'translation';
+    const targetLabel = projectType === 'custom' ? 'output' : 'target';
     const confirmed = await feedbackService.confirm(
-      `Run AI translation for "${fileName}"? This will fill empty target segments only.`,
+      `Run AI ${actionLabel} for "${fileName}"? This will fill empty ${targetLabel} segments only.`,
     );
     if (!confirmed) return;
     try {
@@ -289,9 +296,9 @@ export function useProjectAI({
       setFileJobIndex((prev) => ({ ...prev, [fileId]: jobId }));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      feedbackService.error(`Failed to start AI translation: ${message}`);
+      feedbackService.error(`Failed to start AI ${actionLabel}: ${message}`);
     }
-  }, []);
+  }, [project?.projectType]);
 
   const getFileJob = useCallback(
     (fileId: number): TrackedAIJob | null => {
@@ -312,6 +319,8 @@ export function useProjectAI({
       savingPrompt,
       testSource,
       setTestSource,
+      testContext,
+      setTestContext,
       testResult,
       testPromptUsed,
       testUserMessage,
@@ -347,6 +356,7 @@ export function useProjectAI({
       testRawResponse,
       testResult,
       testSource,
+      testContext,
       testUserMessage,
     ],
   );

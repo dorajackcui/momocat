@@ -23,12 +23,25 @@ export function ColumnSelector({
   const [contextCol, setContextCol] = useState<number | undefined>(undefined);
 
   const isReviewProject = projectType === 'review';
-  const sourceLabel = isReviewProject ? 'Translation Column' : 'Source Column';
-  const targetLabel = isReviewProject ? 'Review Output Column' : 'Target Column';
-  const contextLabel = isReviewProject ? 'Original Column' : 'Comment/Context Column';
-  const sourceTagLabel = isReviewProject ? 'Translation' : 'Source';
-  const targetTagLabel = isReviewProject ? 'Review Output' : 'Target';
-  const contextTagLabel = isReviewProject ? 'Original' : 'Comment';
+  const isCustomProject = projectType === 'custom';
+  const sourceLabel = isReviewProject
+    ? 'Translation Column'
+    : isCustomProject
+      ? 'Input Column'
+      : 'Source Column';
+  const targetLabel = isReviewProject
+    ? 'Review Output Column'
+    : isCustomProject
+      ? 'Output Column'
+      : 'Target Column';
+  const contextLabel = isReviewProject
+    ? 'Original Column'
+    : isCustomProject
+      ? 'Context Column'
+      : 'Comment/Context Column';
+  const sourceTagLabel = isReviewProject ? 'Translation' : isCustomProject ? 'Input' : 'Source';
+  const targetTagLabel = isReviewProject ? 'Review Output' : isCustomProject ? 'Output' : 'Target';
+  const contextTagLabel = isReviewProject ? 'Original' : 'Context';
 
   const maxCols = previewData.length > 0 ? previewData[0].length : 0;
   const colIndexes = Array.from({ length: maxCols }, (_, i) => i);
@@ -51,6 +64,8 @@ export function ColumnSelector({
             <p className="text-sm text-gray-500 mt-1">
               {isReviewProject
                 ? 'Select translation/original/output columns for AI review'
+                : isCustomProject
+                  ? 'Select input/context/output columns for AI custom processing'
                 : 'Select the columns to import from your spreadsheet'}
             </p>
           </div>

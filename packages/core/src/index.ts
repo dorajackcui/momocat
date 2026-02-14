@@ -166,7 +166,7 @@ export interface Project {
   updatedAt: string;
 }
 
-export type ProjectType = 'translation' | 'review';
+export type ProjectType = 'translation' | 'review' | 'custom';
 
 /**
  * Serialize tokens to plain text for display in non-token-aware contexts

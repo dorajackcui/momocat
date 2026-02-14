@@ -96,6 +96,11 @@ export class SegmentService extends EventEmitter {
     if (status === 'confirmed') {
       const segment = this.db.getSegment(segmentId);
       if (segment) {
+        const projectType = this.db.getProjectTypeByFileId(segment.fileId) ?? 'translation';
+        if (projectType !== 'translation') {
+          return { propagatedIds: [] };
+        }
+
         const projectId = this.db.getProjectIdByFileId(segment.fileId);
         if (projectId !== undefined) {
           this.tmService.upsertFromConfirmedSegment(projectId, segment);

@@ -24,6 +24,8 @@ export function ProjectFilesPane({
   projectType = 'translation',
 }: ProjectFilesPaneProps) {
   const isReviewProject = projectType === 'review';
+  const isCustomProject = projectType === 'custom';
+  const supportsTMWorkflow = projectType === 'translation';
   return (
     <div className="max-w-4xl mx-auto">
       <ProjectAIPane ai={ai} projectType={projectType} />
@@ -71,18 +73,22 @@ export function ProjectFilesPane({
                   )}
                 </div>
                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() => onOpenCommitModal(file)}
-                    className="px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg text-xs font-bold hover:bg-purple-100"
-                  >
-                    Commit
-                  </button>
-                  <button
-                    onClick={() => onOpenMatchModal(file)}
-                    className="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold hover:bg-indigo-100"
-                  >
-                    TM Match
-                  </button>
+                  {supportsTMWorkflow && (
+                    <button
+                      onClick={() => onOpenCommitModal(file)}
+                      className="px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg text-xs font-bold hover:bg-purple-100"
+                    >
+                      Commit
+                    </button>
+                  )}
+                  {supportsTMWorkflow && (
+                    <button
+                      onClick={() => onOpenMatchModal(file)}
+                      className="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold hover:bg-indigo-100"
+                    >
+                      TM Match
+                    </button>
+                  )}
                   <button
                     onClick={() => void ai.startAITranslateFile(file.id, file.name)}
                     disabled={jobRunning}
@@ -91,9 +97,13 @@ export function ProjectFilesPane({
                     {jobRunning
                       ? isReviewProject
                         ? 'AI Reviewing...'
+                        : isCustomProject
+                          ? 'AI Processing...'
                         : 'AI Translating...'
                       : isReviewProject
                         ? 'AI Review'
+                        : isCustomProject
+                          ? 'AI Process'
                         : 'AI Translate'}
                   </button>
                   <button

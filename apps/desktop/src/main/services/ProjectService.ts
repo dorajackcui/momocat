@@ -328,7 +328,7 @@ export class ProjectService {
     return this.aiModule.aiTranslateFile(fileId, options);
   }
 
-  public async aiTestTranslate(projectId: number, sourceText: string) {
-    return this.aiModule.aiTestTranslate(projectId, sourceText);
+  public async aiTestTranslate(projectId: number, sourceText: string, contextText?: string) {
+    return this.aiModule.aiTestTranslate(projectId, sourceText, contextText);
   }
 }

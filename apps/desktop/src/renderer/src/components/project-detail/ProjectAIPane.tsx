@@ -8,6 +8,7 @@ interface ProjectAIPaneProps {
 
 export function ProjectAIPane({ ai, projectType = 'translation' }: ProjectAIPaneProps) {
   const isReviewProject = projectType === 'review';
+  const isCustomProject = projectType === 'custom';
   return (
     <div className="mb-8 bg-gray-50 border border-gray-200 rounded-xl p-5">
       <div className="flex items-center justify-between mb-3">
@@ -62,18 +63,22 @@ export function ProjectAIPane({ ai, projectType = 'translation' }: ProjectAIPane
         placeholder={
           isReviewProject
             ? 'Optional. Add project-specific review instructions (accuracy, fluency, style, severity rules).'
-            : 'Optional. Add project-specific translation instructions (tone, terminology, style).'
+            : isCustomProject
+              ? 'Required. Define full custom processing instructions for input/context/output.'
+              : 'Optional. Add project-specific translation instructions (tone, terminology, style).'
         }
         className="w-full text-sm bg-white border border-gray-200 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
       />
       <p className="mt-2 text-[11px] text-gray-500">
         {isReviewProject
           ? 'This prompt will be appended to the default AI review rules.'
-          : 'This prompt will be appended to the default translation rules.'}
+          : isCustomProject
+            ? 'This prompt is used as the full custom system prompt.'
+            : 'This prompt will be appended to the default translation rules.'}
       </p>
       <div className="mt-4 pt-4 border-t border-gray-200">
         <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
-          {isReviewProject ? 'Test Text' : 'Test Source'}
+          {isReviewProject ? 'Test Text' : isCustomProject ? 'Test Input' : 'Test Source'}
         </label>
         <div className="flex gap-2">
           <input
@@ -83,7 +88,9 @@ export function ProjectAIPane({ ai, projectType = 'translation' }: ProjectAIPane
             placeholder={
               isReviewProject
                 ? 'Enter a short sentence to test AI review'
-                : 'Enter a short sentence to test AI translation'
+                : isCustomProject
+                  ? 'Enter a short sentence to test AI custom processing'
+                  : 'Enter a short sentence to test AI translation'
             }
             className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
@@ -94,10 +101,30 @@ export function ProjectAIPane({ ai, projectType = 'translation' }: ProjectAIPane
             Test Prompt
           </button>
         </div>
+        <label className="block mt-2 text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
+          Test Context (Optional)
+        </label>
+        <input
+          type="text"
+          value={ai.testContext}
+          onChange={(event) => ai.setTestContext(event.target.value)}
+          placeholder={
+            isReviewProject
+              ? 'Optional source-language context for review'
+              : isCustomProject
+                ? 'Optional context for custom processing'
+                : 'Optional translation context'
+          }
+          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
         {ai.testResult && (
           <div className="mt-2">
             <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
-              {isReviewProject ? 'Reviewed Text' : 'Translated Text'}
+              {isReviewProject
+                ? 'Reviewed Text'
+                : isCustomProject
+                  ? 'Processed Text'
+                  : 'Translated Text'}
             </div>
             <div className="text-xs text-gray-600 bg-white border border-gray-200 rounded-lg px-3 py-2">{ai.testResult}</div>
           </div>

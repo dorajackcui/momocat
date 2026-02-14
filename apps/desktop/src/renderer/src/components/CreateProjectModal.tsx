@@ -60,7 +60,7 @@ export function CreateProjectModal({ isOpen, onClose, onConfirm, loading }: Crea
             <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
               Project Type
             </label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <button
                 type="button"
                 onClick={() => setProjectType('translation')}
@@ -82,6 +82,17 @@ export function CreateProjectModal({ isOpen, onClose, onConfirm, loading }: Crea
                 }`}
               >
                 Review
+              </button>
+              <button
+                type="button"
+                onClick={() => setProjectType('custom')}
+                className={`px-3 py-2 rounded-lg border text-sm font-bold transition-colors ${
+                  projectType === 'custom'
+                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                    : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                Custom
               </button>
             </div>
           </div>

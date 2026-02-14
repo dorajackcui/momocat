@@ -29,6 +29,12 @@ describe('CATDatabase', () => {
     expect(project?.projectType).toBe('review');
   });
 
+  it('should persist custom project type', () => {
+    const projectId = db.createProject('Custom Project', 'en-US', 'zh-CN', 'custom');
+    const project = db.getProject(projectId);
+    expect(project?.projectType).toBe('custom');
+  });
+
   it('should list projects with correct stats', () => {
     db.createProject('P1', 'en', 'zh');
     db.createProject('P2', 'en', 'ja');
@@ -178,6 +184,18 @@ describe('CATDatabase', () => {
       expect(mounted[0].type).toBe('working');
       expect(mounted[0].name).toBe('Auto TM Project (Working TM)');
       expect(mounted[0].permission).toBe('readwrite');
+    });
+
+    it('should not auto-create Working TM for review projects', () => {
+      const projectId = db.createProject('Review Auto TM Project', 'en', 'zh', 'review');
+      const mounted = db.getProjectMountedTMs(projectId);
+      expect(mounted).toHaveLength(0);
+    });
+
+    it('should not auto-create Working TM for custom projects', () => {
+      const projectId = db.createProject('Custom Auto TM Project', 'en', 'zh', 'custom');
+      const mounted = db.getProjectMountedTMs(projectId);
+      expect(mounted).toHaveLength(0);
     });
 
     it('should allow creating and mounting a Main TM', () => {

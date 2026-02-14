@@ -81,10 +81,16 @@ export function Dashboard({
                       className={`px-2 py-0.5 rounded font-bold ${
                         project.projectType === 'review'
                           ? 'bg-amber-50 text-amber-700'
+                          : project.projectType === 'custom'
+                            ? 'bg-emerald-50 text-emerald-700'
                           : 'bg-slate-100 text-slate-600'
                       }`}
                     >
-                      {project.projectType === 'review' ? 'Review' : 'Translation'}
+                      {project.projectType === 'review'
+                        ? 'Review'
+                        : project.projectType === 'custom'
+                          ? 'Custom'
+                          : 'Translation'}
                     </span>
                   </div>
                 </div>

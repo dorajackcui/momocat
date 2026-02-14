@@ -263,13 +263,13 @@ export const EditorRow: React.FC<EditorRowProps> = ({
     () => buildHighlightChunks(draftText, targetHighlightQuery, highlightMode),
     [draftText, targetHighlightQuery, highlightMode],
   );
-  const showReadonlyHighlightOverlay = !isActive && targetHighlightQuery.trim().length > 0;
+  const showTargetHighlightOverlay = targetHighlightQuery.trim().length > 0;
 
   const renderChunks = useCallback(
     (chunks: ReturnType<typeof buildHighlightChunks>) =>
       chunks.map((chunk, index) =>
         chunk.isMatch ? (
-          <mark key={index} className="bg-yellow-200/80 text-inherit rounded-[2px] px-[1px]">
+          <mark key={index} className="bg-yellow-200/80 text-inherit rounded-[2px]">
             {chunk.text}
           </mark>
         ) : (
@@ -295,7 +295,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
         onMouseEnter={() => setIsSourceHovered(true)}
         onMouseLeave={() => setIsSourceHovered(false)}
       >
-        <div className="w-full min-h-[44px] px-1 pr-3 py-1 text-[14px] text-gray-700 leading-relaxed whitespace-pre-wrap break-words select-text">
+        <div className="w-full min-h-[44px] px-1 pr-3 py-1 text-[14px] font-sans text-gray-700 leading-relaxed whitespace-pre-wrap break-words select-text">
           {renderChunks(sourceHighlightChunks)}
         </div>
         {isSourceHovered && (
@@ -343,15 +343,15 @@ export const EditorRow: React.FC<EditorRowProps> = ({
           onKeyDown={handleTargetKeyDown}
           onDoubleClick={(e) => e.currentTarget.select()}
           spellCheck={false}
-          className={`relative z-10 w-full min-h-[44px] px-3 py-3 text-[14px] leading-relaxed bg-transparent outline-none resize-none overflow-hidden whitespace-pre-wrap break-words ${
-            showReadonlyHighlightOverlay ? 'text-transparent caret-transparent' : 'text-gray-800'
-          } ${!isActive ? 'pointer-events-none' : ''} ${
-            !isActive || showReadonlyHighlightOverlay ? 'caret-transparent' : ''
+          className={`relative z-10 w-full min-h-[44px] px-3 py-3 text-[14px] font-sans leading-relaxed bg-transparent outline-none resize-none overflow-hidden whitespace-pre-wrap break-words text-gray-800 ${
+            !isActive ? 'pointer-events-none' : ''
+          } ${
+            !isActive ? 'caret-transparent' : ''
           }`}
         />
 
-        {showReadonlyHighlightOverlay && (
-          <div className="pointer-events-none absolute inset-0 px-3 py-3 text-[14px] text-gray-800 leading-relaxed whitespace-pre-wrap break-words">
+        {showTargetHighlightOverlay && (
+          <div className="pointer-events-none absolute inset-0 px-3 py-3 text-[14px] font-sans text-transparent leading-relaxed whitespace-pre-wrap break-words select-none">
             {renderChunks(targetHighlightChunks)}
           </div>
         )}

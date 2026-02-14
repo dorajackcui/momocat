@@ -19,7 +19,7 @@ export function createAIApi(ipcRenderer: IpcRendererLike): DesktopApiSlice<AIApi
       ipcRenderer.invoke(IPC_CHANNELS.ai.testConnection, apiKey) as ReturnType<DesktopApi['testAIConnection']>,
     aiTranslateFile: (fileId) =>
       ipcRenderer.invoke(IPC_CHANNELS.ai.translateFile, fileId) as ReturnType<DesktopApi['aiTranslateFile']>,
-    aiTestTranslate: (projectId, sourceText) =>
-      ipcRenderer.invoke(IPC_CHANNELS.ai.testTranslate, projectId, sourceText) as ReturnType<DesktopApi['aiTestTranslate']>
+    aiTestTranslate: (projectId, sourceText, contextText) =>
+      ipcRenderer.invoke(IPC_CHANNELS.ai.testTranslate, projectId, sourceText, contextText) as ReturnType<DesktopApi['aiTestTranslate']>
   };
 }

@@ -222,7 +222,11 @@ export interface DesktopApi {
   clearAIKey: () => Promise<void>;
   testAIConnection: (apiKey?: string) => Promise<{ ok: true }>;
   aiTranslateFile: (fileId: number) => Promise<string>;
-  aiTestTranslate: (projectId: number, sourceText: string) => Promise<AITestTranslateResult>;
+  aiTestTranslate: (
+    projectId: number,
+    sourceText: string,
+    contextText?: string,
+  ) => Promise<AITestTranslateResult>;
 
   openFileDialog: (filters: DialogFileFilter[]) => Promise<string | null>;
   saveFileDialog: (defaultPath: string, filters: DialogFileFilter[]) => Promise<string | null>;

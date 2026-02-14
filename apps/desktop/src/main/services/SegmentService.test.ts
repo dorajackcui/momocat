@@ -50,6 +50,10 @@ class FailingPropagationSegmentRepository implements SegmentRepository {
     return this.delegate.getProjectIdByFileId(fileId);
   }
 
+  getProjectTypeByFileId(fileId: number) {
+    return this.delegate.getProjectTypeByFileId(fileId);
+  }
+
   getProjectSegmentsByHash(projectId: number, srcHash: string): Segment[] {
     return this.delegate.getProjectSegmentsByHash(projectId, srcHash);
   }
@@ -161,5 +165,71 @@ describe('SegmentService transactional confirmation flow', () => {
     expect(tmEntry).toBeUndefined();
 
     expect(eventSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not upsert TM or propagate on confirm for review projects', async () => {
+    db = new CATDatabase(':memory:');
+    const projectId = db.createProject('Review Tx', 'en', 'zh', 'review');
+    const fileId = db.createFile(projectId, 'review.xlsx');
+    const srcHash = 'hash-review';
+
+    db.bulkInsertSegments([
+      buildSegment('seg-1', fileId, 0, srcHash),
+      buildSegment('seg-2', fileId, 1, srcHash),
+    ]);
+
+    const projectRepo = new SqliteProjectRepository(db);
+    const segmentRepo = new SqliteSegmentRepository(db);
+    const tmRepo = new SqliteTMRepository(db);
+    const tx = new SqliteTransactionManager(db);
+    const tmService = new TMService(projectRepo, tmRepo);
+    const service = new SegmentService(segmentRepo, tmService, tx);
+
+    const targetTokens: Token[] = [{ type: 'text', content: '审校后文本' }];
+    const result = await service.updateSegment('seg-1', targetTokens, 'confirmed');
+    expect(result.propagatedIds).toEqual([]);
+
+    const source = db.getSegment('seg-1');
+    const repeated = db.getSegment('seg-2');
+    expect(source?.status).toBe('confirmed');
+    expect(toText(source?.targetTokens ?? [])).toBe('审校后文本');
+    expect(repeated?.status).toBe('new');
+    expect(repeated?.targetTokens).toEqual([]);
+
+    const mountedTMs = db.getProjectMountedTMs(projectId);
+    expect(mountedTMs).toHaveLength(0);
+  });
+
+  it('does not upsert TM or propagate on confirm for custom projects', async () => {
+    db = new CATDatabase(':memory:');
+    const projectId = db.createProject('Custom Tx', 'en', 'zh', 'custom');
+    const fileId = db.createFile(projectId, 'custom.xlsx');
+    const srcHash = 'hash-custom';
+
+    db.bulkInsertSegments([
+      buildSegment('seg-1', fileId, 0, srcHash),
+      buildSegment('seg-2', fileId, 1, srcHash),
+    ]);
+
+    const projectRepo = new SqliteProjectRepository(db);
+    const segmentRepo = new SqliteSegmentRepository(db);
+    const tmRepo = new SqliteTMRepository(db);
+    const tx = new SqliteTransactionManager(db);
+    const tmService = new TMService(projectRepo, tmRepo);
+    const service = new SegmentService(segmentRepo, tmService, tx);
+
+    const targetTokens: Token[] = [{ type: 'text', content: 'processed text' }];
+    const result = await service.updateSegment('seg-1', targetTokens, 'confirmed');
+    expect(result.propagatedIds).toEqual([]);
+
+    const source = db.getSegment('seg-1');
+    const repeated = db.getSegment('seg-2');
+    expect(source?.status).toBe('confirmed');
+    expect(toText(source?.targetTokens ?? [])).toBe('processed text');
+    expect(repeated?.status).toBe('new');
+    expect(repeated?.targetTokens).toEqual([]);
+
+    const mountedTMs = db.getProjectMountedTMs(projectId);
+    expect(mountedTMs).toHaveLength(0);
   });
 });

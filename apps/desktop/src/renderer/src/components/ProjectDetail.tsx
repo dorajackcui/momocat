@@ -256,10 +256,16 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
                   className={`px-1.5 py-0.5 rounded font-semibold ${
                     project.projectType === 'review'
                       ? 'bg-amber-100 text-amber-700'
+                      : project.projectType === 'custom'
+                        ? 'bg-emerald-100 text-emerald-700'
                       : 'bg-blue-100 text-blue-700'
                   }`}
                 >
-                  {project.projectType === 'review' ? 'Review' : 'Translation'}
+                  {project.projectType === 'review'
+                    ? 'Review'
+                    : project.projectType === 'custom'
+                      ? 'Custom'
+                      : 'Translation'}
                 </span>
               </div>
             )}

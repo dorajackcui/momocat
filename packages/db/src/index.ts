@@ -52,8 +52,10 @@ export class CATDatabase {
   ): number {
     const projectId = this.projectRepo.createProject(name, srcLang, tgtLang, projectType);
 
-    const workingTmId = this.tmRepo.createTM(`${name} (Working TM)`, srcLang, tgtLang, 'working');
-    this.tmRepo.mountTMToProject(projectId, workingTmId, 0, 'readwrite');
+    if (projectType === 'translation') {
+      const workingTmId = this.tmRepo.createTM(`${name} (Working TM)`, srcLang, tgtLang, 'working');
+      this.tmRepo.mountTMToProject(projectId, workingTmId, 0, 'readwrite');
+    }
 
     return projectId;
   }
@@ -128,6 +130,10 @@ export class CATDatabase {
 
   public getProjectIdByFileId(fileId: number): number | undefined {
     return this.projectRepo.getProjectIdByFileId(fileId);
+  }
+
+  public getProjectTypeByFileId(fileId: number): ProjectType | undefined {
+    return this.projectRepo.getProjectTypeByFileId(fileId);
   }
 
   public updateSegmentTarget(segmentId: string, targetTokens: Token[], status: SegmentStatus) {
