@@ -16,7 +16,7 @@ export function ProjectMatchModal({
   selectedTmId,
   onSelectedTmIdChange,
   onCancel,
-  onConfirm
+  onConfirm,
 }: ProjectMatchModalProps) {
   if (!file) return null;
 
@@ -33,7 +33,7 @@ export function ProjectMatchModal({
             onChange={(event) => onSelectedTmIdChange(event.target.value)}
             className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm outline-none"
           >
-            {mountedTMs.map(tm => (
+            {mountedTMs.map((tm) => (
               <option key={tm.id} value={tm.id}>
                 {tm.name} ({tm.type})
               </option>
@@ -41,8 +41,8 @@ export function ProjectMatchModal({
           </select>
         </div>
         <p className="mt-2 text-[11px] text-gray-400">
-          Current behavior only applies exact 100% matches, skips already confirmed segments, and sets applied matches to
-          confirmed.
+          Current behavior only applies exact 100% matches, skips already confirmed segments, and
+          sets applied matches to confirmed.
         </p>
         <div className="mt-5 flex justify-end gap-2">
           <button

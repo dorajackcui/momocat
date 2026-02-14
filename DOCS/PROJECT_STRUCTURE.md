@@ -1,4 +1,4 @@
-# 项目结构说明（更新于 2026-02-10）
+# 项目结构说明（更新于 2026-02-14）
 
 本项目为 npm workspaces Monorepo，核心分为 `apps/`（应用）和 `packages/`（共享库）。
 
@@ -66,7 +66,7 @@ simple-cat-tool/
 ## `packages/db`（数据库层）
 
 - `index.ts`: `CATDatabase` 聚合入口
-- `migration/runMigrations.ts`: schema 迁移（当前至 v10）
+- `migration/runMigrations.ts`: schema 迁移（当前至 v11）
 - `repos/*`: Project/Segment/TM/TB/Settings 仓储实现
 
 ## 运行数据与构建

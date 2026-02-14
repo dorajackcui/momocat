@@ -262,7 +262,11 @@ export function useProjectAI({
       setTestUserMessage(null);
       setTestRawResponse(null);
 
-      const result = await apiClient.aiTestTranslate(project.id, source, testContext.trim() || undefined);
+      const result = await apiClient.aiTestTranslate(
+        project.id,
+        source,
+        testContext.trim() || undefined,
+      );
       setTestResult(result.translatedText || null);
       setTestPromptUsed(result.promptUsed);
       setTestUserMessage(result.userMessage);
@@ -278,27 +282,34 @@ export function useProjectAI({
     }
   }, [project, testContext, testSource]);
 
-  const startAITranslateFile = useCallback(async (fileId: number, fileName: string) => {
-    const projectType = project?.projectType || 'translation';
-    const actionLabel =
-      projectType === 'review' ? 'review' : projectType === 'custom' ? 'processing' : 'translation';
-    const targetLabel = projectType === 'custom' ? 'output' : 'target';
-    const confirmed = await feedbackService.confirm(
-      `Run AI ${actionLabel} for "${fileName}"? This will fill empty ${targetLabel} segments only.`,
-    );
-    if (!confirmed) return;
-    try {
-      const jobId = await apiClient.aiTranslateFile(fileId);
-      setAiJobs((prev) => ({
-        ...prev,
-        [jobId]: { jobId, fileId, progress: 0, status: 'running', message: 'Queued' },
-      }));
-      setFileJobIndex((prev) => ({ ...prev, [fileId]: jobId }));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      feedbackService.error(`Failed to start AI ${actionLabel}: ${message}`);
-    }
-  }, [project?.projectType]);
+  const startAITranslateFile = useCallback(
+    async (fileId: number, fileName: string) => {
+      const projectType = project?.projectType || 'translation';
+      const actionLabel =
+        projectType === 'review'
+          ? 'review'
+          : projectType === 'custom'
+            ? 'processing'
+            : 'translation';
+      const targetLabel = projectType === 'custom' ? 'output' : 'target';
+      const confirmed = await feedbackService.confirm(
+        `Run AI ${actionLabel} for "${fileName}"? This will fill empty ${targetLabel} segments only.`,
+      );
+      if (!confirmed) return;
+      try {
+        const jobId = await apiClient.aiTranslateFile(fileId);
+        setAiJobs((prev) => ({
+          ...prev,
+          [jobId]: { jobId, fileId, progress: 0, status: 'running', message: 'Queued' },
+        }));
+        setFileJobIndex((prev) => ({ ...prev, [fileId]: jobId }));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        feedbackService.error(`Failed to start AI ${actionLabel}: ${message}`);
+      }
+    },
+    [project?.projectType],
+  );
 
   const getFileJob = useCallback(
     (fileId: number): TrackedAIJob | null => {

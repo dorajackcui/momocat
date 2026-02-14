@@ -1,41 +1,51 @@
 # DOCS 文档导航
 
-最后更新：2026-02-10
+最后更新：2026-02-14
 
-本目录已按“当前有效 / 历史归档”做清理，避免后续改造时被旧信息误导。
+本目录已按“规范 / 状态 / 导航 / 历史”分层。默认以代码为准，文档用于快速定位、统一约束、同步进度。
+
+## 单入口（Handoff）
+
+新 agent / 新会话统一从这里开始：
+
+1. `DOCS/HANDOFF.md`
+
+该文件包含完整阅读顺序、冲突优先级、任务寻路和收工更新要求。
 
 ## 当前有效（Active）
 
+- `DOCS/HANDOFF.md`
+  - 单入口交接系统（自动寻路）
+- `DOCS/CURRENT_STATUS.md`
+  - 当前阶段、门禁结果、阻塞项、近期优先级（实时执行面板）
 - `DOCS/PROJECT_MAP_QUICKSTART.md`
-  - 新人/回坑快速定位地图（按任务找文件 + 真实调用链路）
-- `DOCS/REFACTOR_PROGRESS_TRACKER_2026-02-10.md`
-  - 改造总看板（优先级、待办、DoD、风险、每日进度）
-- `DOCS/REMEDIATION_PLAN_2026-02-10.md`
-  - 本轮 review 整改清单（按 P1/P2/P3 的执行步骤与验收标准）
-- `DOCS/ROADMAP.md`
-  - 中短期路线图（与当前改造状态同步）
-- `DOCS/PROJECT_STRUCTURE.md`
-  - 当前目录结构与分层职责
-- `DOCS/DATABASE_SCHEMA.md`
-  - 当前数据库 Schema（以 `packages/db/src/migration/runMigrations.ts` 为准）
+  - 新人/回坑快速定位（按任务找文件 + 关键调用链）
 - `DOCS/DEVELOPMENT_GUIDE.md`
-  - 当前开发规范（事务、类型边界、测试要求）
+  - 功能开发硬性准则（由重构期 gate 沉淀）
+- `DOCS/PROJECT_STRUCTURE.md`
+  - Monorepo 结构与分层职责
+- `DOCS/DATABASE_SCHEMA.md`
+  - 当前数据库结构（以 `packages/db/src/migration/runMigrations.ts` 为准）
 - `DOCS/ARCHITECTURE.md`
-  - 架构蓝图与长期方向（高层设计）
-- `DOCS/REVIEW_MODULARIZATION_2026-02-09.md`
-  - 审查快照（历史评估基线，非实时状态）
+  - 当前实现边界 + 中长期演进方向
+- `DOCS/ROADMAP.md`
+  - 当前版本阶段目标与里程碑
+- `DOCS/architecture/GATE05_GUARDRAILS.json`
+  - 架构守卫配置（由 `npm run gate:arch` 校验）
 
 ## 历史归档（Archive）
 
+以下文档保留历史背景，不作为当前规范：
+
 - `DOCS/archive/BUG_FIX_EDITOR_WHITE_SCREEN.md`
 - `DOCS/archive/MISTAKE_NOTEBOOK.md`
-
-这些文档保留排障历史，不作为当前设计或流程规范。
+- `DOCS/archive/PRE_FEATURE_GATES_2026-02-11.md`
+- `DOCS/archive/REFACTOR_PROGRESS_TRACKER_2026-02-10.md`
+- `DOCS/archive/REMEDIATION_PLAN_2026-02-10.md`
+- `DOCS/archive/REVIEW_MODULARIZATION_2026-02-09.md`
 
 ## 使用建议
 
-1. 新人或回坑先看 `PROJECT_MAP_QUICKSTART.md`，先建立方向感再进代码。
-2. 日常开发优先看 `REFACTOR_PROGRESS_TRACKER_2026-02-10.md`。
-3. 实现前看 `DEVELOPMENT_GUIDE.md`，避免新增技术债。
-4. 结构或边界有疑问时看 `PROJECT_STRUCTURE.md` + `DATABASE_SCHEMA.md`。
-5. 每次里程碑推进后同步更新 Tracker 和 Roadmap。
+1. 统一先读 `DOCS/HANDOFF.md`。
+2. 执行细节按 `HANDOFF` 分发的顺序读取。
+3. 历史背景只在需要时查看 `DOCS/archive/*`。

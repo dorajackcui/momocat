@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../services/apiClient', () => ({
-  apiClient: {}
+  apiClient: {},
 }));
 import {
   buildAITestMeta,
   deriveProjectAIFlags,
   normalizeTemperatureValue,
-  parseTemperatureInput
+  parseTemperatureInput,
 } from './useProjectAI';
 
 describe('useProjectAI behavior helpers', () => {
@@ -28,7 +28,7 @@ describe('useProjectAI behavior helpers', () => {
       testMeta: null,
       testUserMessage: null,
       testPromptUsed: null,
-      testRawResponse: null
+      testRawResponse: null,
     });
     expect(clean.hasUnsavedPromptChanges).toBe(false);
     expect(clean.hasInvalidTemperature).toBe(false);
@@ -41,7 +41,7 @@ describe('useProjectAI behavior helpers', () => {
       testMeta: null,
       testUserMessage: null,
       testPromptUsed: null,
-      testRawResponse: null
+      testRawResponse: null,
     });
     expect(dirty.hasUnsavedPromptChanges).toBe(true);
     expect(dirty.hasInvalidTemperature).toBe(false);
@@ -56,7 +56,7 @@ describe('useProjectAI behavior helpers', () => {
       testMeta: null,
       testUserMessage: 'message',
       testPromptUsed: null,
-      testRawResponse: null
+      testRawResponse: null,
     });
 
     expect(flags.hasInvalidTemperature).toBe(true);
@@ -70,11 +70,11 @@ describe('useProjectAI behavior helpers', () => {
       requestId: 'req_123',
       model: 'gpt-4o-mini',
       endpoint: '/v1/chat/completions',
-      ok: false
+      ok: false,
     });
 
     expect(meta).toBe(
-      'status: 200 • requestId: req_123 • model: gpt-4o-mini • endpoint: /v1/chat/completions • ok: false'
+      'status: 200 • requestId: req_123 • model: gpt-4o-mini • endpoint: /v1/chat/completions • ok: false',
     );
   });
 });

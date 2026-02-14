@@ -7,7 +7,12 @@ interface DashboardProps {
   projects: ProjectWithStats[];
   loading?: boolean;
   onOpenProject: (id: number) => void;
-  onCreateProject: (name: string, srcLang: string, tgtLang: string, projectType: ProjectType) => void;
+  onCreateProject: (
+    name: string,
+    srcLang: string,
+    tgtLang: string,
+    projectType: ProjectType,
+  ) => void;
   onDeleteProject: (id: number) => void;
 }
 
@@ -32,13 +37,13 @@ export function Dashboard({
 
   return (
     <div className="p-10 max-w-[1000px] mx-auto h-full overflow-y-auto relative">
-      <CreateProjectModal 
+      <CreateProjectModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onConfirm={handleConfirmCreate}
         loading={!!loading}
       />
-      
+
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold text-gray-800">Projects</h1>
         <button
@@ -64,10 +69,7 @@ export function Dashboard({
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1 min-w-0">
-                  <h3
-                    className="text-lg font-bold text-gray-900 truncate"
-                    title={project.name}
-                  >
+                  <h3 className="text-lg font-bold text-gray-900 truncate" title={project.name}>
                     {project.name}
                   </h3>
                   <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
@@ -83,7 +85,7 @@ export function Dashboard({
                           ? 'bg-amber-50 text-amber-700'
                           : project.projectType === 'custom'
                             ? 'bg-emerald-50 text-emerald-700'
-                          : 'bg-slate-100 text-slate-600'
+                            : 'bg-slate-100 text-slate-600'
                       }`}
                     >
                       {project.projectType === 'review'
@@ -103,7 +105,12 @@ export function Dashboard({
                   title="Delete Project"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
                   </svg>
                 </button>
               </div>

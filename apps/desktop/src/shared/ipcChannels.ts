@@ -7,17 +7,17 @@ export const IPC_CHANNELS = {
     updateAISettings: 'project-update-ai-settings',
     remove: 'project-delete',
     getFiles: 'project-get-files',
-    addFile: 'project-add-file'
+    addFile: 'project-add-file',
   },
   file: {
     get: 'file-get',
     remove: 'file-delete',
     getSegments: 'file-get-segments',
     getPreview: 'file-get-preview',
-    export: 'file-export'
+    export: 'file-export',
   },
   segment: {
-    update: 'segment-update'
+    update: 'segment-update',
   },
   tm: {
     get100Match: 'tm-get-100-match',
@@ -32,7 +32,7 @@ export const IPC_CHANNELS = {
     commitFile: 'tm-commit-file',
     matchFile: 'tm-match-file',
     importPreview: 'tm-import-preview',
-    importExecute: 'tm-import-execute'
+    importExecute: 'tm-import-execute',
   },
   tb: {
     getMatches: 'tb-get-matches',
@@ -43,7 +43,7 @@ export const IPC_CHANNELS = {
     mount: 'tb-mount',
     unmount: 'tb-unmount',
     importPreview: 'tb-import-preview',
-    importExecute: 'tb-import-execute'
+    importExecute: 'tb-import-execute',
   },
   ai: {
     getSettings: 'ai-settings-get',
@@ -51,17 +51,17 @@ export const IPC_CHANNELS = {
     clearKey: 'ai-settings-clear',
     testConnection: 'ai-test-connection',
     translateFile: 'ai-translate-file',
-    testTranslate: 'ai-test-translate'
+    testTranslate: 'ai-test-translate',
   },
   dialog: {
     openFile: 'dialog-open-file',
-    saveFile: 'dialog-save-file'
+    saveFile: 'dialog-save-file',
   },
   events: {
     segmentsUpdated: 'segments-updated',
     appProgress: 'app-progress',
-    jobProgress: 'job-progress'
-  }
+    jobProgress: 'job-progress',
+  },
 } as const;
 
 export type IpcChannelMap = typeof IPC_CHANNELS;

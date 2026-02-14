@@ -306,7 +306,9 @@ export class AIModule {
       validationFeedback: params.validationFeedback,
     });
 
-    params.debug && (params.debug.model = params.model);
+    if (params.debug) {
+      params.debug.model = params.model;
+    }
 
     const response = await this.transport.chatCompletions({
       apiKey: params.apiKey,
@@ -363,14 +365,19 @@ export class AIModule {
   private countFileSegments(fileId: number): number {
     let count = 0;
     let offset = 0;
+    let hasMore = true;
 
-    while (true) {
+    while (hasMore) {
       const page = this.segmentRepo.getSegmentsPage(fileId, offset, AIModule.SEGMENT_PAGE_SIZE);
-      if (page.length === 0) return count;
+      if (page.length === 0) {
+        break;
+      }
       count += page.length;
-      if (page.length < AIModule.SEGMENT_PAGE_SIZE) return count;
+      hasMore = page.length === AIModule.SEGMENT_PAGE_SIZE;
       offset += AIModule.SEGMENT_PAGE_SIZE;
     }
+
+    return count;
   }
 
   private countTranslatableSegments(fileId: number): number {

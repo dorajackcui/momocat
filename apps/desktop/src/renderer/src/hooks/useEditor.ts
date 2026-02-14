@@ -1,5 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Segment, SegmentStatus, TBMatch, Token, parseEditorTextToTokens, serializeTokensToEditorText, TagValidator } from '@cat/core';
+import {
+  Segment,
+  SegmentStatus,
+  TBMatch,
+  Token,
+  parseEditorTextToTokens,
+  serializeTokensToEditorText,
+  TagValidator,
+} from '@cat/core';
 import { apiClient } from '../services/apiClient';
 import type { TMMatch } from '../../../shared/ipc';
 
@@ -15,7 +23,11 @@ interface PersistSegmentUpdateInput {
 }
 
 interface SegmentPersistorDeps {
-  updateSegment: (segmentId: string, targetTokens: Token[], status: SegmentStatus) => Promise<unknown>;
+  updateSegment: (
+    segmentId: string,
+    targetTokens: Token[],
+    status: SegmentStatus,
+  ) => Promise<unknown>;
   rollbackSegment: (segmentId: string, previousSegment: Segment) => void;
   setSegmentSaveError: (segmentId: string, message: string) => void;
   clearSegmentSaveError: (segmentId: string) => void;
@@ -25,6 +37,14 @@ interface SegmentPersistor {
   persistSegmentUpdate: (input: PersistSegmentUpdateInput) => Promise<void>;
   clear: () => void;
 }
+
+const VALID_SEGMENT_STATUSES: Set<SegmentStatus> = new Set([
+  'new',
+  'draft',
+  'translated',
+  'confirmed',
+  'reviewed',
+]);
 
 export function createSegmentPersistor(deps: SegmentPersistorDeps): SegmentPersistor {
   const latestRequestVersionBySegment = new Map<string, number>();
@@ -52,20 +72,13 @@ export function createSegmentPersistor(deps: SegmentPersistorDeps): SegmentPersi
     },
     clear: () => {
       latestRequestVersionBySegment.clear();
-    }
+    },
   };
 }
 
 export function useEditor({ activeFileId }: UseEditorProps) {
   const SEGMENT_PAGE_SIZE = 1000;
   const MATCH_REQUEST_DEBOUNCE_MS = 150;
-  const VALID_SEGMENT_STATUSES: Set<SegmentStatus> = new Set([
-    'new',
-    'draft',
-    'translated',
-    'confirmed',
-    'reviewed',
-  ]);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [projectId, setProjectId] = useState<number | null>(null);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
@@ -78,46 +91,47 @@ export function useEditor({ activeFileId }: UseEditorProps) {
   const termRequestSeqRef = useRef(0);
   const segmentPersistorRef = useRef<SegmentPersistor | null>(null);
 
-  const isTokenLike = (value: unknown): value is Token => {
+  const isTokenLike = useCallback((value: unknown): value is Token => {
     if (!value || typeof value !== 'object') return false;
     const tokenCandidate = value as { type?: unknown; content?: unknown };
     return typeof tokenCandidate.type === 'string' && typeof tokenCandidate.content === 'string';
-  };
+  }, []);
 
-  const normalizeTokens = (tokens: unknown, context: string): Token[] => {
-    if (!Array.isArray(tokens)) {
-      console.warn(`[useEditor] ${context} tokens not array`, tokens);
-      return [];
-    }
-    const cleaned = tokens.filter(isTokenLike);
-    if (cleaned.length !== tokens.length) {
-      console.warn(`[useEditor] ${context} tokens contained invalid entries`, tokens);
-    }
-    return cleaned;
-  };
+  const normalizeTokens = useCallback(
+    (tokens: unknown, context: string): Token[] => {
+      if (!Array.isArray(tokens)) {
+        console.warn(`[useEditor] ${context} tokens not array`, tokens);
+        return [];
+      }
+      const cleaned = tokens.filter(isTokenLike);
+      if (cleaned.length !== tokens.length) {
+        console.warn(`[useEditor] ${context} tokens contained invalid entries`, tokens);
+      }
+      return cleaned;
+    },
+    [isTokenLike],
+  );
 
-  const normalizeStatus = (status: unknown, targetTokens: Token[]): SegmentStatus => {
+  const normalizeStatus = useCallback((status: unknown, targetTokens: Token[]): SegmentStatus => {
     if (typeof status === 'string' && VALID_SEGMENT_STATUSES.has(status as SegmentStatus)) {
       return status as SegmentStatus;
     }
-    const hasTargetContent = targetTokens.some(
-      (token) => token.content.trim().length > 0,
-    );
+    const hasTargetContent = targetTokens.some((token) => token.content.trim().length > 0);
     return hasTargetContent ? 'draft' : 'new';
-  };
+  }, []);
 
   const setSegmentSaveError = useCallback((segmentId: string, message: string) => {
-    setSegmentSaveErrors(prev => {
+    setSegmentSaveErrors((prev) => {
       if (prev[segmentId] === message) return prev;
       return {
         ...prev,
-        [segmentId]: message
+        [segmentId]: message,
       };
     });
   }, []);
 
   const clearSegmentSaveError = useCallback((segmentId: string) => {
-    setSegmentSaveErrors(prev => {
+    setSegmentSaveErrors((prev) => {
       if (!prev[segmentId]) return prev;
       const next = { ...prev };
       delete next[segmentId];
@@ -126,22 +140,23 @@ export function useEditor({ activeFileId }: UseEditorProps) {
   }, []);
 
   const rollbackSegment = useCallback((segmentId: string, previousSegment: Segment) => {
-    setSegments(prev =>
-      prev.map(seg => {
+    setSegments((prev) =>
+      prev.map((seg) => {
         if (seg.segmentId !== segmentId) return seg;
         return {
-          ...previousSegment
+          ...previousSegment,
         };
-      })
+      }),
     );
   }, []);
 
   if (!segmentPersistorRef.current) {
     segmentPersistorRef.current = createSegmentPersistor({
-      updateSegment: (segmentId, targetTokens, status) => apiClient.updateSegment(segmentId, targetTokens, status),
+      updateSegment: (segmentId, targetTokens, status) =>
+        apiClient.updateSegment(segmentId, targetTokens, status),
       rollbackSegment,
       setSegmentSaveError,
-      clearSegmentSaveError
+      clearSegmentSaveError,
     });
   }
 
@@ -165,12 +180,13 @@ export function useEditor({ activeFileId }: UseEditorProps) {
 
       const segmentsArray: Segment[] = [];
       let offset = 0;
-      while (true) {
+      let hasMore = true;
+      while (hasMore) {
         const page = await apiClient.getSegments(activeFileId, offset, SEGMENT_PAGE_SIZE);
         const pageArray = Array.isArray(page) ? page : [];
         if (pageArray.length === 0) break;
         segmentsArray.push(...pageArray);
-        if (pageArray.length < SEGMENT_PAGE_SIZE) break;
+        hasMore = pageArray.length === SEGMENT_PAGE_SIZE;
         offset += SEGMENT_PAGE_SIZE;
       }
 
@@ -183,7 +199,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
           targetTokens,
           status: normalizeStatus(seg.status, targetTokens),
           qaIssues: undefined,
-          autoFixSuggestions: undefined
+          autoFixSuggestions: undefined,
         };
       });
       setSegments(normalized);
@@ -198,7 +214,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
     } finally {
       setLoading(false);
     }
-  }, [activeFileId]);
+  }, [activeFileId, normalizeStatus, normalizeTokens]);
 
   useEffect(() => {
     loadEditorData();
@@ -207,7 +223,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
   // Listen for real-time updates from backend (Propagation, etc.)
   useEffect(() => {
     const unsubscribe = apiClient.onSegmentsUpdated((data) => {
-      setSegmentSaveErrors(prev => {
+      setSegmentSaveErrors((prev) => {
         let changed = false;
         const next = { ...prev };
         if (next[data.segmentId]) {
@@ -223,32 +239,38 @@ export function useEditor({ activeFileId }: UseEditorProps) {
         return changed ? next : prev;
       });
 
-      setSegments(prev => {
+      setSegments((prev) => {
         let changed = false;
         const newSegments: Segment[] = prev.map((seg): Segment => {
           // 1. Is it the directly updated segment?
           if (seg.segmentId === data.segmentId) {
             changed = true;
-            const targetTokens = normalizeTokens(data.targetTokens, `segment ${seg.segmentId} target (update)`);
+            const targetTokens = normalizeTokens(
+              data.targetTokens,
+              `segment ${seg.segmentId} target (update)`,
+            );
             const nextStatus = normalizeStatus(data.status, targetTokens);
-            return { 
-              ...seg, 
+            return {
+              ...seg,
               targetTokens,
               status: nextStatus,
               qaIssues: nextStatus === 'confirmed' ? seg.qaIssues : undefined,
-              autoFixSuggestions: nextStatus === 'confirmed' ? seg.autoFixSuggestions : undefined
+              autoFixSuggestions: nextStatus === 'confirmed' ? seg.autoFixSuggestions : undefined,
             };
           }
           // 2. Is it a propagated segment?
           if (data.propagatedIds?.includes(seg.segmentId)) {
             changed = true;
-            const targetTokens = normalizeTokens(data.targetTokens, `segment ${seg.segmentId} target (propagation)`);
-            return { 
-              ...seg, 
+            const targetTokens = normalizeTokens(
+              data.targetTokens,
+              `segment ${seg.segmentId} target (propagation)`,
+            );
+            return {
+              ...seg,
               targetTokens,
               status: 'draft' as SegmentStatus,
               qaIssues: undefined,
-              autoFixSuggestions: undefined
+              autoFixSuggestions: undefined,
             };
           }
           return seg;
@@ -258,7 +280,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [normalizeStatus, normalizeTokens]);
 
   // Load TM Match for active segment
   useEffect(() => {
@@ -268,7 +290,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
       return;
     }
 
-    const segment = segments.find(s => s.segmentId === activeSegmentId);
+    const segment = segments.find((s) => s.segmentId === activeSegmentId);
     if (!segment) {
       matchRequestSeqRef.current += 1;
       setActiveMatches([]);
@@ -305,7 +327,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
       return;
     }
 
-    const segment = segments.find(s => s.segmentId === activeSegmentId);
+    const segment = segments.find((s) => s.segmentId === activeSegmentId);
     if (!segment) {
       termRequestSeqRef.current += 1;
       setActiveTerms([]);
@@ -342,13 +364,13 @@ export function useEditor({ activeFileId }: UseEditorProps) {
         nextSegment?: Segment;
       } = {};
 
-      setSegments(prev =>
+      setSegments((prev) =>
         prev.map((seg): Segment => {
           if (seg.segmentId !== segmentId) return seg;
           snapshot.previousSegment = seg;
           snapshot.nextSegment = updater(seg);
           return snapshot.nextSegment;
-        })
+        }),
       );
 
       const previousSegment = snapshot.previousSegment;
@@ -361,10 +383,10 @@ export function useEditor({ activeFileId }: UseEditorProps) {
         segmentId,
         targetTokens: nextSegment.targetTokens,
         status: nextSegment.status,
-        previousSegment
+        previousSegment,
       });
     },
-    []
+    [],
   );
 
   const handleTranslationChange = (segmentId: string, text: string) => {
@@ -378,7 +400,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
           targetTokens: tokens,
           status: nextStatus,
           qaIssues: undefined,
-          autoFixSuggestions: undefined
+          autoFixSuggestions: undefined,
         };
       });
     } catch (error) {
@@ -396,7 +418,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
       targetTokens: tokens,
       status: 'draft',
       qaIssues: undefined,
-      autoFixSuggestions: undefined
+      autoFixSuggestions: undefined,
     }));
   };
 
@@ -424,26 +446,28 @@ export function useEditor({ activeFileId }: UseEditorProps) {
         targetTokens: nextTokens,
         status: nextStatus,
         qaIssues: undefined,
-        autoFixSuggestions: undefined
+        autoFixSuggestions: undefined,
       };
     });
   };
 
   const confirmSegment = async (segmentId: string) => {
-    const segment = segments.find(s => s.segmentId === segmentId);
+    const segment = segments.find((s) => s.segmentId === segmentId);
     if (!segment) return;
 
     const validationResult = tagValidator.validate(segment.sourceTokens, segment.targetTokens);
-    const hasBlockingErrors = validationResult.issues.some(issue => issue.severity === 'error');
+    const hasBlockingErrors = validationResult.issues.some((issue) => issue.severity === 'error');
 
-    setSegments(prev => prev.map(seg => {
-      if (seg.segmentId !== segmentId) return seg;
-      return {
-        ...seg,
-        qaIssues: validationResult.issues,
-        autoFixSuggestions: validationResult.suggestions
-      };
-    }));
+    setSegments((prev) =>
+      prev.map((seg) => {
+        if (seg.segmentId !== segmentId) return seg;
+        return {
+          ...seg,
+          qaIssues: validationResult.issues,
+          autoFixSuggestions: validationResult.suggestions,
+        };
+      }),
+    );
 
     if (hasBlockingErrors) {
       return;
@@ -451,15 +475,15 @@ export function useEditor({ activeFileId }: UseEditorProps) {
 
     // We don't need to manually update state here anymore because the listener will handle it!
     await apiClient.updateSegment(segmentId, segment.targetTokens, 'confirmed');
-    
+
     // Jump to next
-    const currentIndex = segments.findIndex(s => s.segmentId === segmentId);
+    const currentIndex = segments.findIndex((s) => s.segmentId === segmentId);
     if (currentIndex < segments.length - 1) {
       setActiveSegmentId(segments[currentIndex + 1].segmentId);
     }
   };
 
-  const getActiveSegment = () => segments.find(s => s.segmentId === activeSegmentId);
+  const getActiveSegment = () => segments.find((s) => s.segmentId === activeSegmentId);
 
   return {
     segments,

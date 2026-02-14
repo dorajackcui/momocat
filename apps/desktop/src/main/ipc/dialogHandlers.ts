@@ -7,7 +7,7 @@ export function registerDialogHandlers({ ipcMain, dialog }: DialogHandlerDeps): 
     const [filters] = args as [DialogFileFilter[]];
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties: ['openFile'],
-      filters
+      filters,
     });
     return canceled ? null : filePaths[0];
   });
@@ -16,7 +16,7 @@ export function registerDialogHandlers({ ipcMain, dialog }: DialogHandlerDeps): 
     const [defaultPath, filters] = args as [string, DialogFileFilter[]];
     const { canceled, filePath } = await dialog.showSaveDialog({
       defaultPath,
-      filters
+      filters,
     });
     return canceled ? null : filePath;
   });

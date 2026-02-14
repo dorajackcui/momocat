@@ -15,8 +15,22 @@ interface TMPanelProps {
 }
 
 type CombinedMatch =
-  | { kind: 'tm'; rank: number; id: string; sourceText: string; targetText: string; payload: TMMatch }
-  | { kind: 'tb'; rank: number; id: string; sourceText: string; targetText: string; payload: TBMatch };
+  | {
+      kind: 'tm';
+      rank: number;
+      id: string;
+      sourceText: string;
+      targetText: string;
+      payload: TMMatch;
+    }
+  | {
+      kind: 'tb';
+      rank: number;
+      id: string;
+      sourceText: string;
+      targetText: string;
+      payload: TBMatch;
+    };
 
 export const TMPanel: React.FC<TMPanelProps> = ({ matches, termMatches, onApply, onApplyTerm }) => {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -27,7 +41,7 @@ export const TMPanel: React.FC<TMPanelProps> = ({ matches, termMatches, onApply,
   };
 
   const toggleExpanded = (key: string) => {
-    setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
+    setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const combined: CombinedMatch[] = [
@@ -37,7 +51,7 @@ export const TMPanel: React.FC<TMPanelProps> = ({ matches, termMatches, onApply,
       id: `tm-${match.id}-${idx}`,
       sourceText: serializeTokensToDisplayText(match.sourceTokens),
       targetText: serializeTokensToDisplayText(match.targetTokens),
-      payload: match
+      payload: match,
     })),
     ...(termMatches || []).map((match, idx) => ({
       kind: 'tb' as const,
@@ -45,8 +59,8 @@ export const TMPanel: React.FC<TMPanelProps> = ({ matches, termMatches, onApply,
       id: `tb-${match.id}-${idx}`,
       sourceText: match.srcTerm,
       targetText: match.tgtTerm,
-      payload: match
-    }))
+      payload: match,
+    })),
   ].sort((a, b) => {
     if (b.rank !== a.rank) return b.rank - a.rank;
     if (a.kind !== b.kind) return a.kind === 'tm' ? -1 : 1;
@@ -75,10 +89,16 @@ export const TMPanel: React.FC<TMPanelProps> = ({ matches, termMatches, onApply,
           const tmMatch = isTM ? (match as TMMatch) : null;
           const tbMatch = !isTM ? (match as TBMatch) : null;
           const tmLabel = isTM
-            ? (tmMatch!.tmType === 'working' ? 'Working TM' : `Main TM: ${tmMatch!.tmName}`)
+            ? tmMatch!.tmType === 'working'
+              ? 'Working TM'
+              : `Main TM: ${tmMatch!.tmName}`
             : `Term Base: ${tbMatch!.tbName}`;
           const scoreBg = isTM
-            ? (tmMatch!.similarity >= 95 ? 'bg-emerald-600' : tmMatch!.similarity >= 85 ? 'bg-blue-600' : 'bg-amber-600')
+            ? tmMatch!.similarity >= 95
+              ? 'bg-emerald-600'
+              : tmMatch!.similarity >= 85
+                ? 'bg-blue-600'
+                : 'bg-amber-600'
             : 'bg-yellow-600';
           const scoreText = isTM ? String(tmMatch!.similarity) : 'TB';
           const key = item.id;
@@ -122,7 +142,9 @@ export const TMPanel: React.FC<TMPanelProps> = ({ matches, termMatches, onApply,
                 </div>
 
                 <div className={`${scoreBg} text-white flex items-center justify-center px-[1px]`}>
-                  <span className="text-[8px] font-bold leading-none whitespace-nowrap">{scoreText}</span>
+                  <span className="text-[8px] font-bold leading-none whitespace-nowrap">
+                    {scoreText}
+                  </span>
                 </div>
 
                 <div className="px-2 py-2 border-l border-gray-100 text-xs text-gray-800 leading-snug">

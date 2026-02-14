@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Project, ProjectFile } from '@cat/core';
-import type { DesktopApi, MountedTB, MountedTM, TBWithStats, TMBatchMatchResult, TMWithStats } from '../../../../shared/ipc';
+import type {
+  DesktopApi,
+  MountedTB,
+  MountedTM,
+  TBWithStats,
+  TMBatchMatchResult,
+  TMWithStats,
+} from '../../../../shared/ipc';
 import { apiClient } from '../../services/apiClient';
 
 export interface UseProjectDetailDataResult {
@@ -24,7 +31,12 @@ export interface UseProjectDetailDataResult {
 
 type ProjectDetailApi = Pick<
   DesktopApi,
-  'mountTMToProject' | 'unmountTMFromProject' | 'mountTBToProject' | 'unmountTBFromProject' | 'commitToMainTM' | 'matchFileWithTM'
+  | 'mountTMToProject'
+  | 'unmountTMFromProject'
+  | 'mountTBToProject'
+  | 'unmountTBFromProject'
+  | 'commitToMainTM'
+  | 'matchFileWithTM'
 >;
 
 interface ProjectDetailActionDeps {
@@ -34,7 +46,12 @@ interface ProjectDetailActionDeps {
   runMutation: <T>(fn: () => Promise<T>) => Promise<T>;
 }
 
-export function createProjectDetailActions({ projectId, api, loadData, runMutation }: ProjectDetailActionDeps) {
+export function createProjectDetailActions({
+  projectId,
+  api,
+  loadData,
+  runMutation,
+}: ProjectDetailActionDeps) {
   return {
     mountTM: async (tmId: string) => {
       await runMutation(async () => {
@@ -73,7 +90,7 @@ export function createProjectDetailActions({ projectId, api, loadData, runMutati
         await loadData();
         return result;
       });
-    }
+    },
   };
 }
 
@@ -131,9 +148,9 @@ export function useProjectDetailData(projectId: number): UseProjectDetailDataRes
         projectId,
         api: apiClient,
         loadData,
-        runMutation
+        runMutation,
       }),
-    [loadData, projectId, runMutation]
+    [loadData, projectId, runMutation],
   );
 
   return {
@@ -152,6 +169,6 @@ export function useProjectDetailData(projectId: number): UseProjectDetailDataRes
     mountTB: actions.mountTB,
     unmountTB: actions.unmountTB,
     commitToMainTM: actions.commitToMainTM,
-    matchFileWithTM: actions.matchFileWithTM
+    matchFileWithTM: actions.matchFileWithTM,
   };
 }

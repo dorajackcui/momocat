@@ -7,7 +7,12 @@ export function registerProjectHandlers({ ipcMain, projectService }: MainHandler
   ipcMain.handle(IPC_CHANNELS.project.list, () => projectService.listProjects());
 
   ipcMain.handle(IPC_CHANNELS.project.create, (_event, ...args) => {
-    const [name, srcLang, tgtLang, projectType] = args as [string, string, string, ProjectType | undefined];
+    const [name, srcLang, tgtLang, projectType] = args as [
+      string,
+      string,
+      string,
+      ProjectType | undefined,
+    ];
     return projectService.createProject(name, srcLang, tgtLang, projectType);
   });
 
@@ -67,7 +72,12 @@ export function registerProjectHandlers({ ipcMain, projectService }: MainHandler
   });
 
   ipcMain.handle(IPC_CHANNELS.file.export, (_event, ...args) => {
-    const [fileId, outputPath, options, forceExport] = args as [number, string, ImportOptions | undefined, boolean | undefined];
+    const [fileId, outputPath, options, forceExport] = args as [
+      number,
+      string,
+      ImportOptions | undefined,
+      boolean | undefined,
+    ];
     return projectService.exportFile(fileId, outputPath, options, forceExport ?? false);
   });
 }

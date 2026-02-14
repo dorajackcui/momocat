@@ -49,6 +49,8 @@ export function ColumnSelector({
   useEffect(() => {
     if (!isOpen || !isReviewProject) return;
     if (contextCol === undefined && colIndexes.length > 0) {
+      // Keep review mode defaults aligned with opened preview columns.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setContextCol(0);
     }
   }, [colIndexes.length, contextCol, isOpen, isReviewProject]);
@@ -66,12 +68,17 @@ export function ColumnSelector({
                 ? 'Select translation/original/output columns for AI review'
                 : isCustomProject
                   ? 'Select input/context/output columns for AI custom processing'
-                : 'Select the columns to import from your spreadsheet'}
+                  : 'Select the columns to import from your spreadsheet'}
             </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -83,13 +90,15 @@ export function ColumnSelector({
                 <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                 {sourceLabel}
               </label>
-              <select 
+              <select
                 value={sourceCol}
                 onChange={(e) => setSourceCol(parseInt(e.target.value))}
                 className="w-full p-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all"
               >
-                {colIndexes.map(i => (
-                  <option key={i} value={i}>Column {XLSX_COL_NAME(i)}</option>
+                {colIndexes.map((i) => (
+                  <option key={i} value={i}>
+                    Column {XLSX_COL_NAME(i)}
+                  </option>
                 ))}
               </select>
             </div>
@@ -99,13 +108,15 @@ export function ColumnSelector({
                 <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                 {targetLabel}
               </label>
-              <select 
+              <select
                 value={targetCol}
                 onChange={(e) => setTargetCol(parseInt(e.target.value))}
                 className="w-full p-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all"
               >
-                {colIndexes.map(i => (
-                  <option key={i} value={i}>Column {XLSX_COL_NAME(i)}</option>
+                {colIndexes.map((i) => (
+                  <option key={i} value={i}>
+                    Column {XLSX_COL_NAME(i)}
+                  </option>
                 ))}
               </select>
             </div>
@@ -115,7 +126,7 @@ export function ColumnSelector({
                 <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
                 {contextLabel}
               </label>
-              <select 
+              <select
                 value={
                   contextCol === undefined
                     ? isReviewProject
@@ -134,57 +145,85 @@ export function ColumnSelector({
                 className="w-full p-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all"
               >
                 {!isReviewProject && <option value={-1}>None (Ignore)</option>}
-                {colIndexes.map(i => (
-                  <option key={i} value={i}>Column {XLSX_COL_NAME(i)}</option>
+                {colIndexes.map((i) => (
+                  <option key={i} value={i}>
+                    Column {XLSX_COL_NAME(i)}
+                  </option>
                 ))}
               </select>
             </div>
           </div>
 
           <div className="flex items-center gap-3 mb-6 bg-blue-50/50 p-4 rounded-xl border border-blue-100/50">
-            <input 
-              type="checkbox" 
-              id="hasHeader" 
+            <input
+              type="checkbox"
+              id="hasHeader"
               checked={hasHeader}
               onChange={(e) => setHasHeader(e.target.checked)}
               className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
             />
-            <label htmlFor="hasHeader" className="text-sm font-medium text-gray-700 cursor-pointer select-none">
+            <label
+              htmlFor="hasHeader"
+              className="text-sm font-medium text-gray-700 cursor-pointer select-none"
+            >
               First row is a header (Skip it)
             </label>
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Preview (First 10 rows)</h3>
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+              Preview (First 10 rows)
+            </h3>
             <div className="border border-gray-200 rounded-xl overflow-hidden overflow-x-auto shadow-sm">
               <table className="w-full text-sm text-left border-collapse">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    {colIndexes.map(i => (
-                      <th key={i} className={`px-4 py-3 font-bold text-[11px] uppercase tracking-tight ${
-                        i === sourceCol ? 'text-blue-600 bg-blue-50/50' : 
-                        i === targetCol ? 'text-green-600 bg-green-50/50' :
-                        i === contextCol ? 'text-purple-600 bg-purple-50/50' :
-                        'text-gray-500'
-                      }`}>
+                    {colIndexes.map((i) => (
+                      <th
+                        key={i}
+                        className={`px-4 py-3 font-bold text-[11px] uppercase tracking-tight ${
+                          i === sourceCol
+                            ? 'text-blue-600 bg-blue-50/50'
+                            : i === targetCol
+                              ? 'text-green-600 bg-green-50/50'
+                              : i === contextCol
+                                ? 'text-purple-600 bg-purple-50/50'
+                                : 'text-gray-500'
+                        }`}
+                      >
                         Col {XLSX_COL_NAME(i)}
-                        {i === sourceCol && <span className="block text-[9px] mt-0.5">{sourceTagLabel}</span>}
-                        {i === targetCol && <span className="block text-[9px] mt-0.5">{targetTagLabel}</span>}
-                        {i === contextCol && <span className="block text-[9px] mt-0.5">{contextTagLabel}</span>}
+                        {i === sourceCol && (
+                          <span className="block text-[9px] mt-0.5">{sourceTagLabel}</span>
+                        )}
+                        {i === targetCol && (
+                          <span className="block text-[9px] mt-0.5">{targetTagLabel}</span>
+                        )}
+                        {i === contextCol && (
+                          <span className="block text-[9px] mt-0.5">{contextTagLabel}</span>
+                        )}
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {previewData.map((row, rowIndex) => (
-                    <tr key={rowIndex} className={`${hasHeader && rowIndex === 0 ? 'bg-gray-50/80 opacity-60 italic' : 'bg-white'}`}>
-                      {colIndexes.map(i => (
-                        <td key={i} className={`px-4 py-3 truncate max-w-[200px] text-xs ${
-                          i === sourceCol ? 'bg-blue-50/20 font-medium' : 
-                          i === targetCol ? 'bg-green-50/20' :
-                          i === contextCol ? 'bg-purple-50/20' :
-                          ''
-                        }`}>
+                    <tr
+                      key={rowIndex}
+                      className={`${hasHeader && rowIndex === 0 ? 'bg-gray-50/80 opacity-60 italic' : 'bg-white'}`}
+                    >
+                      {colIndexes.map((i) => (
+                        <td
+                          key={i}
+                          className={`px-4 py-3 truncate max-w-[200px] text-xs ${
+                            i === sourceCol
+                              ? 'bg-blue-50/20 font-medium'
+                              : i === targetCol
+                                ? 'bg-green-50/20'
+                                : i === contextCol
+                                  ? 'bg-purple-50/20'
+                                  : ''
+                          }`}
+                        >
                           {row[i] || '-'}
                         </td>
                       ))}
@@ -209,7 +248,7 @@ export function ColumnSelector({
                 hasHeader,
                 sourceCol,
                 targetCol,
-                contextCol: isReviewProject ? contextCol ?? 0 : contextCol,
+                contextCol: isReviewProject ? (contextCol ?? 0) : contextCol,
               })
             }
             className="px-8 py-2.5 bg-blue-600 text-white font-bold text-sm rounded-lg hover:bg-blue-700 shadow-md shadow-blue-200 transition-all hover:-translate-y-0.5"
@@ -223,9 +262,9 @@ export function ColumnSelector({
 }
 
 function XLSX_COL_NAME(n: number): string {
-  let s = "";
+  let s = '';
   while (n >= 0) {
-    s = String.fromCharCode(n % 26 + 65) + s;
+    s = String.fromCharCode((n % 26) + 65) + s;
     n = Math.floor(n / 26) - 1;
   }
   return s;

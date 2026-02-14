@@ -25,7 +25,7 @@ describe('TagInsertionUI', () => {
           onInsertTag={mockOnInsertTag}
           onInsertAllTags={mockOnInsertAllTags}
           isVisible={true}
-        />
+        />,
       );
 
       expect(screen.getByRole('menu')).toBeInTheDocument();
@@ -39,7 +39,7 @@ describe('TagInsertionUI', () => {
           onInsertTag={mockOnInsertTag}
           onInsertAllTags={mockOnInsertAllTags}
           isVisible={false}
-        />
+        />,
       );
 
       expect(container.firstChild).toBeNull();
@@ -52,7 +52,7 @@ describe('TagInsertionUI', () => {
           onInsertTag={mockOnInsertTag}
           onInsertAllTags={mockOnInsertAllTags}
           isVisible={true}
-        />
+        />,
       );
 
       expect(container.firstChild).toBeNull();
@@ -67,7 +67,7 @@ describe('TagInsertionUI', () => {
           onInsertTag={mockOnInsertTag}
           onInsertAllTags={mockOnInsertAllTags}
           isVisible={true}
-        />
+        />,
       );
 
       // Check that all tags are displayed
@@ -83,7 +83,7 @@ describe('TagInsertionUI', () => {
           onInsertTag={mockOnInsertTag}
           onInsertAllTags={mockOnInsertAllTags}
           isVisible={true}
-        />
+        />,
       );
 
       // Check for display format in capsules
@@ -101,7 +101,7 @@ describe('TagInsertionUI', () => {
           onInsertTag={mockOnInsertTag}
           onInsertAllTags={mockOnInsertAllTags}
           isVisible={true}
-        />
+        />,
       );
 
       const insertAllButton = screen.getByText('Insert All Tags');
@@ -116,7 +116,7 @@ describe('TagInsertionUI', () => {
           onInsertTag={mockOnInsertTag}
           onInsertAllTags={mockOnInsertAllTags}
           isVisible={true}
-        />
+        />,
       );
 
       const insertAllButton = screen.getByText('Insert All Tags');
@@ -135,7 +135,7 @@ describe('TagInsertionUI', () => {
           onInsertTag={mockOnInsertTag}
           onInsertAllTags={mockOnInsertAllTags}
           isVisible={true}
-        />
+        />,
       );
 
       // Click the first tag
@@ -153,7 +153,7 @@ describe('TagInsertionUI', () => {
           onInsertTag={mockOnInsertTag}
           onInsertAllTags={mockOnInsertAllTags}
           isVisible={true}
-        />
+        />,
       );
 
       // Click the third tag
@@ -173,7 +173,7 @@ describe('TagInsertionUI', () => {
           onInsertTag={mockOnInsertTag}
           onInsertAllTags={mockOnInsertAllTags}
           isVisible={true}
-        />
+        />,
       );
 
       const menu = screen.getByRole('menu');
@@ -190,7 +190,7 @@ describe('TagInsertionUI', () => {
           onInsertTag={mockOnInsertTag}
           onInsertAllTags={mockOnInsertAllTags}
           isVisible={true}
-        />
+        />,
       );
 
       expect(screen.getByLabelText('Insert tag 1: <bold>')).toBeInTheDocument();
@@ -208,11 +208,19 @@ describe('TagInsertionUI', () => {
           onInsertTag={mockOnInsertTag}
           onInsertAllTags={mockOnInsertAllTags}
           isVisible={true}
-        />
+        />,
       );
 
       const menu = container.querySelector('[role="menu"]');
-      expect(menu).toHaveClass('absolute', 'top-full', 'left-0', 'bg-white', 'border', 'rounded-md', 'shadow-lg');
+      expect(menu).toHaveClass(
+        'absolute',
+        'top-full',
+        'left-0',
+        'bg-white',
+        'border',
+        'rounded-md',
+        'shadow-lg',
+      );
     });
 
     test('tag preview capsules have correct styling', () => {
@@ -222,7 +230,7 @@ describe('TagInsertionUI', () => {
           onInsertTag={mockOnInsertTag}
           onInsertAllTags={mockOnInsertAllTags}
           isVisible={true}
-        />
+        />,
       );
 
       const capsule = screen.getByText('[1').closest('span');

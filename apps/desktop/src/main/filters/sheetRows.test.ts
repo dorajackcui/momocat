@@ -13,7 +13,7 @@ describe('extractSheetRows', () => {
       ['s5', 't5'],
       ['s6', 't6'],
       ['s7', 't7'],
-      ['s8', 't8']
+      ['s8', 't8'],
     ]);
 
     // Simulate files whose !ref is bloated by formatting metadata.
@@ -32,7 +32,7 @@ describe('extractSheetRows', () => {
       ['a', 'b', 'c'],
       ['', 'x', ''],
       ['   ', '', ''],
-      ['d', '', 'e']
+      ['d', '', 'e'],
     ]);
 
     const rows = extractSheetRows(worksheet, { maxRows: 2 });

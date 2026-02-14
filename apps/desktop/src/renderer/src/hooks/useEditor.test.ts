@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { Segment } from '@cat/core';
 
 vi.mock('../services/apiClient', () => ({
-  apiClient: {}
+  apiClient: {},
 }));
 
 import { createSegmentPersistor } from './useEditor';
@@ -19,8 +19,8 @@ function createSegment(segmentId: string, targetText: string): Segment {
     matchKey: 'hello',
     srcHash: `hash-${segmentId}`,
     meta: {
-      updatedAt: new Date().toISOString()
-    }
+      updatedAt: new Date().toISOString(),
+    },
   };
 }
 
@@ -34,7 +34,7 @@ describe('createSegmentPersistor', () => {
       updateSegment,
       rollbackSegment,
       setSegmentSaveError,
-      clearSegmentSaveError
+      clearSegmentSaveError,
     });
 
     const previousSegment = createSegment('seg-1', '旧译文');
@@ -44,7 +44,7 @@ describe('createSegmentPersistor', () => {
       segmentId: 'seg-1',
       targetTokens: nextTokens,
       status: 'draft',
-      previousSegment
+      previousSegment,
     });
 
     expect(updateSegment).toHaveBeenCalledWith('seg-1', nextTokens, 'draft');
@@ -62,7 +62,7 @@ describe('createSegmentPersistor', () => {
       updateSegment,
       rollbackSegment,
       setSegmentSaveError,
-      clearSegmentSaveError
+      clearSegmentSaveError,
     });
 
     const previousSegment = createSegment('seg-2', '原目标');
@@ -72,11 +72,14 @@ describe('createSegmentPersistor', () => {
       segmentId: 'seg-2',
       targetTokens: nextTokens,
       status: 'draft',
-      previousSegment
+      previousSegment,
     });
 
     expect(rollbackSegment).toHaveBeenCalledWith('seg-2', previousSegment);
-    expect(setSegmentSaveError).toHaveBeenCalledWith('seg-2', expect.stringContaining('network down'));
+    expect(setSegmentSaveError).toHaveBeenCalledWith(
+      'seg-2',
+      expect.stringContaining('network down'),
+    );
   });
 
   it('ignores stale failure when a newer save request succeeds', async () => {
@@ -101,7 +104,7 @@ describe('createSegmentPersistor', () => {
       updateSegment,
       rollbackSegment,
       setSegmentSaveError,
-      clearSegmentSaveError
+      clearSegmentSaveError,
     });
 
     const previousSegment = createSegment('seg-3', '旧值');
@@ -109,14 +112,14 @@ describe('createSegmentPersistor', () => {
       segmentId: 'seg-3',
       targetTokens: [{ type: 'text', content: 'old' }],
       status: 'draft',
-      previousSegment
+      previousSegment,
     });
 
     const newCall = persistor.persistSegmentUpdate({
       segmentId: 'seg-3',
       targetTokens: [{ type: 'text', content: 'new' }],
       status: 'draft',
-      previousSegment: createSegment('seg-3', 'old')
+      previousSegment: createSegment('seg-3', 'old'),
     });
 
     resolveNewRequest?.();

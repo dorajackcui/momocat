@@ -34,12 +34,17 @@ export function ProjectFilesPane({
 
       {files.length === 0 ? (
         <div className="text-center py-20 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
-          <p className="text-gray-500">No files added yet. Click "+ Add File" to start.</p>
+          <p className="text-gray-500">
+            No files added yet. Click &quot;+ Add File&quot; to start.
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
-          {files.map(file => {
-            const progress = file.totalSegments === 0 ? 0 : Math.round((file.confirmedSegments / file.totalSegments) * 100);
+          {files.map((file) => {
+            const progress =
+              file.totalSegments === 0
+                ? 0
+                : Math.round((file.confirmedSegments / file.totalSegments) * 100);
             const job = ai.getFileJob(file.id);
             const jobRunning = job?.status === 'running';
 
@@ -99,12 +104,12 @@ export function ProjectFilesPane({
                         ? 'AI Reviewing...'
                         : isCustomProject
                           ? 'AI Processing...'
-                        : 'AI Translating...'
+                          : 'AI Translating...'
                       : isReviewProject
                         ? 'AI Review'
                         : isCustomProject
                           ? 'AI Process'
-                        : 'AI Translate'}
+                          : 'AI Translate'}
                   </button>
                   <button
                     onClick={() => onOpenFile(file.id)}

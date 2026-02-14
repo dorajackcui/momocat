@@ -1,7 +1,10 @@
 import { ProjectType } from '@cat/core';
 import { buildCustomSystemPrompt, buildCustomUserPrompt } from './customPromptTemplate';
 import { buildReviewSystemPrompt, buildReviewUserPrompt } from './reviewPromptTemplate';
-import { buildTranslationSystemPrompt, buildTranslationUserPrompt } from './translationPromptTemplate';
+import {
+  buildTranslationSystemPrompt,
+  buildTranslationUserPrompt,
+} from './translationPromptTemplate';
 import { SystemPromptBuildParams, UserPromptBuildParams } from './types';
 
 export function normalizeProjectType(projectType?: ProjectType): ProjectType {

@@ -1,4 +1,12 @@
-import { Project, ProjectType as CoreProjectType, Segment, SegmentStatus, TBMatch, TMEntry, Token } from '@cat/core';
+import {
+  Project,
+  ProjectType as CoreProjectType,
+  Segment,
+  SegmentStatus,
+  TBMatch,
+  TMEntry,
+  Token,
+} from '@cat/core';
 import type {
   MountedTBRecord as DbMountedTBRecord,
   MountedTMRecord as DbMountedTMRecord,

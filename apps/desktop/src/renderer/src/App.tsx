@@ -56,10 +56,7 @@ function App(): JSX.Element {
   if (currentView === 'editor' && activeFileId !== null) {
     return (
       <ErrorBoundary>
-        <Editor
-          fileId={activeFileId}
-          onBack={handleBackToProject}
-        />
+        <Editor fileId={activeFileId} onBack={handleBackToProject} />
       </ErrorBoundary>
     );
   }
@@ -80,18 +77,21 @@ function App(): JSX.Element {
     <div className="h-screen bg-gray-50 flex flex-col font-sans">
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
       <header className="px-10 py-5 bg-white border-b border-gray-200 flex justify-between items-center shadow-sm">
-        <div 
-          className="flex items-center gap-3 cursor-pointer" 
-          onClick={handleBackToDashboard}
-        >
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">C</div>
-          <h1 className="text-xl font-bold text-gray-900 tracking-tight">MomoCAT<span className="text-xs font-normal text-blue-500 ml-1">v0.2</span></h1>
+        <div className="flex items-center gap-3 cursor-pointer" onClick={handleBackToDashboard}>
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">
+            C
+          </div>
+          <h1 className="text-xl font-bold text-gray-900 tracking-tight">
+            MomoCAT<span className="text-xs font-normal text-blue-500 ml-1">v0.2</span>
+          </h1>
         </div>
         <nav className="flex gap-2 items-center">
           <button
             onClick={() => setCurrentView('dashboard')}
             className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${
-              currentView === 'dashboard' ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-100'
+              currentView === 'dashboard'
+                ? 'bg-blue-50 text-blue-600'
+                : 'text-gray-500 hover:bg-gray-100'
             }`}
           >
             Projects
@@ -107,7 +107,9 @@ function App(): JSX.Element {
           <button
             onClick={() => setCurrentView('tbs')}
             className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${
-              currentView === 'tbs' ? 'bg-emerald-50 text-emerald-600' : 'text-gray-500 hover:bg-gray-100'
+              currentView === 'tbs'
+                ? 'bg-emerald-50 text-emerald-600'
+                : 'text-gray-500 hover:bg-gray-100'
             }`}
           >
             TB
@@ -122,7 +124,7 @@ function App(): JSX.Element {
           </button>
         </nav>
       </header>
-      
+
       <main className="flex-1 overflow-hidden flex">
         {currentView === 'dashboard' ? (
           <Dashboard

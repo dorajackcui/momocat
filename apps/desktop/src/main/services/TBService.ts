@@ -30,7 +30,7 @@ export class TBService {
 
       matches.push({
         ...entry,
-        positions
+        positions,
       });
       seenSrcNorm.add(entry.srcNorm);
     }

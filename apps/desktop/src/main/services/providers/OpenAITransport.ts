@@ -12,8 +12,8 @@ export class OpenAITransport implements AITransport {
       response = await fetch('https://api.openai.com/v1/models', {
         method: 'GET',
         headers: {
-          Authorization: `Bearer ${apiKey}`
-        }
+          Authorization: `Bearer ${apiKey}`,
+        },
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -48,16 +48,16 @@ export class OpenAITransport implements AITransport {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${params.apiKey}`
+          Authorization: `Bearer ${params.apiKey}`,
         },
         body: JSON.stringify({
           model: params.model,
           temperature: params.temperature,
           messages: [
             { role: 'system', content: params.systemPrompt },
-            { role: 'user', content: params.userPrompt }
-          ]
-        })
+            { role: 'user', content: params.userPrompt },
+          ],
+        }),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -66,7 +66,10 @@ export class OpenAITransport implements AITransport {
       );
     }
 
-    const requestId = response.headers.get('x-request-id') || response.headers.get('x-openai-request-id') || undefined;
+    const requestId =
+      response.headers.get('x-request-id') ||
+      response.headers.get('x-openai-request-id') ||
+      undefined;
     const rawBody = await response.text();
 
     if (!response.ok) {
@@ -90,7 +93,7 @@ export class OpenAITransport implements AITransport {
       requestId,
       status: response.status,
       endpoint,
-      rawResponseText: rawBody.slice(0, 4000)
+      rawResponseText: rawBody.slice(0, 4000),
     };
   }
 }

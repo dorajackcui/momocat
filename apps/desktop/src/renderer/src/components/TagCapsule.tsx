@@ -3,57 +3,57 @@ import { Token, getTagDisplayInfo } from '@cat/core';
 
 /**
  * Props interface for the TagCapsule component
- * 
+ *
  * This component renders individual tags with appropriate visual styling
  * and interaction handlers for the CAT tool editor.
  */
 export interface TagCapsuleProps {
   /** The token to render (must be of type 'tag') */
   token: Token;
-  
+
   /** Zero-based index of the tag in the token sequence */
   index: number;
-  
+
   /** Whether this tag is in the source segment (affects color scheme) */
   isSource: boolean;
-  
+
   /** Whether this tag is currently selected */
   isSelected: boolean;
-  
+
   /** Validation state of the tag (affects border styling) */
   validationState?: 'valid' | 'error' | 'warning';
-  
+
   /** Callback when the tag is selected/clicked */
   onSelect: (index: number) => void;
-  
+
   /** Callback when the tag is deleted */
   onDelete: (index: number) => void;
-  
+
   /** Callback when the tag is right-clicked for context menu */
   onContextMenu: (index: number, event: React.MouseEvent) => void;
-  
+
   /** Callback when drag operation starts */
   onDragStart: (index: number, event: React.DragEvent) => void;
-  
+
   /** Callback when drag operation ends */
   onDragEnd: (index: number, event: React.DragEvent) => void;
 }
 
 /**
  * TagCapsule Component
- * 
+ *
  * Renders individual tags with appropriate visual styling based on:
  * - Tag type (paired-start, paired-end, standalone)
  * - Source vs target segment
  * - Validation state (valid, error, warning)
  * - Selection state
- * 
+ *
  * Supports interaction via:
  * - Click to select
  * - Right-click for context menu
  * - Drag and drop for reordering
  * - Keyboard navigation (via tabIndex)
- * 
+ *
  * **Validates: Requirements 1.1, 1.2, 1.3**
  */
 export const TagCapsule: React.FC<TagCapsuleProps> = ({
@@ -70,53 +70,58 @@ export const TagCapsule: React.FC<TagCapsuleProps> = ({
 }) => {
   // Get display information for the tag
   const tagInfo = getTagDisplayInfo(token.content, index);
-  
+
   // Base styles for all tags
-  const baseStyles = "inline-flex items-center px-1 py-0.5 mx-0.5 text-[10px] font-bold border cursor-pointer select-none";
-  
+  const baseStyles =
+    'inline-flex items-center px-1 py-0.5 mx-0.5 text-[10px] font-bold border cursor-pointer select-none';
+
   // Color scheme based on source/target
-  const colorStyles = isSource 
-    ? "bg-blue-100 text-blue-700 border-blue-200"
-    : "bg-blue-500 text-white border-blue-600";
-  
+  const colorStyles = isSource
+    ? 'bg-blue-100 text-blue-700 border-blue-200'
+    : 'bg-blue-500 text-white border-blue-600';
+
   // Validation state styling
-  const validationStyles = 
-    validationState === 'error' ? "ring-2 ring-red-500" :
-    validationState === 'warning' ? "ring-2 ring-yellow-400" :
-    "";
-  
+  const validationStyles =
+    validationState === 'error'
+      ? 'ring-2 ring-red-500'
+      : validationState === 'warning'
+        ? 'ring-2 ring-yellow-400'
+        : '';
+
   // Shape based on tag type
-  const shapeStyles = 
-    tagInfo.type === 'paired-start' ? "rounded-l" :
-    tagInfo.type === 'paired-end' ? "rounded-r" :
-    "rounded";
-  
+  const shapeStyles =
+    tagInfo.type === 'paired-start'
+      ? 'rounded-l'
+      : tagInfo.type === 'paired-end'
+        ? 'rounded-r'
+        : 'rounded';
+
   // Selection styling
-  const selectionStyles = isSelected ? "ring-2 ring-blue-400" : "";
-  
+  const selectionStyles = isSelected ? 'ring-2 ring-blue-400' : '';
+
   // Handle click event
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onSelect(index);
   };
-  
+
   // Handle context menu event
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     onContextMenu(index, e);
   };
-  
+
   // Handle drag start event
   const handleDragStart = (e: React.DragEvent) => {
     onDragStart(index, e);
   };
-  
+
   // Handle drag end event
   const handleDragEnd = (e: React.DragEvent) => {
     onDragEnd(index, e);
   };
-  
+
   // Handle keyboard events for accessibility
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -127,7 +132,7 @@ export const TagCapsule: React.FC<TagCapsuleProps> = ({
       onDelete(index);
     }
   };
-  
+
   return (
     <span
       className={`${baseStyles} ${colorStyles} ${validationStyles} ${shapeStyles} ${selectionStyles}`}

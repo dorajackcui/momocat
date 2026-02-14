@@ -29,6 +29,7 @@
       "getFile",
       "getProject",
       "getProjectIdByFileId",
+      "getProjectTypeByFileId",
       "getProjectMountedTMs",
       "getProjectMountedTermBases",
       "getProjectSegmentsByHash",

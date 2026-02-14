@@ -28,22 +28,22 @@ export function registerAIHandlers({ ipcMain, projectService, jobManager }: AIHa
           const progress = data.total === 0 ? 100 : Math.round((data.current / data.total) * 100);
           jobManager.updateProgress(jobId, {
             progress,
-            message: data.message
+            message: data.message,
           });
-        }
+        },
       })
       .then((result) => {
         jobManager.updateProgress(jobId, {
           progress: 100,
           status: 'completed',
-          message: `AI translation completed: ${result.translated} translated, ${result.skipped} skipped, ${result.failed} failed`
+          message: `AI translation completed: ${result.translated} translated, ${result.skipped} skipped, ${result.failed} failed`,
         });
       })
       .catch((error) => {
         jobManager.updateProgress(jobId, {
           progress: 100,
           status: 'failed',
-          message: error instanceof Error ? error.message : String(error)
+          message: error instanceof Error ? error.message : String(error),
         });
       });
 
@@ -64,7 +64,7 @@ export function registerAIHandlers({ ipcMain, projectService, jobManager }: AIHa
               .filter(Boolean)
               .join('\n\n')
           : '',
-        translatedText: ''
+        translatedText: '',
       };
     }
   });

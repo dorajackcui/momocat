@@ -16,11 +16,11 @@ export function ProjectCommitModal({
   selectedTmId,
   onSelectedTmIdChange,
   onCancel,
-  onConfirm
+  onConfirm,
 }: ProjectCommitModalProps) {
   if (!file) return null;
 
-  const mountedMainTMs = mountedTMs.filter(tm => tm.type === 'main');
+  const mountedMainTMs = mountedTMs.filter((tm) => tm.type === 'main');
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center">
@@ -35,7 +35,7 @@ export function ProjectCommitModal({
             onChange={(event) => onSelectedTmIdChange(event.target.value)}
             className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm outline-none"
           >
-            {mountedMainTMs.map(tm => (
+            {mountedMainTMs.map((tm) => (
               <option key={tm.id} value={tm.id}>
                 {tm.name} ({tm.srcLang}→{tm.tgtLang})
               </option>

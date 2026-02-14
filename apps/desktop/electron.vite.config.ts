@@ -15,10 +15,10 @@ export default defineConfig({
         external: ['better-sqlite3'],
         input: {
           index: resolve('src/main/index.ts'),
-          tmImportWorker: resolve('src/main/tmImportWorker.ts')
-        }
-      }
-    }
+          tmImportWorker: resolve('src/main/tmImportWorker.ts'),
+        },
+      },
+    },
   },
   preload: {
     plugins: [externalizeDepsPlugin({ exclude: ['@cat/core'] })],

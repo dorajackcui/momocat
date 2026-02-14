@@ -47,14 +47,14 @@ export class SegmentService extends EventEmitter {
    */
   public async updateSegment(segmentId: string, targetTokens: Token[], status: SegmentStatus) {
     const { propagatedIds } = this.tx.runInTransaction(() =>
-      this.updateSegmentInternal(segmentId, targetTokens, status)
+      this.updateSegmentInternal(segmentId, targetTokens, status),
     );
 
     this.emitSegmentUpdated({
       segmentId,
       targetTokens,
       status,
-      propagatedIds
+      propagatedIds,
     });
 
     return { propagatedIds };
@@ -64,7 +64,9 @@ export class SegmentService extends EventEmitter {
    * Update multiple segments in one transaction with all-or-nothing semantics.
    * Events are emitted only after transaction commit.
    */
-  public async updateSegmentsAtomically(updates: SegmentUpdateInput[]): Promise<SegmentUpdateEventPayload[]> {
+  public async updateSegmentsAtomically(
+    updates: SegmentUpdateInput[],
+  ): Promise<SegmentUpdateEventPayload[]> {
     if (updates.length === 0) return [];
 
     const events = this.tx.runInTransaction(() =>
@@ -72,13 +74,13 @@ export class SegmentService extends EventEmitter {
         const { propagatedIds } = this.updateSegmentInternal(
           update.segmentId,
           update.targetTokens,
-          update.status
+          update.status,
         );
         return {
           ...update,
-          propagatedIds
+          propagatedIds,
         };
-      })
+      }),
     );
 
     for (const event of events) {
@@ -88,7 +90,11 @@ export class SegmentService extends EventEmitter {
     return events;
   }
 
-  private updateSegmentInternal(segmentId: string, targetTokens: Token[], status: SegmentStatus): { propagatedIds: string[] } {
+  private updateSegmentInternal(
+    segmentId: string,
+    targetTokens: Token[],
+    status: SegmentStatus,
+  ): { propagatedIds: string[] } {
     this.db.updateSegmentTarget(segmentId, targetTokens, status);
 
     let propagatedIds: string[] = [];
@@ -120,19 +126,22 @@ export class SegmentService extends EventEmitter {
    * Propagate translation to all identical segments in the project
    */
   private propagate(projectId: number, sourceSegment: Segment): string[] {
-    console.log(`[SegmentService] Propagating segment ${sourceSegment.segmentId} in project ${projectId}`);
-    
+    console.log(
+      `[SegmentService] Propagating segment ${sourceSegment.segmentId} in project ${projectId}`,
+    );
+
     // Find segments with same srcHash in the same project (across files)
-     const repeats = this.db.getProjectSegmentsByHash(projectId, sourceSegment.srcHash)
-       .filter((s: Segment) => s.segmentId !== sourceSegment.segmentId && s.status !== 'confirmed');
- 
-     if (repeats.length === 0) return [];
+    const repeats = this.db
+      .getProjectSegmentsByHash(projectId, sourceSegment.srcHash)
+      .filter((s: Segment) => s.segmentId !== sourceSegment.segmentId && s.status !== 'confirmed');
+
+    if (repeats.length === 0) return [];
 
     const batch: PropagationBatch = {
       id: randomUUID(),
       projectId,
       timestamp: new Date().toISOString(),
-      changes: []
+      changes: [],
     };
 
     const updatedIds: string[] = [];
@@ -142,7 +151,7 @@ export class SegmentService extends EventEmitter {
       batch.changes.push({
         segmentId: seg.segmentId,
         oldTargetTokens: seg.targetTokens,
-        oldStatus: seg.status
+        oldStatus: seg.status,
       });
 
       // Update segment (using draft status for propagated translations)

@@ -3,7 +3,7 @@ import type { TMBatchMatchResult } from '../../../../shared/ipc';
 import { createProjectDetailActions } from './useProjectDetailData';
 
 vi.mock('../../services/apiClient', () => ({
-  apiClient: {}
+  apiClient: {},
 }));
 
 function createMutationHarness() {
@@ -31,7 +31,7 @@ describe('useProjectDetailData behavior helpers', () => {
       mountTBToProject: vi.fn(async () => {}),
       unmountTBFromProject: vi.fn(async () => {}),
       commitToMainTM: vi.fn(async () => 0),
-      matchFileWithTM: vi.fn(async () => ({ total: 0, matched: 0, applied: 0, skipped: 0 }))
+      matchFileWithTM: vi.fn(async () => ({ total: 0, matched: 0, applied: 0, skipped: 0 })),
     };
     const actions = createProjectDetailActions({ projectId: 7, api, loadData, runMutation });
 
@@ -50,7 +50,7 @@ describe('useProjectDetailData behavior helpers', () => {
       mountTBToProject: vi.fn(async () => {}),
       unmountTBFromProject: vi.fn(async () => {}),
       commitToMainTM: vi.fn(async () => 23),
-      matchFileWithTM: vi.fn(async () => ({ total: 0, matched: 0, applied: 0, skipped: 0 }))
+      matchFileWithTM: vi.fn(async () => ({ total: 0, matched: 0, applied: 0, skipped: 0 })),
     };
     const actions = createProjectDetailActions({ projectId: 11, api, loadData, runMutation });
 
@@ -70,7 +70,7 @@ describe('useProjectDetailData behavior helpers', () => {
       mountTBToProject: vi.fn(async () => {}),
       unmountTBFromProject: vi.fn(async () => {}),
       commitToMainTM: vi.fn(async () => 0),
-      matchFileWithTM: vi.fn(async () => expected)
+      matchFileWithTM: vi.fn(async () => expected),
     };
     const actions = createProjectDetailActions({ projectId: 1, api, loadData, runMutation });
 
@@ -91,7 +91,7 @@ describe('useProjectDetailData behavior helpers', () => {
       }),
       unmountTBFromProject: vi.fn(async () => {}),
       commitToMainTM: vi.fn(async () => 0),
-      matchFileWithTM: vi.fn(async () => ({ total: 0, matched: 0, applied: 0, skipped: 0 }))
+      matchFileWithTM: vi.fn(async () => ({ total: 0, matched: 0, applied: 0, skipped: 0 })),
     };
     const actions = createProjectDetailActions({ projectId: 1, api, loadData, runMutation });
 

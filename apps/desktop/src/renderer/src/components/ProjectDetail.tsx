@@ -251,14 +251,16 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
             </h2>
             {project && (
               <div className="text-xs text-gray-500 flex items-center gap-2">
-                <span>{project.srcLang} → {project.tgtLang}</span>
+                <span>
+                  {project.srcLang} → {project.tgtLang}
+                </span>
                 <span
                   className={`px-1.5 py-0.5 rounded font-semibold ${
                     project.projectType === 'review'
                       ? 'bg-amber-100 text-amber-700'
                       : project.projectType === 'custom'
                         ? 'bg-emerald-100 text-emerald-700'
-                      : 'bg-blue-100 text-blue-700'
+                        : 'bg-blue-100 text-blue-700'
                   }`}
                 >
                   {project.projectType === 'review'

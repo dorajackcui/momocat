@@ -6,7 +6,7 @@
 
 - 当前主线：`v0.3` 进行中
 - 当前重点：**正确性收口 + 解耦改造 + 类型契约收紧**
-- 改造看板：`DOCS/REFACTOR_PROGRESS_TRACKER_2026-02-10.md`
+- 版本路线：`DOCS/ROADMAP.md`
 
 ## 主要能力
 
@@ -58,8 +58,9 @@ DOCS/            # 项目文档
 
 ## 文档入口
 
+- 交接单入口：`DOCS/HANDOFF.md`
 - 文档导航：`DOCS/README.md`
-- 改造进度：`DOCS/REFACTOR_PROGRESS_TRACKER_2026-02-10.md`
+- 当前状态：`DOCS/CURRENT_STATUS.md`
 - 路线图：`DOCS/ROADMAP.md`
 - 开发规范：`DOCS/DEVELOPMENT_GUIDE.md`
 - 数据库结构：`DOCS/DATABASE_SCHEMA.md`

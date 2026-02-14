@@ -31,8 +31,13 @@ function shouldKeepCell(value: SheetCellValue): boolean {
   return true;
 }
 
-export function extractSheetRows(worksheet: XLSX.WorkSheet, options: ExtractSheetRowsOptions = {}): SheetRow[] {
-  const columnSet = options.columnIndexes ? new Set(options.columnIndexes.filter((col) => Number.isInteger(col) && col >= 0)) : null;
+export function extractSheetRows(
+  worksheet: XLSX.WorkSheet,
+  options: ExtractSheetRowsOptions = {},
+): SheetRow[] {
+  const columnSet = options.columnIndexes
+    ? new Set(options.columnIndexes.filter((col) => Number.isInteger(col) && col >= 0))
+    : null;
   const rowMap = new Map<number, Map<number, SheetCellValue>>();
 
   for (const [address, cell] of Object.entries(worksheet)) {
@@ -54,7 +59,9 @@ export function extractSheetRows(worksheet: XLSX.WorkSheet, options: ExtractShee
 
   const sortedRowIndexes = Array.from(rowMap.keys()).sort((a, b) => a - b);
   const limitedIndexes =
-    options.maxRows && options.maxRows > 0 ? sortedRowIndexes.slice(0, options.maxRows) : sortedRowIndexes;
+    options.maxRows && options.maxRows > 0
+      ? sortedRowIndexes.slice(0, options.maxRows)
+      : sortedRowIndexes;
 
   return limitedIndexes.map((rowIndex) => {
     const cells = rowMap.get(rowIndex);
@@ -66,7 +73,7 @@ export function extractSheetRows(worksheet: XLSX.WorkSheet, options: ExtractShee
     }
     return {
       rowIndex,
-      cells: rowArray
+      cells: rowArray,
     };
   });
 }

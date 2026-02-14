@@ -39,12 +39,7 @@ export type TBRecord = DbTBRecord;
 export type MountedTBRecord = DbMountedTBRecord;
 
 export interface ProjectRepository {
-  createProject(
-    name: string,
-    srcLang: string,
-    tgtLang: string,
-    projectType?: ProjectType,
-  ): number;
+  createProject(name: string, srcLang: string, tgtLang: string, projectType?: ProjectType): number;
   listProjects(): ProjectListRecord[];
   getProject(id: number): ProjectRecord | undefined;
   updateProjectPrompt(projectId: number, aiPrompt: string | null): void;

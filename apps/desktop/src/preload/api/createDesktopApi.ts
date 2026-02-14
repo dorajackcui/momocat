@@ -14,6 +14,6 @@ export function createDesktopApi(ipcRenderer: IpcRendererLike): DesktopApi {
     ...createTBApi(ipcRenderer),
     ...createAIApi(ipcRenderer),
     ...createDialogApi(ipcRenderer),
-    ...createEventApi(ipcRenderer)
+    ...createEventApi(ipcRenderer),
   };
 }

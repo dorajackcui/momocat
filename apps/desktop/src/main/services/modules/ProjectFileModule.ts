@@ -231,8 +231,9 @@ export class ProjectFileModule {
   private getAllSegments(fileId: number): Segment[] {
     const segments: Segment[] = [];
     let offset = 0;
+    let hasMore = true;
 
-    while (true) {
+    while (hasMore) {
       const page = this.segmentRepo.getSegmentsPage(
         fileId,
         offset,
@@ -240,7 +241,7 @@ export class ProjectFileModule {
       );
       if (page.length === 0) break;
       segments.push(...page);
-      if (page.length < ProjectFileModule.SEGMENT_PAGE_SIZE) break;
+      hasMore = page.length === ProjectFileModule.SEGMENT_PAGE_SIZE;
       offset += ProjectFileModule.SEGMENT_PAGE_SIZE;
     }
 

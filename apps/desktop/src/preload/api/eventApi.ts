@@ -1,4 +1,3 @@
-import type { DesktopApi } from '../../shared/ipc';
 import type { IpcRendererEvent } from 'electron';
 import { IPC_CHANNELS } from '../../shared/ipcChannels';
 import type { DesktopApiSlice, IpcRendererLike } from './types';
@@ -30,6 +29,6 @@ export function createEventApi(ipcRenderer: IpcRendererLike): DesktopApiSlice<Ev
       };
       ipcRenderer.on(IPC_CHANNELS.events.jobProgress, listener);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.events.jobProgress, listener);
-    }
+    },
   };
 }

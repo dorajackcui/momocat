@@ -462,14 +462,15 @@ export class TMModule {
 
   private forEachFileSegment(fileId: number, visitor: (segment: Segment) => void): void {
     let offset = 0;
+    let hasMore = true;
 
-    while (true) {
+    while (hasMore) {
       const page = this.segmentRepo.getSegmentsPage(fileId, offset, TMModule.SEGMENT_PAGE_SIZE);
       if (page.length === 0) break;
       for (const segment of page) {
         visitor(segment);
       }
-      if (page.length < TMModule.SEGMENT_PAGE_SIZE) break;
+      hasMore = page.length === TMModule.SEGMENT_PAGE_SIZE;
       offset += TMModule.SEGMENT_PAGE_SIZE;
     }
   }

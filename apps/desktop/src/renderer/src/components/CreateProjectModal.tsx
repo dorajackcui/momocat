@@ -19,10 +19,15 @@ const LANGUAGE_OPTIONS = [
   { label: 'Italian (it-IT)', value: 'it-IT' },
   { label: 'Portuguese (pt-PT)', value: 'pt-PT' },
   { label: 'Thai (th-TH)', value: 'th-TH' },
-  { label: 'Bahasa Indonesia (id-ID)', value: 'id-ID' }
+  { label: 'Bahasa Indonesia (id-ID)', value: 'id-ID' },
 ] as const;
 
-export function CreateProjectModal({ isOpen, onClose, onConfirm, loading }: CreateProjectModalProps) {
+export function CreateProjectModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  loading,
+}: CreateProjectModalProps) {
   const [name, setName] = useState('');
   const [projectType, setProjectType] = useState<ProjectType>('translation');
   const [srcLang, setSrcLang] = useState('zh-CN');
@@ -45,12 +50,14 @@ export function CreateProjectModal({ isOpen, onClose, onConfirm, loading }: Crea
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
           <h2 className="text-xl font-bold text-gray-900">Create New Project</h2>
-          <button 
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -98,7 +105,9 @@ export function CreateProjectModal({ isOpen, onClose, onConfirm, loading }: Crea
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Project Name</label>
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
+              Project Name
+            </label>
             <input
               autoFocus
               type="text"
@@ -112,7 +121,9 @@ export function CreateProjectModal({ isOpen, onClose, onConfirm, loading }: Crea
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Source Language</label>
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
+                Source Language
+              </label>
               <select
                 value={srcLang}
                 onChange={(e) => setSrcLang(e.target.value)}
@@ -127,7 +138,9 @@ export function CreateProjectModal({ isOpen, onClose, onConfirm, loading }: Crea
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Target Language</label>
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
+                Target Language
+              </label>
               <select
                 value={tgtLang}
                 onChange={(e) => setTgtLang(e.target.value)}

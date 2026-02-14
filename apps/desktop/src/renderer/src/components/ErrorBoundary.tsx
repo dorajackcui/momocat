@@ -16,7 +16,7 @@ export class ErrorBoundary extends Component<Props, State> {
     this.state = {
       hasError: false,
       error: null,
-      errorInfo: null
+      errorInfo: null,
     };
   }
 
@@ -24,7 +24,7 @@ export class ErrorBoundary extends Component<Props, State> {
     return {
       hasError: true,
       error,
-      errorInfo: null
+      errorInfo: null,
     };
   }
 
@@ -32,10 +32,10 @@ export class ErrorBoundary extends Component<Props, State> {
     console.error('ErrorBoundary caught an error:', error);
     console.error('Error info:', errorInfo);
     console.error('Component stack:', errorInfo.componentStack);
-    
+
     this.setState({
       error,
-      errorInfo
+      errorInfo,
     });
   }
 
@@ -43,7 +43,7 @@ export class ErrorBoundary extends Component<Props, State> {
     this.setState({
       hasError: false,
       error: null,
-      errorInfo: null
+      errorInfo: null,
     });
   };
 
@@ -52,9 +52,7 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="flex items-center justify-center h-screen bg-gray-50">
           <div className="max-w-2xl p-8 bg-white rounded-lg shadow-lg">
-            <h1 className="text-2xl font-bold text-red-600 mb-4">
-              Something went wrong
-            </h1>
+            <h1 className="text-2xl font-bold text-red-600 mb-4">Something went wrong</h1>
             <div className="mb-4">
               <p className="text-gray-700 mb-2">
                 The application encountered an error. Please try refreshing the page.

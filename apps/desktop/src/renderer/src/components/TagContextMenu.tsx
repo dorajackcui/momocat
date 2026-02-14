@@ -3,44 +3,44 @@ import { Token } from '@cat/core';
 
 /**
  * Props interface for the TagContextMenu component
- * 
+ *
  * This component displays a context menu when users right-click on tags,
  * providing quick access to tag-specific operations.
  */
 export interface TagContextMenuProps {
   /** The tag token that was right-clicked */
   tag: Token;
-  
+
   /** Zero-based index of the tag in the token sequence */
   tagIndex: number;
-  
+
   /** Position where the context menu should appear */
   position: { x: number; y: number };
-  
+
   /** Index of the paired tag (if this is a paired tag) */
   pairedTagIndex?: number;
-  
+
   /** Callback to close the context menu */
   onClose: () => void;
-  
+
   /** Callback when "View Full Content" is selected */
   onViewContent: () => void;
-  
+
   /** Callback when "Copy Tag" is selected */
   onCopyTag: () => void;
-  
+
   /** Callback when "Delete Tag" is selected */
   onDeleteTag: () => void;
-  
+
   /** Callback when "Jump to Pair" is selected (only for paired tags) */
   onJumpToPair?: () => void;
 }
 
 /**
  * TagContextMenu Component
- * 
+ *
  * Displays a context menu with tag-specific actions when users right-click on tags.
- * 
+ *
  * Features:
  * - Positioned at the click location
  * - Provides "View Full Content" to see complete tag markup
@@ -48,9 +48,9 @@ export interface TagContextMenuProps {
  * - Provides "Delete Tag" to remove the tag
  * - Conditionally provides "Jump to Pair" for paired tags only
  * - Closes automatically after action selection
- * 
+ *
  * **Validates: Requirements 10.1, 10.2, 10.7**
- * 
+ *
  * @example
  * ```tsx
  * <TagContextMenu
@@ -67,8 +67,6 @@ export interface TagContextMenuProps {
  * ```
  */
 export const TagContextMenu: React.FC<TagContextMenuProps> = ({
-  tag,
-  tagIndex,
   position,
   pairedTagIndex,
   onClose,
@@ -82,24 +80,24 @@ export const TagContextMenu: React.FC<TagContextMenuProps> = ({
     action();
     onClose();
   };
-  
+
   // Close menu when clicking outside
   React.useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = () => {
       onClose();
     };
-    
+
     // Add listener after a small delay to avoid immediate closure
     const timeoutId = setTimeout(() => {
       document.addEventListener('click', handleClickOutside);
     }, 0);
-    
+
     return () => {
       clearTimeout(timeoutId);
       document.removeEventListener('click', handleClickOutside);
     };
   }, [onClose]);
-  
+
   // Close menu on Escape key
   React.useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -107,11 +105,11 @@ export const TagContextMenu: React.FC<TagContextMenuProps> = ({
         onClose();
       }
     };
-    
+
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
   }, [onClose]);
-  
+
   return (
     <div
       className="fixed bg-white border border-gray-200 rounded-md shadow-lg z-50 py-1 min-w-[180px]"
@@ -129,7 +127,7 @@ export const TagContextMenu: React.FC<TagContextMenuProps> = ({
       >
         <span className="text-gray-700">View Full Content</span>
       </button>
-      
+
       {/* Copy Tag */}
       <button
         onClick={() => handleMenuItemClick(onCopyTag)}
@@ -139,7 +137,7 @@ export const TagContextMenu: React.FC<TagContextMenuProps> = ({
       >
         <span className="text-gray-700">Copy Tag</span>
       </button>
-      
+
       {/* Delete Tag */}
       <button
         onClick={() => handleMenuItemClick(onDeleteTag)}
@@ -149,7 +147,7 @@ export const TagContextMenu: React.FC<TagContextMenuProps> = ({
       >
         <span>Delete Tag</span>
       </button>
-      
+
       {/* Jump to Pair - Only shown for paired tags */}
       {pairedTagIndex !== undefined && onJumpToPair && (
         <>

@@ -27,7 +27,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         } else {
           setApiKeyHint(null);
         }
-      } catch (error) {
+      } catch {
         setApiKeyHint(null);
       }
     };
@@ -51,7 +51,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       setApiKeyHint(`****${key.slice(-4)}`);
       setApiKeyInput('');
       setStatus('API key saved. You can run a test now.');
-    } catch (error) {
+    } catch {
       setStatus('Failed to save API key.');
     } finally {
       setLoading(false);
@@ -81,7 +81,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       setApiKeyHint(null);
       setApiKeyInput('');
       setStatus('Saved API key removed.');
-    } catch (error) {
+    } catch {
       setStatus('Failed to remove saved API key.');
     } finally {
       setClearing(false);
@@ -93,19 +93,23 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
           <h2 className="text-xl font-bold text-gray-900">AI Settings</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
 
         <div className="p-6 space-y-4">
           <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">OpenAI API Key</label>
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
+              OpenAI API Key
+            </label>
             <input
               type="password"
               value={apiKeyInput}

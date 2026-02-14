@@ -14,7 +14,7 @@ export const ConcordancePanel: React.FC<ConcordancePanelProps> = ({
   projectId,
   focusSignal = 0,
   externalQuery = '',
-  searchSignal = 0
+  searchSignal = 0,
 }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<TMConcordanceEntry[]>([]);
@@ -39,7 +39,7 @@ export const ConcordancePanel: React.FC<ConcordancePanelProps> = ({
         setIsSearching(false);
       }
     },
-    [projectId]
+    [projectId],
   );
 
   useEffect(() => {
@@ -65,7 +65,9 @@ export const ConcordancePanel: React.FC<ConcordancePanelProps> = ({
   return (
     <div className="flex flex-col h-full bg-white border-l border-gray-200 w-80">
       <div className="p-4 border-b border-gray-100 bg-gray-50/50">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Concordance Search</h3>
+        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
+          Concordance Search
+        </h3>
         <form onSubmit={handleSearch} className="relative">
           <input
             ref={inputRef}
@@ -77,7 +79,12 @@ export const ConcordancePanel: React.FC<ConcordancePanelProps> = ({
           />
           <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
             </svg>
           </div>
         </form>
@@ -97,19 +104,27 @@ export const ConcordancePanel: React.FC<ConcordancePanelProps> = ({
               </div>
               <div className="mt-2 flex items-center justify-between text-[10px] text-gray-400">
                 <div className="flex items-center gap-2">
-                  <span className={`px-1 py-0.5 rounded-[3px] font-bold uppercase text-[8px] ${entry.tmType === 'working' ? 'bg-blue-50 text-blue-500' : 'bg-purple-50 text-purple-500'}`}>
+                  <span
+                    className={`px-1 py-0.5 rounded-[3px] font-bold uppercase text-[8px] ${entry.tmType === 'working' ? 'bg-blue-50 text-blue-500' : 'bg-purple-50 text-purple-500'}`}
+                  >
                     {entry.tmType === 'working' ? 'Working' : entry.tmName}
                   </span>
                   <span>Used {entry.usageCount} times</span>
                 </div>
-                <button className="text-blue-500 hover:underline opacity-0 group-hover:opacity-100 transition-opacity">Apply</button>
+                <button className="text-blue-500 hover:underline opacity-0 group-hover:opacity-100 transition-opacity">
+                  Apply
+                </button>
               </div>
             </div>
           ))
         ) : query ? (
-          <div className="text-center py-8 text-gray-400 text-xs">No matches found for "{query}"</div>
+          <div className="text-center py-8 text-gray-400 text-xs">
+            No matches found for &quot;{query}&quot;
+          </div>
         ) : (
-          <div className="text-center py-8 text-gray-400 text-xs italic">Enter keywords to search across project memory.</div>
+          <div className="text-center py-8 text-gray-400 text-xs italic">
+            Enter keywords to search across project memory.
+          </div>
         )}
       </div>
     </div>

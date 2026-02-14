@@ -36,6 +36,8 @@ export function TMImportWizard({
 
   useEffect(() => {
     terminalStateHandledRef.current = false;
+    // Reset per-job progress state immediately when a new job id is assigned.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setJobProgress(null);
   }, [jobId]);
 

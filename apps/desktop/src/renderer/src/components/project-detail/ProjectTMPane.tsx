@@ -7,24 +7,35 @@ interface ProjectTMPaneProps {
   onUnmountTM: (tmId: string) => void;
 }
 
-export function ProjectTMPane({ mountedTMs, allMainTMs, onMountTM, onUnmountTM }: ProjectTMPaneProps) {
-  const workingTMs = mountedTMs.filter(tm => tm.type === 'working');
-  const mountedMainTMs = mountedTMs.filter(tm => tm.type === 'main');
+export function ProjectTMPane({
+  mountedTMs,
+  allMainTMs,
+  onMountTM,
+  onUnmountTM,
+}: ProjectTMPaneProps) {
+  const workingTMs = mountedTMs.filter((tm) => tm.type === 'working');
+  const mountedMainTMs = mountedTMs.filter((tm) => tm.type === 'main');
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div>
-        <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Working Translation Memory</h3>
+        <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">
+          Working Translation Memory
+        </h3>
         <div className="bg-blue-50/50 p-6 rounded-xl border border-blue-100">
-          {workingTMs.map(tm => (
+          {workingTMs.map((tm) => (
             <div key={tm.id} className="flex justify-between items-center">
               <div>
                 <h4 className="font-bold text-blue-900">{tm.name}</h4>
-                <p className="text-xs text-blue-600 mt-1">Automatic updates on segment confirmation. Read/Write enabled.</p>
+                <p className="text-xs text-blue-600 mt-1">
+                  Automatic updates on segment confirmation. Read/Write enabled.
+                </p>
               </div>
               <div className="text-right">
                 <span className="block text-lg font-bold text-blue-900">{tm.entryCount || 0}</span>
-                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-tight">Segments</span>
+                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-tight">
+                  Segments
+                </span>
               </div>
             </div>
           ))}
@@ -33,7 +44,9 @@ export function ProjectTMPane({ mountedTMs, allMainTMs, onMountTM, onUnmountTM }
 
       <div>
         <div className="flex justify-between items-end mb-4">
-          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider">Mounted Main TMs (Read-only)</h3>
+          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider">
+            Mounted Main TMs (Read-only)
+          </h3>
           <div className="flex items-center gap-2">
             <select
               className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium outline-none"
@@ -47,8 +60,8 @@ export function ProjectTMPane({ mountedTMs, allMainTMs, onMountTM, onUnmountTM }
                 + Main TM
               </option>
               {allMainTMs
-                .filter(tm => !mountedTMs.find(mounted => mounted.id === tm.id))
-                .map(tm => (
+                .filter((tm) => !mountedTMs.find((mounted) => mounted.id === tm.id))
+                .map((tm) => (
                   <option key={tm.id} value={tm.id}>
                     {tm.name} ({tm.srcLang}→{tm.tgtLang})
                   </option>
@@ -63,8 +76,11 @@ export function ProjectTMPane({ mountedTMs, allMainTMs, onMountTM, onUnmountTM }
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3">
-            {mountedMainTMs.map(tm => (
-              <div key={tm.id} className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl">
+            {mountedMainTMs.map((tm) => (
+              <div
+                key={tm.id}
+                className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl"
+              >
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center text-purple-600">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -85,7 +101,9 @@ export function ProjectTMPane({ mountedTMs, allMainTMs, onMountTM, onUnmountTM }
                 </div>
                 <div className="flex items-center gap-6">
                   <div className="text-right">
-                    <span className="block text-sm font-bold text-gray-700">{tm.entryCount || 0}</span>
+                    <span className="block text-sm font-bold text-gray-700">
+                      {tm.entryCount || 0}
+                    </span>
                     <span className="text-[9px] font-bold text-gray-400 uppercase">Segments</span>
                   </div>
                   <button
@@ -94,7 +112,12 @@ export function ProjectTMPane({ mountedTMs, allMainTMs, onMountTM, onUnmountTM }
                     title="Unmount from Project"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
                     </svg>
                   </button>
                 </div>

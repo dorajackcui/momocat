@@ -77,6 +77,8 @@ export const EditorRow: React.FC<EditorRowProps> = ({
   }, []);
 
   useEffect(() => {
+    // Sync local draft when active segment changes or external updates arrive.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraftText(targetEditorText);
   }, [targetEditorText, segment.segmentId]);
 
@@ -86,6 +88,8 @@ export const EditorRow: React.FC<EditorRowProps> = ({
       onAutoFocus?.(segment.segmentId);
     }
     if (!isActive) {
+      // Reset transient insertion UI when row loses focus.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowTagInsertionUI(false);
     }
   }, [disableAutoFocus, isActive, onAutoFocus, segment.segmentId]);
@@ -192,9 +196,9 @@ export const EditorRow: React.FC<EditorRowProps> = ({
           ? 'bg-teal-500'
           : segment.status === 'translated'
             ? 'bg-blue-500'
-        : segment.status === 'draft'
-          ? 'bg-yellow-500'
-          : 'bg-gray-400';
+            : segment.status === 'draft'
+              ? 'bg-yellow-500'
+              : 'bg-gray-400';
 
   const statusTitle = hasError
     ? `Status: ${segment.status} (QA error)`
@@ -345,9 +349,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
           spellCheck={false}
           className={`relative z-10 w-full min-h-[44px] px-3 py-3 text-[14px] font-sans leading-relaxed bg-transparent outline-none resize-none overflow-hidden whitespace-pre-wrap break-words text-gray-800 ${
             !isActive ? 'pointer-events-none' : ''
-          } ${
-            !isActive ? 'caret-transparent' : ''
-          }`}
+          } ${!isActive ? 'caret-transparent' : ''}`}
         />
 
         {showTargetHighlightOverlay && (

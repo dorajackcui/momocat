@@ -34,11 +34,17 @@ export function ProjectAIPane({ ai, projectType = 'translation' }: ProjectAIPane
             ai.hasUnsavedPromptChanges ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600'
           }`}
         >
-          {ai.savingPrompt ? 'Saving...' : ai.hasUnsavedPromptChanges ? 'Save AI Settings' : 'AI Settings Saved'}
+          {ai.savingPrompt
+            ? 'Saving...'
+            : ai.hasUnsavedPromptChanges
+              ? 'Save AI Settings'
+              : 'AI Settings Saved'}
         </button>
       </div>
       <div className="mb-3">
-        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Temperature</label>
+        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
+          Temperature
+        </label>
         <input
           type="number"
           min={0}
@@ -48,12 +54,18 @@ export function ProjectAIPane({ ai, projectType = 'translation' }: ProjectAIPane
           onChange={(event) => ai.setTemperatureDraft(event.target.value)}
           placeholder="0.2"
           className={`w-40 text-sm bg-white border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 ${
-            ai.hasInvalidTemperature ? 'border-red-300 focus:ring-red-500' : 'border-gray-200 focus:ring-blue-500'
+            ai.hasInvalidTemperature
+              ? 'border-red-300 focus:ring-red-500'
+              : 'border-gray-200 focus:ring-blue-500'
           }`}
         />
-        <p className="mt-1 text-[11px] text-gray-500">Range `0` to `2`. Lower is more deterministic. Default is `0.2`.</p>
+        <p className="mt-1 text-[11px] text-gray-500">
+          Range `0` to `2`. Lower is more deterministic. Default is `0.2`.
+        </p>
         {ai.hasInvalidTemperature && (
-          <p className="mt-1 text-[11px] text-red-500">Please enter a valid number from `0` to `2`.</p>
+          <p className="mt-1 text-[11px] text-red-500">
+            Please enter a valid number from `0` to `2`.
+          </p>
         )}
       </div>
       <textarea
@@ -126,19 +138,25 @@ export function ProjectAIPane({ ai, projectType = 'translation' }: ProjectAIPane
                   ? 'Processed Text'
                   : 'Translated Text'}
             </div>
-            <div className="text-xs text-gray-600 bg-white border border-gray-200 rounded-lg px-3 py-2">{ai.testResult}</div>
+            <div className="text-xs text-gray-600 bg-white border border-gray-200 rounded-lg px-3 py-2">
+              {ai.testResult}
+            </div>
           </div>
         )}
         {ai.testError && (
           <div className="mt-2">
-            <div className="text-[10px] font-bold text-red-400 uppercase tracking-wider mb-1">Error</div>
-            <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{ai.testError}</div>
+            <div className="text-[10px] font-bold text-red-400 uppercase tracking-wider mb-1">
+              Error
+            </div>
+            <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {ai.testError}
+            </div>
           </div>
         )}
         {ai.hasTestDetails && (
           <div className="mt-2">
             <button
-              onClick={() => ai.setShowTestDetails(prev => !prev)}
+              onClick={() => ai.setShowTestDetails((prev) => !prev)}
               className="text-[10px] text-blue-600 font-bold hover:underline"
             >
               {ai.showTestDetails ? 'Hide Test Details' : 'Show Test Details'}
@@ -149,13 +167,19 @@ export function ProjectAIPane({ ai, projectType = 'translation' }: ProjectAIPane
           <>
             {ai.testMeta && (
               <div className="mt-2">
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Transport</div>
-                <div className="text-[10px] text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-2">{ai.testMeta}</div>
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                  Transport
+                </div>
+                <div className="text-[10px] text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                  {ai.testMeta}
+                </div>
               </div>
             )}
             {ai.testUserMessage && (
               <div className="mt-2">
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">User Message</div>
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                  User Message
+                </div>
                 <div className="text-[10px] text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-2 whitespace-pre-wrap">
                   {ai.testUserMessage}
                 </div>
@@ -163,7 +187,9 @@ export function ProjectAIPane({ ai, projectType = 'translation' }: ProjectAIPane
             )}
             {ai.testPromptUsed && (
               <div className="mt-2">
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">System Prompt</div>
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                  System Prompt
+                </div>
                 <div className="text-[10px] text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-2 whitespace-pre-wrap">
                   {ai.testPromptUsed}
                 </div>
@@ -171,7 +197,9 @@ export function ProjectAIPane({ ai, projectType = 'translation' }: ProjectAIPane
             )}
             {ai.testRawResponse && (
               <div className="mt-2">
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Raw OpenAI Response</div>
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                  Raw OpenAI Response
+                </div>
                 <div className="text-[10px] text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-2 whitespace-pre-wrap max-h-40 overflow-auto">
                   {ai.testRawResponse}
                 </div>

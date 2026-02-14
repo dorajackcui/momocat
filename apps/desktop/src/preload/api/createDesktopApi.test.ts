@@ -27,19 +27,29 @@ describe('createDesktopApi smoke', () => {
 
   it('subscribes and unsubscribes event channels correctly', () => {
     const invoke = vi.fn().mockResolvedValue(undefined);
-    const listenerStore = new Map<string, ((event: IpcRendererEvent, payload: unknown) => void)[]>();
-    const on = vi.fn((channel: string, listener: (event: IpcRendererEvent, payload: unknown) => void) => {
-      listenerStore.set(channel, [...(listenerStore.get(channel) ?? []), listener]);
-    });
-    const removeListener = vi.fn((channel: string, listener: (event: IpcRendererEvent, payload: unknown) => void) => {
-      const listeners = listenerStore.get(channel) ?? [];
-      listenerStore.set(channel, listeners.filter((item) => item !== listener));
-    });
+    const listenerStore = new Map<
+      string,
+      ((event: IpcRendererEvent, payload: unknown) => void)[]
+    >();
+    const on = vi.fn(
+      (channel: string, listener: (event: IpcRendererEvent, payload: unknown) => void) => {
+        listenerStore.set(channel, [...(listenerStore.get(channel) ?? []), listener]);
+      },
+    );
+    const removeListener = vi.fn(
+      (channel: string, listener: (event: IpcRendererEvent, payload: unknown) => void) => {
+        const listeners = listenerStore.get(channel) ?? [];
+        listenerStore.set(
+          channel,
+          listeners.filter((item) => item !== listener),
+        );
+      },
+    );
 
     const api = createDesktopApi({
       invoke,
       on,
-      removeListener
+      removeListener,
     });
 
     const callback = vi.fn();

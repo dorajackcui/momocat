@@ -17,24 +17,24 @@ describe('ProjectFileModule.addFileToProject cleanup', () => {
       getProject: vi.fn().mockReturnValue({ id: 1 }),
       createFile: vi.fn().mockReturnValue(createdFileId),
       deleteFile: vi.fn(),
-      getFile: vi.fn()
+      getFile: vi.fn(),
     } as unknown as ProjectRepository;
 
     const segmentRepo = {
-      bulkInsertSegments: vi.fn()
+      bulkInsertSegments: vi.fn(),
     } as unknown as SegmentRepository;
 
     const filter = {
       import: vi.fn().mockRejectedValue(new Error('Import failed')),
       export: vi.fn(),
-      getPreview: vi.fn()
+      getPreview: vi.fn(),
     } as unknown as SpreadsheetGateway;
 
     const module = new ProjectFileModule(projectRepo, segmentRepo, filter, rootDir);
     const options = {
       hasHeader: true,
       sourceCol: 0,
-      targetCol: 1
+      targetCol: 1,
     };
 
     try {
@@ -60,7 +60,7 @@ describe('ProjectFileModule.addFileToProject cleanup', () => {
       getProject: vi.fn().mockReturnValue({ id: 1 }),
       createFile: vi.fn().mockReturnValue(createdFileId),
       deleteFile: vi.fn(),
-      getFile: vi.fn()
+      getFile: vi.fn(),
     } as unknown as ProjectRepository;
 
     const importedSegments: Segment[] = [
@@ -74,27 +74,27 @@ describe('ProjectFileModule.addFileToProject cleanup', () => {
         tagsSignature: '',
         matchKey: 'hello',
         srcHash: 'hash-1',
-        meta: { updatedAt: new Date().toISOString() }
-      }
+        meta: { updatedAt: new Date().toISOString() },
+      },
     ];
 
     const segmentRepo = {
       bulkInsertSegments: vi.fn().mockImplementation(() => {
         throw new Error('Insert failed');
-      })
+      }),
     } as unknown as SegmentRepository;
 
     const filter = {
       import: vi.fn().mockResolvedValue(importedSegments),
       export: vi.fn(),
-      getPreview: vi.fn()
+      getPreview: vi.fn(),
     } as unknown as SpreadsheetGateway;
 
     const module = new ProjectFileModule(projectRepo, segmentRepo, filter, rootDir);
     const options = {
       hasHeader: true,
       sourceCol: 0,
-      targetCol: 1
+      targetCol: 1,
     };
 
     try {
@@ -122,24 +122,24 @@ describe('ProjectFileModule.addFileToProject cleanup', () => {
       deleteFile: vi.fn().mockImplementation(() => {
         throw new Error('cleanup delete failed');
       }),
-      getFile: vi.fn()
+      getFile: vi.fn(),
     } as unknown as ProjectRepository;
 
     const segmentRepo = {
-      bulkInsertSegments: vi.fn()
+      bulkInsertSegments: vi.fn(),
     } as unknown as SegmentRepository;
 
     const filter = {
       import: vi.fn().mockRejectedValue(new Error('Import failed')),
       export: vi.fn(),
-      getPreview: vi.fn()
+      getPreview: vi.fn(),
     } as unknown as SpreadsheetGateway;
 
     const module = new ProjectFileModule(projectRepo, segmentRepo, filter, rootDir);
     const options = {
       hasHeader: true,
       sourceCol: 0,
-      targetCol: 1
+      targetCol: 1,
     };
 
     try {

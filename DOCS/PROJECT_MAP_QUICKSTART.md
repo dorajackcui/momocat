@@ -1,6 +1,6 @@
 # 项目上手地图（快速定位版）
 
-最后更新：2026-02-11
+最后更新：2026-02-14
 
 这份文档的目标不是“讲全”，而是帮你在改功能时 1-2 分钟内找到入口，不再迷路。
 
@@ -236,10 +236,11 @@ TMImportWizard / TBImportWizard
 
 ## 7) 与其他文档的关系
 
+- 要看“当前执行状态/阻塞项”：`DOCS/CURRENT_STATUS.md`
 - 要看“完整结构定义”：`DOCS/PROJECT_STRUCTURE.md`
 - 要看“数据库细节”：`DOCS/DATABASE_SCHEMA.md`
 - 要看“开发约束”：`DOCS/DEVELOPMENT_GUIDE.md`
-- 要看“功能开发门槛与收口结论”：`DOCS/PRE_FEATURE_GATES_2026-02-11.md`
-- 要看“改造优先级”：`DOCS/REFACTOR_PROGRESS_TRACKER_2026-02-10.md`
+- 要看“版本阶段目标”：`DOCS/ROADMAP.md`
+- 要看“历史门禁与整改背景”：`DOCS/archive/`
 
 本文档定位是快速上手导航，不替代上述规范文档。

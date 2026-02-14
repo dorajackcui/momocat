@@ -7,8 +7,12 @@ type DialogApiKeys = 'openFileDialog' | 'saveFileDialog';
 export function createDialogApi(ipcRenderer: IpcRendererLike): DesktopApiSlice<DialogApiKeys> {
   return {
     openFileDialog: (filters) =>
-      ipcRenderer.invoke(IPC_CHANNELS.dialog.openFile, filters) as ReturnType<DesktopApi['openFileDialog']>,
+      ipcRenderer.invoke(IPC_CHANNELS.dialog.openFile, filters) as ReturnType<
+        DesktopApi['openFileDialog']
+      >,
     saveFileDialog: (defaultPath, filters) =>
-      ipcRenderer.invoke(IPC_CHANNELS.dialog.saveFile, defaultPath, filters) as ReturnType<DesktopApi['saveFileDialog']>
+      ipcRenderer.invoke(IPC_CHANNELS.dialog.saveFile, defaultPath, filters) as ReturnType<
+        DesktopApi['saveFileDialog']
+      >,
   };
 }

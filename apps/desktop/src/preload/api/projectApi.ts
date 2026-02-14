@@ -20,42 +20,69 @@ type ProjectApiKeys =
 
 export function createProjectApi(ipcRenderer: IpcRendererLike): DesktopApiSlice<ProjectApiKeys> {
   return {
-    listProjects: () => ipcRenderer.invoke(IPC_CHANNELS.project.list) as ReturnType<DesktopApi['listProjects']>,
+    listProjects: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.project.list) as ReturnType<DesktopApi['listProjects']>,
     createProject: (name, srcLang, tgtLang, projectType) =>
-      ipcRenderer.invoke(IPC_CHANNELS.project.create, name, srcLang, tgtLang, projectType) as ReturnType<DesktopApi['createProject']>,
+      ipcRenderer.invoke(
+        IPC_CHANNELS.project.create,
+        name,
+        srcLang,
+        tgtLang,
+        projectType,
+      ) as ReturnType<DesktopApi['createProject']>,
     deleteProject: (projectId) =>
-      ipcRenderer.invoke(IPC_CHANNELS.project.remove, projectId) as ReturnType<DesktopApi['deleteProject']>,
+      ipcRenderer.invoke(IPC_CHANNELS.project.remove, projectId) as ReturnType<
+        DesktopApi['deleteProject']
+      >,
     getProject: (projectId) =>
-      ipcRenderer.invoke(IPC_CHANNELS.project.get, projectId) as ReturnType<DesktopApi['getProject']>,
+      ipcRenderer.invoke(IPC_CHANNELS.project.get, projectId) as ReturnType<
+        DesktopApi['getProject']
+      >,
     updateProjectPrompt: (projectId, aiPrompt) =>
-      ipcRenderer.invoke(IPC_CHANNELS.project.updatePrompt, projectId, aiPrompt) as ReturnType<DesktopApi['updateProjectPrompt']>,
+      ipcRenderer.invoke(IPC_CHANNELS.project.updatePrompt, projectId, aiPrompt) as ReturnType<
+        DesktopApi['updateProjectPrompt']
+      >,
     updateProjectAISettings: (projectId, aiPrompt, aiTemperature) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.project.updateAISettings,
         projectId,
         aiPrompt,
-        aiTemperature
+        aiTemperature,
       ) as ReturnType<DesktopApi['updateProjectAISettings']>,
     getProjectFiles: (projectId) =>
-      ipcRenderer.invoke(IPC_CHANNELS.project.getFiles, projectId) as ReturnType<DesktopApi['getProjectFiles']>,
-    getFile: (fileId) => ipcRenderer.invoke(IPC_CHANNELS.file.get, fileId) as ReturnType<DesktopApi['getFile']>,
+      ipcRenderer.invoke(IPC_CHANNELS.project.getFiles, projectId) as ReturnType<
+        DesktopApi['getProjectFiles']
+      >,
+    getFile: (fileId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.file.get, fileId) as ReturnType<DesktopApi['getFile']>,
     getFilePreview: (filePath) =>
-      ipcRenderer.invoke(IPC_CHANNELS.file.getPreview, filePath) as ReturnType<DesktopApi['getFilePreview']>,
+      ipcRenderer.invoke(IPC_CHANNELS.file.getPreview, filePath) as ReturnType<
+        DesktopApi['getFilePreview']
+      >,
     deleteFile: (fileId) =>
       ipcRenderer.invoke(IPC_CHANNELS.file.remove, fileId) as ReturnType<DesktopApi['deleteFile']>,
     addFileToProject: (projectId, filePath, options) =>
-      ipcRenderer.invoke(IPC_CHANNELS.project.addFile, projectId, filePath, options) as ReturnType<DesktopApi['addFileToProject']>,
+      ipcRenderer.invoke(IPC_CHANNELS.project.addFile, projectId, filePath, options) as ReturnType<
+        DesktopApi['addFileToProject']
+      >,
     getSegments: (fileId, offset, limit) =>
-      ipcRenderer.invoke(IPC_CHANNELS.file.getSegments, fileId, offset, limit) as ReturnType<DesktopApi['getSegments']>,
+      ipcRenderer.invoke(IPC_CHANNELS.file.getSegments, fileId, offset, limit) as ReturnType<
+        DesktopApi['getSegments']
+      >,
     exportFile: (fileId, outputPath, options, forceExport) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.file.export,
         fileId,
         outputPath,
         options as ImportOptions | undefined,
-        forceExport
+        forceExport,
       ) as ReturnType<DesktopApi['exportFile']>,
     updateSegment: (segmentId, targetTokens, status) =>
-      ipcRenderer.invoke(IPC_CHANNELS.segment.update, segmentId, targetTokens, status) as ReturnType<DesktopApi['updateSegment']>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.segment.update,
+        segmentId,
+        targetTokens,
+        status,
+      ) as ReturnType<DesktopApi['updateSegment']>,
   };
 }

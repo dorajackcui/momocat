@@ -9,7 +9,12 @@ import { SqliteTMRepository } from './adapters/SqliteTMRepository';
 import { SqliteTransactionManager } from './adapters/SqliteTransactionManager';
 import { SegmentRepository } from './ports';
 
-function buildSegment(segmentId: string, fileId: number, orderIndex: number, srcHash: string): Segment {
+function buildSegment(
+  segmentId: string,
+  fileId: number,
+  orderIndex: number,
+  srcHash: string,
+): Segment {
   return {
     segmentId,
     fileId,
@@ -20,18 +25,18 @@ function buildSegment(segmentId: string, fileId: number, orderIndex: number, src
     tagsSignature: '',
     matchKey: 'hello',
     srcHash,
-    meta: { updatedAt: new Date().toISOString() }
+    meta: { updatedAt: new Date().toISOString() },
   };
 }
 
 function toText(tokens: Token[]): string {
-  return tokens.map(token => token.content).join('');
+  return tokens.map((token) => token.content).join('');
 }
 
 class FailingPropagationSegmentRepository implements SegmentRepository {
   constructor(
     private readonly delegate: SegmentRepository,
-    private readonly failingSegmentId: string
+    private readonly failingSegmentId: string,
   ) {}
 
   bulkInsertSegments(segments: Segment[]): void {
@@ -82,7 +87,7 @@ describe('SegmentService transactional confirmation flow', () => {
 
     db.bulkInsertSegments([
       buildSegment('seg-1', fileId, 0, srcHash),
-      buildSegment('seg-2', fileId, 1, srcHash)
+      buildSegment('seg-2', fileId, 1, srcHash),
     ]);
 
     const projectRepo = new SqliteProjectRepository(db);
@@ -107,7 +112,7 @@ describe('SegmentService transactional confirmation flow', () => {
     expect(repeated?.status).toBe('draft');
     expect(toText(repeated?.targetTokens ?? [])).toBe('你好');
 
-    const workingTM = db.getProjectMountedTMs(projectId).find(tm => tm.type === 'working');
+    const workingTM = db.getProjectMountedTMs(projectId).find((tm) => tm.type === 'working');
     expect(workingTM).toBeDefined();
     if (!workingTM) {
       throw new Error('Expected working TM to exist');
@@ -120,7 +125,7 @@ describe('SegmentService transactional confirmation flow', () => {
     expect(eventSpy.mock.calls[0][0]).toMatchObject({
       segmentId: 'seg-1',
       status: 'confirmed',
-      propagatedIds: ['seg-2']
+      propagatedIds: ['seg-2'],
     });
   });
 
@@ -132,7 +137,7 @@ describe('SegmentService transactional confirmation flow', () => {
 
     db.bulkInsertSegments([
       buildSegment('seg-1', fileId, 0, srcHash),
-      buildSegment('seg-2', fileId, 1, srcHash)
+      buildSegment('seg-2', fileId, 1, srcHash),
     ]);
 
     const projectRepo = new SqliteProjectRepository(db);
@@ -147,7 +152,9 @@ describe('SegmentService transactional confirmation flow', () => {
     service.on('segments-updated', eventSpy);
 
     const targetTokens: Token[] = [{ type: 'text', content: '你好' }];
-    await expect(service.updateSegment('seg-1', targetTokens, 'confirmed')).rejects.toThrow('Propagation failed');
+    await expect(service.updateSegment('seg-1', targetTokens, 'confirmed')).rejects.toThrow(
+      'Propagation failed',
+    );
 
     const source = db.getSegment('seg-1');
     const repeated = db.getSegment('seg-2');
@@ -156,7 +163,7 @@ describe('SegmentService transactional confirmation flow', () => {
     expect(repeated?.status).toBe('new');
     expect(repeated?.targetTokens).toEqual([]);
 
-    const workingTM = db.getProjectMountedTMs(projectId).find(tm => tm.type === 'working');
+    const workingTM = db.getProjectMountedTMs(projectId).find((tm) => tm.type === 'working');
     expect(workingTM).toBeDefined();
     if (!workingTM) {
       throw new Error('Expected working TM to exist');

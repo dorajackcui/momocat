@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Segment } from '@cat/core';
 import { TBService } from './TBService';
+import type { TBRepository } from './ports';
 
 function buildSegment(sourceText: string): Segment {
   return {
@@ -14,16 +15,16 @@ function buildSegment(sourceText: string): Segment {
     matchKey: sourceText.toLowerCase(),
     srcHash: sourceText.toLowerCase(),
     meta: {
-      updatedAt: new Date().toISOString()
-    }
+      updatedAt: new Date().toISOString(),
+    },
   };
 }
 
-function createServiceWithEntries(entries: any[]) {
+function createServiceWithEntries(entries: ReturnType<TBRepository['listProjectTermEntries']>) {
   const dbMock = {
-    listProjectTermEntries: () => entries
-  } as any;
-  return new TBService(dbMock);
+    listProjectTermEntries: () => entries,
+  } satisfies Pick<TBRepository, 'listProjectTermEntries'>;
+  return new TBService(dbMock as TBRepository);
 }
 
 describe('TBService', () => {
@@ -40,7 +41,7 @@ describe('TBService', () => {
         updatedAt: '',
         usageCount: 1,
         tbName: 'Season TB',
-        priority: 1
+        priority: 1,
       },
       {
         id: 'tb-2',
@@ -53,8 +54,8 @@ describe('TBService', () => {
         updatedAt: '',
         usageCount: 1,
         tbName: 'Noise TB',
-        priority: 2
-      }
+        priority: 2,
+      },
     ]);
 
     const matches = await service.findMatches(1, buildSegment('Warmth Amid Winter'));
@@ -76,8 +77,8 @@ describe('TBService', () => {
         updatedAt: '',
         usageCount: 1,
         tbName: 'UI TB',
-        priority: 1
-      }
+        priority: 1,
+      },
     ]);
 
     const matches = await service.findMatches(1, buildSegment('请点击设置按钮然后保存'));
@@ -99,7 +100,7 @@ describe('TBService', () => {
         updatedAt: '',
         usageCount: 1,
         tbName: 'TB 1',
-        priority: 1
+        priority: 1,
       },
       {
         id: 'tb-5',
@@ -112,8 +113,8 @@ describe('TBService', () => {
         updatedAt: '',
         usageCount: 1,
         tbName: 'TB 1',
-        priority: 1
-      }
+        priority: 1,
+      },
     ]);
 
     const matches = await service.findMatches(1, buildSegment('Warmth Amid Winter'));
@@ -135,7 +136,7 @@ describe('TBService', () => {
         updatedAt: '',
         usageCount: 1,
         tbName: 'Priority TB',
-        priority: 1
+        priority: 1,
       },
       {
         id: 'tb-7',
@@ -148,8 +149,8 @@ describe('TBService', () => {
         updatedAt: '',
         usageCount: 1,
         tbName: 'Low Priority TB',
-        priority: 9
-      }
+        priority: 9,
+      },
     ]);
 
     const matches = await service.findMatches(1, buildSegment('Please keep your API key secure.'));

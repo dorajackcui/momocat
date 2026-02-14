@@ -10,7 +10,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ segments, compact }) =
   const total = segments.length;
   const completed = segments.filter((s) => s.status === 'confirmed').length;
   const draft = segments.filter((s) => s.status === 'draft').length;
-  
+
   const completedPct = total === 0 ? 0 : (completed / total) * 100;
   const draftPct = total === 0 ? 0 : (draft / total) * 100;
 
@@ -50,7 +50,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ segments, compact }) =
         </div>
         <span>Total: {total}</span>
       </div>
-      
+
       <div className="h-2 bg-gray-200 rounded-full overflow-hidden flex">
         <div
           className="h-full bg-green-500 transition-all duration-500"

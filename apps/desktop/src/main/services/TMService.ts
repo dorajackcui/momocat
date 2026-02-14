@@ -1,4 +1,9 @@
-import { Segment, TMEntry, serializeTokensToDisplayText, serializeTokensToTextOnly } from '@cat/core';
+import {
+  Segment,
+  TMEntry,
+  serializeTokensToDisplayText,
+  serializeTokensToTextOnly,
+} from '@cat/core';
 import { randomUUID } from 'crypto';
 import { distance } from 'fastest-levenshtein';
 import { ProjectRepository, TMRepository } from './ports';
@@ -27,8 +32,10 @@ export class TMService {
 
     // V5: Find the writable TM (Working TM) for this project
     const mountedTMs = this.tmRepo.getProjectMountedTMs(projectId);
-    const workingTM = mountedTMs.find(tm => tm.type === 'working' && (tm.permission === 'write' || tm.permission === 'readwrite'));
-    
+    const workingTM = mountedTMs.find(
+      (tm) => tm.type === 'working' && (tm.permission === 'write' || tm.permission === 'readwrite'),
+    );
+
     if (!workingTM) {
       console.warn(`[TMService] No writable Working TM found for project ${projectId}`);
       return;
@@ -48,7 +55,7 @@ export class TMService {
       originSegmentId: segment.segmentId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      usageCount: 1
+      usageCount: 1,
     };
 
     const entryId = this.tmRepo.upsertTMEntryBySrcHash(entry);
@@ -56,7 +63,7 @@ export class TMService {
       workingTM.id,
       serializeTokensToDisplayText(segment.sourceTokens),
       serializeTokensToDisplayText(segment.targetTokens),
-      entryId
+      entryId,
     );
   }
 
@@ -67,21 +74,20 @@ export class TMService {
     const mountedTMs = this.tmRepo.getProjectMountedTMs(projectId);
     if (mountedTMs.length === 0) return [];
 
-    const sourceText = serializeTokensToDisplayText(segment.sourceTokens);
     const sourceTextOnly = serializeTokensToTextOnly(segment.sourceTokens);
-    
+
     const results: TMMatch[] = [];
     const seenHashes = new Set<string>();
 
     // 1. First, check for 100% matches (exact hash)
-      for (const tm of mountedTMs) {
+    for (const tm of mountedTMs) {
       const match = this.tmRepo.findTMEntryByHash(tm.id, segment.srcHash);
       if (match) {
         results.push({
           ...match,
           similarity: 100,
           tmName: tm.name,
-          tmType: tm.type
+          tmType: tm.type,
         });
         seenHashes.add(match.srcHash);
       }
@@ -92,18 +98,17 @@ export class TMService {
     const query = sourceTextOnly
       .replace(/[^\w\s\u4e00-\u9fa5]/g, ' ')
       .split(/\s+/)
-      .filter(w => w.length >= 2)
+      .filter((w) => w.length >= 2)
       .join(' OR ');
 
     if (query) {
       const candidates = this.tmRepo.searchConcordance(projectId, query);
-      
+
       for (const cand of candidates) {
         if (seenHashes.has(cand.srcHash)) continue;
 
-        const candText = serializeTokensToDisplayText(cand.sourceTokens);
         const candTextOnly = serializeTokensToTextOnly(cand.sourceTokens);
-        
+
         let similarity = 0;
 
         // Logic A: Text is identical, but Tags are different
@@ -117,12 +122,12 @@ export class TMService {
         }
 
         if (similarity >= 70) {
-          const tm = mountedTMs.find(t => t.id === cand.tmId);
+          const tm = mountedTMs.find((t) => t.id === cand.tmId);
           results.push({
             ...cand,
             similarity,
             tmName: tm?.name || 'Unknown TM',
-            tmType: tm?.type || 'main'
+            tmType: tm?.type || 'main',
           });
           seenHashes.add(cand.srcHash);
         }
@@ -139,7 +144,7 @@ export class TMService {
   public async find100Match(projectId: number, srcHash: string) {
     // Keep for backward compatibility if needed, but UI should move to findMatches
     const mountedTMs = this.tmRepo.getProjectMountedTMs(projectId);
-    
+
     for (const tm of mountedTMs) {
       const match = this.tmRepo.findTMEntryByHash(tm.id, srcHash);
       if (match) {
@@ -147,11 +152,11 @@ export class TMService {
           ...match,
           similarity: 100,
           tmName: tm.name,
-          tmType: tm.type
+          tmType: tm.type,
         };
       }
     }
-    
+
     return null;
   }
 }

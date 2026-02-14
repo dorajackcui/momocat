@@ -12,14 +12,26 @@ type AIApiKeys =
 
 export function createAIApi(ipcRenderer: IpcRendererLike): DesktopApiSlice<AIApiKeys> {
   return {
-    getAISettings: () => ipcRenderer.invoke(IPC_CHANNELS.ai.getSettings) as ReturnType<DesktopApi['getAISettings']>,
-    setAIKey: (apiKey) => ipcRenderer.invoke(IPC_CHANNELS.ai.setKey, apiKey) as ReturnType<DesktopApi['setAIKey']>,
-    clearAIKey: () => ipcRenderer.invoke(IPC_CHANNELS.ai.clearKey) as ReturnType<DesktopApi['clearAIKey']>,
+    getAISettings: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.ai.getSettings) as ReturnType<DesktopApi['getAISettings']>,
+    setAIKey: (apiKey) =>
+      ipcRenderer.invoke(IPC_CHANNELS.ai.setKey, apiKey) as ReturnType<DesktopApi['setAIKey']>,
+    clearAIKey: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.ai.clearKey) as ReturnType<DesktopApi['clearAIKey']>,
     testAIConnection: (apiKey) =>
-      ipcRenderer.invoke(IPC_CHANNELS.ai.testConnection, apiKey) as ReturnType<DesktopApi['testAIConnection']>,
+      ipcRenderer.invoke(IPC_CHANNELS.ai.testConnection, apiKey) as ReturnType<
+        DesktopApi['testAIConnection']
+      >,
     aiTranslateFile: (fileId) =>
-      ipcRenderer.invoke(IPC_CHANNELS.ai.translateFile, fileId) as ReturnType<DesktopApi['aiTranslateFile']>,
+      ipcRenderer.invoke(IPC_CHANNELS.ai.translateFile, fileId) as ReturnType<
+        DesktopApi['aiTranslateFile']
+      >,
     aiTestTranslate: (projectId, sourceText, contextText) =>
-      ipcRenderer.invoke(IPC_CHANNELS.ai.testTranslate, projectId, sourceText, contextText) as ReturnType<DesktopApi['aiTestTranslate']>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.ai.testTranslate,
+        projectId,
+        sourceText,
+        contextText,
+      ) as ReturnType<DesktopApi['aiTestTranslate']>,
   };
 }
