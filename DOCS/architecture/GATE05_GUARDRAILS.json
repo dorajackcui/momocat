@@ -61,6 +61,7 @@
       "unmountTermBaseFromProject",
       "updateFileStats",
       "updateProjectAISettings",
+      "updateProjectQASettings",
       "updateProjectPrompt",
       "updateSegmentTarget",
       "upsertTBEntryBySrcTerm",

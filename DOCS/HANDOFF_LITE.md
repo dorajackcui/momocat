@@ -22,9 +22,10 @@
 ## 2. 必须遵守（硬规则）
 
 1. `npm run gate:check` 不通过时，不合并。
-2. 触达 `ProjectService` / `CATDatabase` / IPC 契约时，必须补测试。
-3. 不做“顺手扩面重构”；只做当前任务直接相关改动。
-4. 文档与代码冲突时，以代码为准，并在本次改动补文档。
+2. 并行新 worktree 开工前先执行 `npm run worktree:deps:link`（已有本地依赖目录需覆盖时用 `npm run worktree:deps:link:force`）。
+3. 触达 `ProjectService` / `CATDatabase` / IPC 契约时，必须补测试。
+4. 不做“顺手扩面重构”；只做当前任务直接相关改动。
+5. 文档与代码冲突时，以代码为准，并在本次改动补文档。
 
 ## 3. 开工前需要给出的 4 点
 

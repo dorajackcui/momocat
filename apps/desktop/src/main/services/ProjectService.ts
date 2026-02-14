@@ -1,4 +1,12 @@
-import { ProjectAIModel, ProjectType, Segment, SegmentStatus, Token } from '@cat/core';
+import {
+  FileQaReport,
+  ProjectAIModel,
+  ProjectQASettings,
+  ProjectType,
+  Segment,
+  SegmentStatus,
+  Token,
+} from '@cat/core';
 import { CATDatabase } from '@cat/db';
 import { SpreadsheetFilter } from '../filters/SpreadsheetFilter';
 import { TMService } from './TMService';
@@ -143,6 +151,10 @@ export class ProjectService {
     aiModel: ProjectAIModel | null,
   ) {
     this.projectModule.updateProjectAISettings(projectId, aiPrompt, aiTemperature, aiModel);
+  }
+
+  public updateProjectQASettings(projectId: number, qaSettings: ProjectQASettings) {
+    this.projectModule.updateProjectQASettings(projectId, qaSettings);
   }
 
   public async deleteProject(projectId: number) {
@@ -301,6 +313,12 @@ export class ProjectService {
     forceExport: boolean = false,
   ) {
     return this.projectModule.exportFile(fileId, outputPath, options, forceExport);
+  }
+
+  public async runFileQA(fileId: number): Promise<FileQaReport> {
+    return this.projectModule.runFileQA(fileId, (projectId, segment) =>
+      this.tbModule.findTermMatches(projectId, segment),
+    );
   }
 
   public getAISettings(): { apiKeySet: boolean; apiKeyLast4?: string } {

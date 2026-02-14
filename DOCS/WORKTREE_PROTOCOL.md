@@ -39,7 +39,8 @@
 1. 读 `DOCS/HANDOFF_LITE.md`。
 2. 读 `DOCS/WORKTREE_PROTOCOL.md`。
 3. 读或创建 `DOCS/worktrees/<branch>.md`。
-4. 在任务卡写明“本次计划改动范围”后再开始编码。
+4. 新 worktree 先执行 `npm run worktree:deps:link`（如需覆盖本地依赖目录，使用 `npm run worktree:deps:link:force`）。
+5. 在任务卡写明“本次计划改动范围”后再开始编码。
 
 ## 6. 收工交接流程
 

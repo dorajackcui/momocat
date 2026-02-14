@@ -1,5 +1,5 @@
 import { CATDatabase } from '@cat/db';
-import { ProjectType, Segment, SegmentStatus, Token } from '@cat/core';
+import { ProjectType, QaIssue, Segment, SegmentStatus, Token } from '@cat/core';
 import { SegmentRepository } from '../ports';
 
 export class SqliteSegmentRepository implements SegmentRepository {
@@ -31,5 +31,9 @@ export class SqliteSegmentRepository implements SegmentRepository {
 
   updateSegmentTarget(segmentId: string, targetTokens: Token[], status: SegmentStatus): void {
     this.db.updateSegmentTarget(segmentId, targetTokens, status);
+  }
+
+  updateSegmentQaIssues(segmentId: string, qaIssues: QaIssue[]): void {
+    this.db.updateSegmentQaIssues(segmentId, qaIssues);
   }
 }

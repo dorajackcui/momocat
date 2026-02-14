@@ -164,3 +164,80 @@ describe('ProjectFileModule.addFileToProject cleanup', () => {
     }
   });
 });
+
+describe('ProjectFileModule.runFileQA', () => {
+  it('writes per-segment qa issues back to repository while building report', async () => {
+    const projectRepo = {
+      getFile: vi.fn().mockReturnValue({ id: 1, projectId: 99 }),
+      getProject: vi.fn().mockReturnValue({
+        id: 99,
+        qaSettings: {
+          enabledRuleIds: ['tag-integrity'],
+          instantQaOnConfirm: true,
+        },
+      }),
+    } as unknown as ProjectRepository;
+
+    const segments: Segment[] = [
+      {
+        segmentId: 'seg-has-error',
+        fileId: 1,
+        orderIndex: 0,
+        sourceTokens: [{ type: 'tag', content: '<1>' }],
+        targetTokens: [],
+        status: 'draft',
+        tagsSignature: '<1>',
+        matchKey: 'k1',
+        srcHash: 'h1',
+        meta: { rowRef: 3, updatedAt: new Date().toISOString() },
+      },
+      {
+        segmentId: 'seg-clean',
+        fileId: 1,
+        orderIndex: 1,
+        sourceTokens: [{ type: 'text', content: 'hello' }],
+        targetTokens: [{ type: 'text', content: '你好' }],
+        status: 'draft',
+        tagsSignature: '',
+        matchKey: 'k2',
+        srcHash: 'h2',
+        meta: { rowRef: 4, updatedAt: new Date().toISOString() },
+      },
+    ];
+
+    const segmentRepo = {
+      getSegmentsPage: vi
+        .fn()
+        .mockImplementation((_fileId: number, offset: number) => (offset === 0 ? segments : [])),
+      updateSegmentQaIssues: vi.fn(),
+    } as unknown as SegmentRepository;
+
+    const filter = {
+      import: vi.fn(),
+      export: vi.fn(),
+      getPreview: vi.fn(),
+    } as unknown as SpreadsheetGateway;
+
+    const module = new ProjectFileModule(projectRepo, segmentRepo, filter, '/tmp');
+    const report = await module.runFileQA(1, vi.fn().mockResolvedValue([]));
+
+    expect(report.checkedSegments).toBe(2);
+    expect(report.errorCount).toBe(1);
+    expect(report.warningCount).toBe(0);
+    expect(report.issues).toHaveLength(1);
+    expect(report.issues[0].segmentId).toBe('seg-has-error');
+
+    expect(segmentRepo.updateSegmentQaIssues).toHaveBeenCalledTimes(2);
+    expect(segmentRepo.updateSegmentQaIssues).toHaveBeenNthCalledWith(
+      1,
+      'seg-has-error',
+      expect.arrayContaining([
+        expect.objectContaining({
+          ruleId: 'tag-missing',
+          severity: 'error',
+        }),
+      ]),
+    );
+    expect(segmentRepo.updateSegmentQaIssues).toHaveBeenNthCalledWith(2, 'seg-clean', []);
+  });
+});

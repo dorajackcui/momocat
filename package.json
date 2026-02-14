@@ -10,6 +10,8 @@
     "dev": "npm run rebuild:electron && npm run dev --workspace=apps/desktop",
     "build": "npm run rebuild:electron && npm run build --workspace=apps/desktop",
     "pack": "npm run pack --workspace=apps/desktop",
+    "worktree:deps:link": "bash scripts/worktree-link-deps.sh",
+    "worktree:deps:link:force": "bash scripts/worktree-link-deps.sh --force",
     "lint": "npm run lint --workspaces",
     "gate:arch": "node scripts/gate-architecture-check.mjs",
     "gate:smoke:large-file": "vitest run apps/desktop/src/main/services/modules/TMModule.test.ts -t \"scans segments page by page\"",

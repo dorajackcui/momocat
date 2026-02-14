@@ -5,6 +5,7 @@ export const IPC_CHANNELS = {
     get: 'project-get',
     updatePrompt: 'project-update-prompt',
     updateAISettings: 'project-update-ai-settings',
+    updateQASettings: 'project-update-qa-settings',
     remove: 'project-delete',
     getFiles: 'project-get-files',
     addFile: 'project-add-file',
@@ -15,6 +16,7 @@ export const IPC_CHANNELS = {
     getSegments: 'file-get-segments',
     getPreview: 'file-get-preview',
     export: 'file-export',
+    runQA: 'file-run-qa',
   },
   segment: {
     update: 'segment-update',

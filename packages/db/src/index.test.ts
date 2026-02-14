@@ -1,83 +1,110 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { CATDatabase } from './index';
-import { join } from 'path';
-import { unlinkSync, existsSync } from 'fs';
+import { describe, it, expect, beforeEach } from "vitest";
+import { CATDatabase } from "./index";
+import { join } from "path";
+import { unlinkSync, existsSync } from "fs";
 
-describe('CATDatabase', () => {
+describe("CATDatabase", () => {
   let db: CATDatabase;
-  const testDbPath = ':memory:'; // Use in-memory for tests
+  const testDbPath = ":memory:"; // Use in-memory for tests
 
   beforeEach(() => {
     db = new CATDatabase(testDbPath);
   });
 
-  it('should create a project and retrieve it', () => {
-    const projectId = db.createProject('Test Project', 'en-US', 'zh-CN');
+  it("should create a project and retrieve it", () => {
+    const projectId = db.createProject("Test Project", "en-US", "zh-CN");
     expect(projectId).toBeGreaterThan(0);
 
     const project = db.getProject(projectId);
     expect(project).toBeDefined();
-    expect(project?.name).toBe('Test Project');
-    expect(project?.srcLang).toBe('en-US');
-    expect(project?.tgtLang).toBe('zh-CN');
-    expect(project?.projectType).toBe('translation');
-    expect(project?.aiModel).toBe('gpt-4o');
+    expect(project?.name).toBe("Test Project");
+    expect(project?.srcLang).toBe("en-US");
+    expect(project?.tgtLang).toBe("zh-CN");
+    expect(project?.projectType).toBe("translation");
+    expect(project?.aiModel).toBe("gpt-4o");
   });
 
-  it('should persist review project type', () => {
-    const projectId = db.createProject('Review Project', 'en-US', 'zh-CN', 'review');
+  it("should persist review project type", () => {
+    const projectId = db.createProject(
+      "Review Project",
+      "en-US",
+      "zh-CN",
+      "review",
+    );
     const project = db.getProject(projectId);
-    expect(project?.projectType).toBe('review');
+    expect(project?.projectType).toBe("review");
   });
 
-  it('should persist custom project type', () => {
-    const projectId = db.createProject('Custom Project', 'en-US', 'zh-CN', 'custom');
+  it("should persist custom project type", () => {
+    const projectId = db.createProject(
+      "Custom Project",
+      "en-US",
+      "zh-CN",
+      "custom",
+    );
     const project = db.getProject(projectId);
-    expect(project?.projectType).toBe('custom');
+    expect(project?.projectType).toBe("custom");
   });
 
-  it('should list projects with correct stats', () => {
-    db.createProject('P1', 'en', 'zh');
-    db.createProject('P2', 'en', 'ja');
+  it("should list projects with correct stats", () => {
+    db.createProject("P1", "en", "zh");
+    db.createProject("P2", "en", "ja");
 
     const projects = db.listProjects();
     expect(projects).toHaveLength(2);
-    const names = projects.map(p => p.name);
-    expect(names).toContain('P1');
-    expect(names).toContain('P2');
+    const names = projects.map((p) => p.name);
+    expect(names).toContain("P1");
+    expect(names).toContain("P2");
   });
 
-  it('should update project AI settings', () => {
-    const projectId = db.createProject('AI Settings Project', 'en-US', 'zh-CN');
-    db.updateProjectAISettings(projectId, 'Keep product names untranslated.', 0.7, 'gpt-5-mini');
+  it("should update project AI settings", () => {
+    const projectId = db.createProject("AI Settings Project", "en-US", "zh-CN");
+    db.updateProjectAISettings(
+      projectId,
+      "Keep product names untranslated.",
+      0.7,
+      "gpt-5-mini",
+    );
 
     const project = db.getProject(projectId);
-    expect(project?.aiPrompt).toBe('Keep product names untranslated.');
+    expect(project?.aiPrompt).toBe("Keep product names untranslated.");
     expect(project?.aiTemperature).toBe(0.7);
-    expect(project?.aiModel).toBe('gpt-5-mini');
+    expect(project?.aiModel).toBe("gpt-5-mini");
   });
 
-  it('should handle cascading delete (Project -> Files -> Segments)', () => {
+  it("should update project QA settings", () => {
+    const projectId = db.createProject("QA Settings Project", "en-US", "zh-CN");
+    db.updateProjectQASettings(projectId, {
+      enabledRuleIds: ["tag-integrity"],
+      instantQaOnConfirm: false,
+    });
+
+    const project = db.getProject(projectId);
+    expect(project?.qaSettings?.enabledRuleIds).toEqual(["tag-integrity"]);
+    expect(project?.qaSettings?.instantQaOnConfirm).toBe(false);
+  });
+
+  it("should handle cascading delete (Project -> Files -> Segments)", () => {
     // 1. Create Project
-    const projectId = db.createProject('Delete Me', 'en', 'zh');
-    
+    const projectId = db.createProject("Delete Me", "en", "zh");
+
     // 2. Create File
-    const fileId = db.createFile(projectId, 'test.xlsx');
-    
+    const fileId = db.createFile(projectId, "test.xlsx");
+
     // 3. Add Segments
     db.bulkInsertSegments([
       {
-        segmentId: 'seg1',
+        segmentId: "seg1",
         fileId: fileId,
         orderIndex: 0,
-        sourceTokens: [{ type: 'text', content: 'Hello' }],
+        sourceTokens: [{ type: "text", content: "Hello" }],
         targetTokens: [],
-        status: 'new',
-        tagsSignature: '',
-        matchKey: 'hello',
-        srcHash: 'hash1',
-        meta: { updatedAt: new Date().toISOString() }
-      }
+        status: "new",
+        tagsSignature: "",
+        matchKey: "hello",
+        srcHash: "hash1",
+        meta: { updatedAt: new Date().toISOString() },
+      },
     ]);
 
     // Verify exists
@@ -95,35 +122,35 @@ describe('CATDatabase', () => {
     // We can check stats or another query to be sure
   });
 
-  it('should update file stats when segments change', () => {
-    const projectId = db.createProject('Stats Project', 'en', 'zh');
-    const fileId = db.createFile(projectId, 'stats.xlsx');
-    
+  it("should update file stats when segments change", () => {
+    const projectId = db.createProject("Stats Project", "en", "zh");
+    const fileId = db.createFile(projectId, "stats.xlsx");
+
     db.bulkInsertSegments([
       {
-        segmentId: 's1',
+        segmentId: "s1",
         fileId: fileId,
         orderIndex: 0,
-        sourceTokens: [{ type: 'text', content: 'A' }],
+        sourceTokens: [{ type: "text", content: "A" }],
         targetTokens: [],
-        status: 'new',
-        tagsSignature: '',
-        matchKey: 'a',
-        srcHash: 'ha',
-        meta: { updatedAt: '' }
+        status: "new",
+        tagsSignature: "",
+        matchKey: "a",
+        srcHash: "ha",
+        meta: { updatedAt: "" },
       },
       {
-        segmentId: 's2',
+        segmentId: "s2",
         fileId: fileId,
         orderIndex: 1,
-        sourceTokens: [{ type: 'text', content: 'B' }],
+        sourceTokens: [{ type: "text", content: "B" }],
         targetTokens: [],
-        status: 'new',
-        tagsSignature: '',
-        matchKey: 'b',
-        srcHash: 'hb',
-        meta: { updatedAt: '' }
-      }
+        status: "new",
+        tagsSignature: "",
+        matchKey: "b",
+        srcHash: "hb",
+        meta: { updatedAt: "" },
+      },
     ]);
 
     let file = db.getFile(fileId);
@@ -131,176 +158,233 @@ describe('CATDatabase', () => {
     expect(file?.confirmedSegments).toBe(0);
 
     // Confirm one segment
-    db.updateSegmentTarget('s1', [{ type: 'text', content: '甲' }], 'confirmed');
-    
+    db.updateSegmentTarget(
+      "s1",
+      [{ type: "text", content: "甲" }],
+      "confirmed",
+    );
+
     file = db.getFile(fileId);
     expect(file?.confirmedSegments).toBe(1);
   });
 
-  it('should normalize invalid segment status values when reading', () => {
-    const projectId = db.createProject('Status Normalize Project', 'en', 'zh');
-    const fileId = db.createFile(projectId, 'normalize.xlsx');
+  it("should persist qa issues and clear them after segment update", () => {
+    const projectId = db.createProject("QA Cache Project", "en", "zh");
+    const fileId = db.createFile(projectId, "qa-cache.xlsx");
 
     db.bulkInsertSegments([
       {
-        segmentId: 'invalid-empty-target',
+        segmentId: "qa-1",
         fileId,
         orderIndex: 0,
-        sourceTokens: [{ type: 'text', content: 'A' }],
+        sourceTokens: [{ type: "text", content: "Click <1>" }],
+        targetTokens: [{ type: "text", content: "点击" }],
+        status: "draft",
+        tagsSignature: "<1>",
+        matchKey: "click",
+        srcHash: "qa-cache-hash",
+        meta: { updatedAt: new Date().toISOString() },
+      },
+    ]);
+
+    db.updateSegmentQaIssues("qa-1", [
+      {
+        ruleId: "tag-missing",
+        severity: "error",
+        message: "Missing tags: <1>",
+      },
+    ]);
+
+    let segment = db.getSegment("qa-1");
+    expect(segment?.qaIssues).toHaveLength(1);
+    expect(segment?.qaIssues?.[0].ruleId).toBe("tag-missing");
+
+    db.updateSegmentTarget(
+      "qa-1",
+      [{ type: "text", content: "点击 <1>" }],
+      "draft",
+    );
+
+    segment = db.getSegment("qa-1");
+    expect(segment?.qaIssues).toBeUndefined();
+  });
+
+  it("should normalize invalid segment status values when reading", () => {
+    const projectId = db.createProject("Status Normalize Project", "en", "zh");
+    const fileId = db.createFile(projectId, "normalize.xlsx");
+
+    db.bulkInsertSegments([
+      {
+        segmentId: "invalid-empty-target",
+        fileId,
+        orderIndex: 0,
+        sourceTokens: [{ type: "text", content: "A" }],
         targetTokens: [],
-        status: '' as any,
-        tagsSignature: '',
-        matchKey: 'a',
-        srcHash: 'status-hash-1',
-        meta: { updatedAt: new Date().toISOString() }
+        status: "" as any,
+        tagsSignature: "",
+        matchKey: "a",
+        srcHash: "status-hash-1",
+        meta: { updatedAt: new Date().toISOString() },
       },
       {
-        segmentId: 'invalid-has-target',
+        segmentId: "invalid-has-target",
         fileId,
         orderIndex: 1,
-        sourceTokens: [{ type: 'text', content: 'B' }],
-        targetTokens: [{ type: 'text', content: '已有内容' }],
-        status: '' as any,
-        tagsSignature: '',
-        matchKey: 'b',
-        srcHash: 'status-hash-2',
-        meta: { updatedAt: new Date().toISOString() }
-      }
+        sourceTokens: [{ type: "text", content: "B" }],
+        targetTokens: [{ type: "text", content: "已有内容" }],
+        status: "" as any,
+        tagsSignature: "",
+        matchKey: "b",
+        srcHash: "status-hash-2",
+        meta: { updatedAt: new Date().toISOString() },
+      },
     ] as any);
 
     const segments = db.getSegmentsPage(fileId, 0, 10);
-    expect(segments.find((segment) => segment.segmentId === 'invalid-empty-target')?.status).toBe(
-      'new',
-    );
-    expect(segments.find((segment) => segment.segmentId === 'invalid-has-target')?.status).toBe(
-      'draft',
-    );
+    expect(
+      segments.find((segment) => segment.segmentId === "invalid-empty-target")
+        ?.status,
+    ).toBe("new");
+    expect(
+      segments.find((segment) => segment.segmentId === "invalid-has-target")
+        ?.status,
+    ).toBe("draft");
   });
 
-  describe('Multi-TM Architecture (v5)', () => {
-    it('should automatically create and mount a Working TM when a project is created', () => {
-      const projectId = db.createProject('Auto TM Project', 'en', 'zh');
+  describe("Multi-TM Architecture (v5)", () => {
+    it("should automatically create and mount a Working TM when a project is created", () => {
+      const projectId = db.createProject("Auto TM Project", "en", "zh");
       const mounted = db.getProjectMountedTMs(projectId);
-      
+
       expect(mounted).toHaveLength(1);
-      expect(mounted[0].type).toBe('working');
-      expect(mounted[0].name).toBe('Auto TM Project (Working TM)');
-      expect(mounted[0].permission).toBe('readwrite');
+      expect(mounted[0].type).toBe("working");
+      expect(mounted[0].name).toBe("Auto TM Project (Working TM)");
+      expect(mounted[0].permission).toBe("readwrite");
     });
 
-    it('should not auto-create Working TM for review projects', () => {
-      const projectId = db.createProject('Review Auto TM Project', 'en', 'zh', 'review');
+    it("should not auto-create Working TM for review projects", () => {
+      const projectId = db.createProject(
+        "Review Auto TM Project",
+        "en",
+        "zh",
+        "review",
+      );
       const mounted = db.getProjectMountedTMs(projectId);
       expect(mounted).toHaveLength(0);
     });
 
-    it('should not auto-create Working TM for custom projects', () => {
-      const projectId = db.createProject('Custom Auto TM Project', 'en', 'zh', 'custom');
+    it("should not auto-create Working TM for custom projects", () => {
+      const projectId = db.createProject(
+        "Custom Auto TM Project",
+        "en",
+        "zh",
+        "custom",
+      );
       const mounted = db.getProjectMountedTMs(projectId);
       expect(mounted).toHaveLength(0);
     });
 
-    it('should allow creating and mounting a Main TM', () => {
-      const projectId = db.createProject('Main TM Project', 'en', 'zh');
-      const tmId = db.createTM('Global Main TM', 'en', 'zh', 'main');
-      
-      db.mountTMToProject(projectId, tmId, 10, 'read');
-      
+    it("should allow creating and mounting a Main TM", () => {
+      const projectId = db.createProject("Main TM Project", "en", "zh");
+      const tmId = db.createTM("Global Main TM", "en", "zh", "main");
+
+      db.mountTMToProject(projectId, tmId, 10, "read");
+
       const mounted = db.getProjectMountedTMs(projectId);
       expect(mounted).toHaveLength(2);
-      
-      const mainTM = mounted.find(m => m.type === 'main');
+
+      const mainTM = mounted.find((m) => m.type === "main");
       expect(mainTM).toBeDefined();
-      expect(mainTM!.name).toBe('Global Main TM');
-      expect(mainTM!.permission).toBe('read');
+      expect(mainTM!.name).toBe("Global Main TM");
+      expect(mainTM!.permission).toBe("read");
     });
 
-    it('should search concordance across multiple mounted TMs', () => {
-      const projectId = db.createProject('Concordance Project', 'en', 'zh');
+    it("should search concordance across multiple mounted TMs", () => {
+      const projectId = db.createProject("Concordance Project", "en", "zh");
       const mounted = db.getProjectMountedTMs(projectId);
       const workingTmId = mounted[0].id;
-      
-      const mainTmId = db.createTM('Main Asset', 'en', 'zh', 'main');
-      db.mountTMToProject(projectId, mainTmId, 10, 'read');
+
+      const mainTmId = db.createTM("Main Asset", "en", "zh", "main");
+      db.mountTMToProject(projectId, mainTmId, 10, "read");
 
       // Insert into Working TM
       db.upsertTMEntry({
-        id: 'e1',
+        id: "e1",
         tmId: workingTmId,
-        srcHash: 'h1',
-        matchKey: 'hello',
-        tagsSignature: '',
-        sourceTokens: [{ type: 'text', content: 'Hello' }],
-        targetTokens: [{ type: 'text', content: '你好' }],
-        usageCount: 1
+        srcHash: "h1",
+        matchKey: "hello",
+        tagsSignature: "",
+        sourceTokens: [{ type: "text", content: "Hello" }],
+        targetTokens: [{ type: "text", content: "你好" }],
+        usageCount: 1,
       } as any);
 
       // Insert into Main TM
       db.upsertTMEntry({
-        id: 'e2',
+        id: "e2",
         tmId: mainTmId,
-        srcHash: 'h2',
-        matchKey: 'world',
-        tagsSignature: '',
-        sourceTokens: [{ type: 'text', content: 'World' }],
-        targetTokens: [{ type: 'text', content: '世界' }],
-        usageCount: 1
+        srcHash: "h2",
+        matchKey: "world",
+        tagsSignature: "",
+        sourceTokens: [{ type: "text", content: "World" }],
+        targetTokens: [{ type: "text", content: "世界" }],
+        usageCount: 1,
       } as any);
 
-      const results = db.searchConcordance(projectId, 'hello');
+      const results = db.searchConcordance(projectId, "hello");
       expect(results).toHaveLength(1);
-      expect(results[0].srcHash).toBe('h1');
+      expect(results[0].srcHash).toBe("h1");
 
-      const allResults = db.searchConcordance(projectId, 'world');
+      const allResults = db.searchConcordance(projectId, "world");
       expect(allResults).toHaveLength(1);
-      expect(allResults[0].srcHash).toBe('h2');
+      expect(allResults[0].srcHash).toBe("h2");
     });
   });
 
-  describe('Term Base System (v10)', () => {
-    it('should create and mount term base to project', () => {
-      const projectId = db.createProject('TB Project', 'en', 'zh');
-      const tbId = db.createTermBase('Product Terms', 'en', 'zh');
+  describe("Term Base System (v10)", () => {
+    it("should create and mount term base to project", () => {
+      const projectId = db.createProject("TB Project", "en", "zh");
+      const tbId = db.createTermBase("Product Terms", "en", "zh");
 
       db.mountTermBaseToProject(projectId, tbId, 5);
 
       const mounted = db.getProjectMountedTermBases(projectId);
       expect(mounted).toHaveLength(1);
       expect(mounted[0].id).toBe(tbId);
-      expect(mounted[0].name).toBe('Product Terms');
+      expect(mounted[0].name).toBe("Product Terms");
     });
 
-    it('should insert and upsert term entries by normalized source term', () => {
-      const tbId = db.createTermBase('Glossary', 'en', 'zh');
+    it("should insert and upsert term entries by normalized source term", () => {
+      const tbId = db.createTermBase("Glossary", "en", "zh");
 
       const firstInsert = db.insertTBEntryIfAbsentBySrcTerm({
-        id: 'tb-e1',
+        id: "tb-e1",
         tbId,
-        srcTerm: 'Power Supply',
-        tgtTerm: '电源'
+        srcTerm: "Power Supply",
+        tgtTerm: "电源",
       });
-      expect(firstInsert).toBe('tb-e1');
+      expect(firstInsert).toBe("tb-e1");
 
       const duplicateInsert = db.insertTBEntryIfAbsentBySrcTerm({
-        id: 'tb-e2',
+        id: "tb-e2",
         tbId,
-        srcTerm: ' power   supply ',
-        tgtTerm: '供电'
+        srcTerm: " power   supply ",
+        tgtTerm: "供电",
       });
       expect(duplicateInsert).toBeUndefined();
 
       const upserted = db.upsertTBEntryBySrcTerm({
-        id: 'tb-e3',
+        id: "tb-e3",
         tbId,
-        srcTerm: 'Power Supply',
-        tgtTerm: '供电模块'
+        srcTerm: "Power Supply",
+        tgtTerm: "供电模块",
       });
-      expect(upserted).toBe('tb-e1');
+      expect(upserted).toBe("tb-e1");
 
       const entries = db.listTBEntries(tbId, 20, 0);
       expect(entries).toHaveLength(1);
-      expect(entries[0].srcNorm).toBe('power supply');
-      expect(entries[0].tgtTerm).toBe('供电模块');
+      expect(entries[0].srcNorm).toBe("power supply");
+      expect(entries[0].tgtTerm).toBe("供电模块");
     });
   });
 });

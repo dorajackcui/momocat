@@ -1,7 +1,9 @@
 import {
   Project,
   ProjectAIModel,
+  ProjectQASettings,
   ProjectType,
+  QaIssue,
   Segment,
   SegmentStatus,
   TBEntry,
@@ -58,6 +60,7 @@ export interface ProjectRepository {
     aiTemperature: number | null,
     aiModel: ProjectAIModel | null,
   ): void;
+  updateProjectQASettings(projectId: number, qaSettings: ProjectQASettings): void;
   deleteProject(id: number): void;
 
   createFile(projectId: number, name: string, importOptionsJson?: string): number;
@@ -74,6 +77,7 @@ export interface SegmentRepository {
   getProjectTypeByFileId(fileId: number): ProjectType | undefined;
   getProjectSegmentsByHash(projectId: number, srcHash: string): Segment[];
   updateSegmentTarget(segmentId: string, targetTokens: Token[], status: SegmentStatus): void;
+  updateSegmentQaIssues(segmentId: string, qaIssues: QaIssue[]): void;
 }
 
 export interface TMRepository {

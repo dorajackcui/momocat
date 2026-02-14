@@ -17,12 +17,14 @@ describe('createDesktopApi smoke', () => {
     await api.listTBs();
     await api.getAISettings();
     await api.openFileDialog([]);
+    await api.runFileQA(1);
 
     expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.project.list);
     expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.tm.list, undefined);
     expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.tb.list);
     expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.ai.getSettings);
     expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.dialog.openFile, []);
+    expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.file.runQA, 1);
   });
 
   it('subscribes and unsubscribes event channels correctly', () => {

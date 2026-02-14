@@ -1,10 +1,43 @@
 import Database from 'better-sqlite3';
-import { Project, ProjectAIModel, ProjectType } from '@cat/core';
+import {
+  DEFAULT_PROJECT_QA_SETTINGS,
+  Project,
+  ProjectAIModel,
+  ProjectQASettings,
+  ProjectType,
+} from '@cat/core';
 import { randomUUID } from 'crypto';
 import type { ProjectFileRecord } from '../types';
 
 export class ProjectRepo {
   constructor(private readonly db: Database.Database) {}
+
+  private toProject(row: (Project & { qaSettingsJson?: string | null }) | undefined): Project | undefined {
+    if (!row) return undefined;
+    const { qaSettingsJson, ...rest } = row;
+    let qaSettings: ProjectQASettings | null = null;
+    try {
+      const parsed = qaSettingsJson ? (JSON.parse(qaSettingsJson) as Partial<ProjectQASettings>) : null;
+      qaSettings = parsed
+        ? {
+            enabledRuleIds: Array.isArray(parsed.enabledRuleIds)
+              ? (parsed.enabledRuleIds as ProjectQASettings['enabledRuleIds'])
+              : DEFAULT_PROJECT_QA_SETTINGS.enabledRuleIds,
+            instantQaOnConfirm:
+              typeof parsed.instantQaOnConfirm === 'boolean'
+                ? parsed.instantQaOnConfirm
+                : Boolean(parsed.instantQaOnConfirm),
+          }
+        : DEFAULT_PROJECT_QA_SETTINGS;
+    } catch {
+      qaSettings = DEFAULT_PROJECT_QA_SETTINGS;
+    }
+
+    return {
+      ...rest,
+      qaSettings,
+    };
+  }
 
   public createProject(
     name: string,
@@ -14,17 +47,32 @@ export class ProjectRepo {
   ): number {
     console.log(`[DB] Creating project: ${name} (${srcLang} -> ${tgtLang}, ${projectType})`);
     const result = this.db
-      .prepare('INSERT INTO projects (uuid, name, srcLang, tgtLang, projectType) VALUES (?, ?, ?, ?, ?)')
-      .run(randomUUID(), name, srcLang, tgtLang, projectType);
+      .prepare(
+        'INSERT INTO projects (uuid, name, srcLang, tgtLang, projectType, qaSettingsJson) VALUES (?, ?, ?, ?, ?, ?)',
+      )
+      .run(
+        randomUUID(),
+        name,
+        srcLang,
+        tgtLang,
+        projectType,
+        JSON.stringify(DEFAULT_PROJECT_QA_SETTINGS),
+      );
     return result.lastInsertRowid as number;
   }
 
   public listProjects(): Project[] {
-    return this.db.prepare('SELECT * FROM projects ORDER BY updatedAt DESC').all() as Project[];
+    const rows = this.db
+      .prepare('SELECT * FROM projects ORDER BY updatedAt DESC')
+      .all() as Array<Project & { qaSettingsJson?: string | null }>;
+    return rows.map((row) => this.toProject(row) as Project);
   }
 
   public getProject(id: number): Project | undefined {
-    return this.db.prepare('SELECT * FROM projects WHERE id = ?').get(id) as Project | undefined;
+    const row = this.db
+      .prepare('SELECT * FROM projects WHERE id = ?')
+      .get(id) as (Project & { qaSettingsJson?: string | null }) | undefined;
+    return this.toProject(row);
   }
 
   public updateProjectPrompt(projectId: number, aiPrompt: string | null) {
@@ -46,6 +94,14 @@ export class ProjectRepo {
         "UPDATE projects SET aiPrompt = ?, aiTemperature = ?, aiModel = ?, updatedAt = (strftime('%Y-%m-%dT%H:%M:%fZ','now')) WHERE id = ?"
       )
       .run(aiPrompt, aiTemperature, aiModel, projectId);
+  }
+
+  public updateProjectQASettings(projectId: number, qaSettings: ProjectQASettings) {
+    this.db
+      .prepare(
+        "UPDATE projects SET qaSettingsJson = ?, updatedAt = (strftime('%Y-%m-%dT%H:%M:%fZ','now')) WHERE id = ?",
+      )
+      .run(JSON.stringify(qaSettings), projectId);
   }
 
   public deleteProject(id: number) {

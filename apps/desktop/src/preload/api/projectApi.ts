@@ -9,6 +9,7 @@ type ProjectApiKeys =
   | 'getProject'
   | 'updateProjectPrompt'
   | 'updateProjectAISettings'
+  | 'updateProjectQASettings'
   | 'getProjectFiles'
   | 'getFile'
   | 'getFilePreview'
@@ -16,6 +17,7 @@ type ProjectApiKeys =
   | 'addFileToProject'
   | 'getSegments'
   | 'exportFile'
+  | 'runFileQA'
   | 'updateSegment';
 
 export function createProjectApi(ipcRenderer: IpcRendererLike): DesktopApiSlice<ProjectApiKeys> {
@@ -50,6 +52,12 @@ export function createProjectApi(ipcRenderer: IpcRendererLike): DesktopApiSlice<
         aiTemperature,
         aiModel,
       ) as ReturnType<DesktopApi['updateProjectAISettings']>,
+    updateProjectQASettings: (projectId, qaSettings) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.project.updateQASettings,
+        projectId,
+        qaSettings,
+      ) as ReturnType<DesktopApi['updateProjectQASettings']>,
     getProjectFiles: (projectId) =>
       ipcRenderer.invoke(IPC_CHANNELS.project.getFiles, projectId) as ReturnType<
         DesktopApi['getProjectFiles']
@@ -78,6 +86,8 @@ export function createProjectApi(ipcRenderer: IpcRendererLike): DesktopApiSlice<
         options as ImportOptions | undefined,
         forceExport,
       ) as ReturnType<DesktopApi['exportFile']>,
+    runFileQA: (fileId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.file.runQA, fileId) as ReturnType<DesktopApi['runFileQA']>,
     updateSegment: (segmentId, targetTokens, status) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.segment.update,

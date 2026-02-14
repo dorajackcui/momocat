@@ -4,6 +4,7 @@ import type { JobManager } from '../JobManager';
 
 export interface IpcMainLike {
   handle: (channel: string, listener: (event: unknown, ...args: unknown[]) => unknown) => void;
+  removeHandler?: (channel: string) => void;
 }
 
 export interface MainHandlerDeps {

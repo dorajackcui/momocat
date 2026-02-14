@@ -1,6 +1,16 @@
 import { basename, join } from 'path';
 import { copyFile, mkdir, rm, unlink } from 'fs/promises';
-import { ProjectAIModel, ProjectType, Segment, validateSegmentTags } from '@cat/core';
+import {
+  DEFAULT_PROJECT_QA_SETTINGS,
+  FileQaReport,
+  ProjectAIModel,
+  ProjectQASettings,
+  ProjectType,
+  Segment,
+  TBMatch,
+  evaluateSegmentQa,
+  validateSegmentTags,
+} from '@cat/core';
 import {
   ImportOptions,
   ProjectRepository,
@@ -71,6 +81,10 @@ export class ProjectFileModule {
     aiModel: ProjectAIModel | null,
   ) {
     this.projectRepo.updateProjectAISettings(projectId, aiPrompt, aiTemperature, aiModel);
+  }
+
+  public updateProjectQASettings(projectId: number, qaSettings: ProjectQASettings) {
+    this.projectRepo.updateProjectQASettings(projectId, qaSettings);
   }
 
   public async deleteProject(projectId: number) {
@@ -227,6 +241,70 @@ export class ProjectFileModule {
 
     const storedPath = join(this.projectsDir, file.projectId.toString(), `${file.id}_${file.name}`);
     await this.filter.export(storedPath, segments, finalOptions, outputPath);
+  }
+
+  public async runFileQA(
+    fileId: number,
+    resolveTermMatches: (projectId: number, segment: Segment) => Promise<TBMatch[]>,
+  ): Promise<FileQaReport> {
+    const file = this.projectRepo.getFile(fileId);
+    if (!file) {
+      throw new Error('File not found');
+    }
+
+    const project = this.projectRepo.getProject(file.projectId);
+    if (!project) {
+      throw new Error('Project not found');
+    }
+
+    const qaSettings = project.qaSettings || DEFAULT_PROJECT_QA_SETTINGS;
+    const enabledRuleIds = qaSettings.enabledRuleIds || [];
+    const issues: FileQaReport['issues'] = [];
+    let checkedSegments = 0;
+    let errorCount = 0;
+    let warningCount = 0;
+    let offset = 0;
+    const pageSize = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      const page = this.segmentRepo.getSegmentsPage(fileId, offset, pageSize);
+      if (page.length === 0) break;
+      offset += page.length;
+      hasMore = page.length === pageSize;
+
+      for (const segment of page) {
+        checkedSegments += 1;
+        const termMatches = enabledRuleIds.includes('terminology-consistency')
+          ? await resolveTermMatches(project.id, segment)
+          : [];
+        const segmentIssues = evaluateSegmentQa(segment, {
+          enabledRuleIds,
+          termMatches,
+        });
+        this.segmentRepo.updateSegmentQaIssues(segment.segmentId, segmentIssues);
+
+        for (const issue of segmentIssues) {
+          if (issue.severity === 'error') errorCount += 1;
+          if (issue.severity === 'warning') warningCount += 1;
+          issues.push({
+            segmentId: segment.segmentId,
+            row: segment.meta.rowRef || segment.orderIndex + 1,
+            ruleId: issue.ruleId,
+            severity: issue.severity,
+            message: issue.message,
+          });
+        }
+      }
+    }
+
+    return {
+      fileId,
+      checkedSegments,
+      errorCount,
+      warningCount,
+      issues,
+    };
   }
 
   private getAllSegments(fileId: number): Segment[] {

@@ -1,11 +1,12 @@
 import {
-  PROJECT_AI_MODELS,
+  DEFAULT_PROJECT_AI_MODEL,
   ProjectAIModel,
   ProjectType,
   Segment,
   SegmentStatus,
   Token,
   TagValidator,
+  isProjectAIModel,
   parseEditorTextToTokens,
   serializeTokensToDisplayText,
   serializeTokensToEditorText,
@@ -30,8 +31,6 @@ interface TranslateDebugMeta {
 
 export class AIModule {
   private static readonly SEGMENT_PAGE_SIZE = 1000;
-  private static readonly DEFAULT_AI_MODEL: ProjectAIModel = 'gpt-4o';
-  private static readonly SUPPORTED_AI_MODELS = new Set<string>(PROJECT_AI_MODELS);
   private readonly tagValidator = new TagValidator();
 
   constructor(
@@ -362,15 +361,15 @@ export class AIModule {
     model?: string | null,
     projectModel?: ProjectAIModel | null,
   ): ProjectAIModel {
-    if (typeof model === 'string' && AIModule.SUPPORTED_AI_MODELS.has(model)) {
-      return model as ProjectAIModel;
+    if (isProjectAIModel(model)) {
+      return model;
     }
 
-    if (typeof projectModel === 'string' && AIModule.SUPPORTED_AI_MODELS.has(projectModel)) {
-      return projectModel as ProjectAIModel;
+    if (isProjectAIModel(projectModel)) {
+      return projectModel;
     }
 
-    return AIModule.DEFAULT_AI_MODEL;
+    return DEFAULT_PROJECT_AI_MODEL;
   }
 
   private isTranslatableSegment(segment: Segment): boolean {

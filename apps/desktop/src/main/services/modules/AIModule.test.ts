@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { Segment, serializeTokensToDisplayText } from '@cat/core';
+import { DEFAULT_PROJECT_AI_MODEL, Segment, serializeTokensToDisplayText } from '@cat/core';
 import { AIModule } from './AIModule';
 import { AITransport, ProjectRepository, SegmentRepository, SettingsRepository } from '../ports';
 import { SegmentService } from '../SegmentService';
@@ -188,6 +188,96 @@ describe('AIModule.aiTranslateFile', () => {
 
     const request = (transport.chatCompletions as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(request.model).toBe('gpt-5-mini');
+  });
+
+  it('prefers request model over project aiModel when request model is valid', async () => {
+    const segments: Segment[] = [
+      createSegment({ segmentId: 'model-2', sourceText: 'Hello world' }),
+    ];
+
+    const projectRepo = {
+      getFile: vi.fn().mockReturnValue({ id: 1, projectId: 11, name: 'demo.xlsx' }),
+      getProject: vi.fn().mockReturnValue({
+        id: 11,
+        srcLang: 'en',
+        tgtLang: 'zh',
+        aiPrompt: '',
+        aiTemperature: 0.2,
+        aiModel: 'gpt-5-mini',
+      }),
+    } as unknown as ProjectRepository;
+
+    const segmentRepo = {
+      getSegmentsPage: vi.fn().mockReturnValue(segments),
+    } as unknown as SegmentRepository;
+
+    const settingsRepo = {
+      getSetting: vi.fn().mockReturnValue('test-api-key'),
+    } as unknown as SettingsRepository;
+
+    const segmentService = {
+      updateSegment: vi.fn().mockResolvedValue(undefined),
+    } as unknown as SegmentService;
+
+    const transport = {
+      testConnection: vi.fn().mockResolvedValue({ ok: true }),
+      chatCompletions: vi.fn().mockResolvedValue({
+        content: '你好世界',
+        status: 200,
+        endpoint: '/v1/chat/completions',
+      }),
+    } as unknown as AITransport;
+
+    const module = new AIModule(projectRepo, segmentRepo, settingsRepo, segmentService, transport);
+    await module.aiTranslateFile(1, { model: 'gpt-5.2' });
+
+    const request = (transport.chatCompletions as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(request.model).toBe('gpt-5.2');
+  });
+
+  it('falls back to default model when both request and project model are invalid', async () => {
+    const segments: Segment[] = [
+      createSegment({ segmentId: 'model-3', sourceText: 'Hello world' }),
+    ];
+
+    const projectRepo = {
+      getFile: vi.fn().mockReturnValue({ id: 1, projectId: 11, name: 'demo.xlsx' }),
+      getProject: vi.fn().mockReturnValue({
+        id: 11,
+        srcLang: 'en',
+        tgtLang: 'zh',
+        aiPrompt: '',
+        aiTemperature: 0.2,
+        aiModel: 'unsupported-project-model',
+      }),
+    } as unknown as ProjectRepository;
+
+    const segmentRepo = {
+      getSegmentsPage: vi.fn().mockReturnValue(segments),
+    } as unknown as SegmentRepository;
+
+    const settingsRepo = {
+      getSetting: vi.fn().mockReturnValue('test-api-key'),
+    } as unknown as SettingsRepository;
+
+    const segmentService = {
+      updateSegment: vi.fn().mockResolvedValue(undefined),
+    } as unknown as SegmentService;
+
+    const transport = {
+      testConnection: vi.fn().mockResolvedValue({ ok: true }),
+      chatCompletions: vi.fn().mockResolvedValue({
+        content: '你好世界',
+        status: 200,
+        endpoint: '/v1/chat/completions',
+      }),
+    } as unknown as AITransport;
+
+    const module = new AIModule(projectRepo, segmentRepo, settingsRepo, segmentService, transport);
+    await module.aiTranslateFile(1, { model: 'unsupported-request-model' });
+
+    const request = (transport.chatCompletions as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(request.model).toBe(DEFAULT_PROJECT_AI_MODEL);
   });
 
   it('keeps context field in user prompt when imported context is missing', async () => {

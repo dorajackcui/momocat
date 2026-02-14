@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ProjectFile } from '@cat/core';
+import { DEFAULT_PROJECT_QA_SETTINGS, ProjectFile, ProjectQASettings } from '@cat/core';
 import { ColumnSelector } from './ColumnSelector';
 import { apiClient } from '../services/apiClient';
 import { feedbackService } from '../services/feedbackService';
@@ -11,6 +11,7 @@ import { ProjectMatchModal } from './project-detail/ProjectMatchModal';
 import { ProjectFilesPane } from './project-detail/ProjectFilesPane';
 import { ProjectTMPane } from './project-detail/ProjectTMPane';
 import { ProjectTBPane } from './project-detail/ProjectTBPane';
+import { ProjectQASettingsModal } from './project-detail/ProjectQASettingsModal';
 
 interface ProjectDetailProps {
   projectId: number;
@@ -24,6 +25,11 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
   const [commitTmId, setCommitTmId] = useState('');
   const [matchModalFile, setMatchModalFile] = useState<ProjectFile | null>(null);
   const [matchTmId, setMatchTmId] = useState('');
+  const [qaSettingsOpen, setQaSettingsOpen] = useState(false);
+  const [qaSettingsSaving, setQaSettingsSaving] = useState(false);
+  const [qaSettingsDraft, setQaSettingsDraft] = useState<ProjectQASettings>(
+    DEFAULT_PROJECT_QA_SETTINGS,
+  );
 
   const {
     project,
@@ -190,6 +196,55 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
     }
   };
 
+  const openQaSettings = () => {
+    if (!project) return;
+    setQaSettingsDraft(project.qaSettings || DEFAULT_PROJECT_QA_SETTINGS);
+    setQaSettingsOpen(true);
+  };
+
+  const saveQaSettings = async () => {
+    if (!project) return;
+    setQaSettingsSaving(true);
+    try {
+      await runMutation(async () => {
+        await apiClient.updateProjectQASettings(project.id, qaSettingsDraft);
+        await loadData();
+      });
+      setProject((prev) => (prev ? { ...prev, qaSettings: qaSettingsDraft } : prev));
+      setQaSettingsOpen(false);
+      feedbackService.success('QA settings updated');
+    } catch (error) {
+      feedbackService.error(
+        `Failed to update QA settings: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    } finally {
+      setQaSettingsSaving(false);
+    }
+  };
+
+  const handleRunFileQA = async (fileId: number, fileName: string) => {
+    try {
+      const report = await runMutation(async () => apiClient.runFileQA(fileId));
+      if (report.errorCount === 0 && report.warningCount === 0) {
+        feedbackService.success(
+          `QA passed for "${fileName}" (${report.checkedSegments} segments).`,
+        );
+        return;
+      }
+      const previewLines = report.issues
+        .slice(0, 5)
+        .map((issue) => `Row ${issue.row} [${issue.severity}] ${issue.ruleId}: ${issue.message}`)
+        .join('\n');
+      feedbackService.info(
+        `QA finished for "${fileName}".\nErrors: ${report.errorCount}, Warnings: ${report.warningCount}\n${previewLines}${report.issues.length > 5 ? `\n...and ${report.issues.length - 5} more.` : ''}`,
+      );
+    } catch (error) {
+      feedbackService.error(
+        `Run QA failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-white">
       <ColumnSelector
@@ -222,6 +277,15 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
           setMatchTmId('');
         }}
         onConfirm={() => void confirmMatchModal()}
+      />
+
+      <ProjectQASettingsModal
+        isOpen={qaSettingsOpen}
+        draft={qaSettingsDraft}
+        onChange={setQaSettingsDraft}
+        onClose={() => setQaSettingsOpen(false)}
+        onSave={() => void saveQaSettings()}
+        saving={qaSettingsSaving}
       />
 
       <div className="px-10 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
@@ -311,13 +375,24 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
           <div className="h-6 w-[1px] bg-gray-200" />
 
           {project && activeTab === 'files' && (
-            <button
-              onClick={() => void fileImport.openFileImport()}
-              disabled={loading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-            >
-              + Add File
-            </button>
+            <div className="flex items-center gap-2">
+              {project.projectType === 'translation' && (
+                <button
+                  onClick={openQaSettings}
+                  disabled={loading}
+                  className="px-4 py-2 bg-amber-100 text-amber-800 rounded-lg text-sm font-medium hover:bg-amber-200 disabled:opacity-50"
+                >
+                  QA Settings
+                </button>
+              )}
+              <button
+                onClick={() => void fileImport.openFileImport()}
+                disabled={loading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              >
+                + Add File
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -346,6 +421,7 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
             onOpenMatchModal={openMatchModal}
             onDeleteFile={handleDeleteFile}
             onExportFile={handleExportFile}
+            onRunFileQA={handleRunFileQA}
             ai={ai}
             projectType={project.projectType || 'translation'}
           />

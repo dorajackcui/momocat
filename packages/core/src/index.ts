@@ -1,3 +1,5 @@
+import type { ProjectAIModel } from './aiModelRegistry';
+
 export type TokenType = 'text' | 'tag' | 'locked' | 'ws';
 
 export type TagType = 'paired-start' | 'paired-end' | 'standalone';
@@ -24,6 +26,14 @@ export {
   type EditorMarkerPattern,
   type TagPatternRegistryConfig
 } from './tag/TagPatternRegistry';
+export {
+  DEFAULT_PROJECT_AI_MODEL,
+  PROJECT_AI_MODELS,
+  PROJECT_AI_MODEL_SET,
+  isProjectAIModel,
+  normalizeProjectAIModel,
+  type ProjectAIModel,
+} from './aiModelRegistry';
 
 export type ValidationState = 'valid' | 'error' | 'warning';
 
@@ -163,13 +173,59 @@ export interface Project {
   aiPrompt?: string | null;
   aiTemperature?: number | null;
   aiModel?: ProjectAIModel | null;
+  qaSettings?: ProjectQASettings | null;
   createdAt: string;
   updatedAt: string;
 }
 
 export type ProjectType = 'translation' | 'review' | 'custom';
-export const PROJECT_AI_MODELS = ['gpt-5.2', 'gpt-5-mini', 'gpt-4o', 'gpt-4.1-mini'] as const;
-export type ProjectAIModel = (typeof PROJECT_AI_MODELS)[number];
+
+export type SegmentQaRuleId = 'tag-integrity' | 'terminology-consistency';
+
+export interface SegmentQaRuleOption {
+  id: SegmentQaRuleId;
+  label: string;
+  description: string;
+}
+
+export interface ProjectQASettings {
+  enabledRuleIds: SegmentQaRuleId[];
+  instantQaOnConfirm: boolean;
+}
+
+export interface FileQaIssueRecord {
+  segmentId: string;
+  row: number;
+  ruleId: string;
+  severity: QaSeverity;
+  message: string;
+}
+
+export interface FileQaReport {
+  fileId: number;
+  checkedSegments: number;
+  errorCount: number;
+  warningCount: number;
+  issues: FileQaIssueRecord[];
+}
+
+export const SEGMENT_QA_RULE_OPTIONS: SegmentQaRuleOption[] = [
+  {
+    id: 'tag-integrity',
+    label: 'Tag Integrity',
+    description: 'Check missing/extra/out-of-order tags.',
+  },
+  {
+    id: 'terminology-consistency',
+    label: 'Terminology Consistency',
+    description: 'Check TB preferred terms in target text.',
+  },
+];
+
+export const DEFAULT_PROJECT_QA_SETTINGS: ProjectQASettings = {
+  enabledRuleIds: ['tag-integrity', 'terminology-consistency'],
+  instantQaOnConfirm: true,
+};
 
 /**
  * Serialize tokens to plain text for display in non-token-aware contexts
@@ -327,6 +383,27 @@ export function validateSegmentTerminology(segment: Segment, termMatches: TBMatc
       severity: 'warning',
       message: `Terminology check: source term "${sourceTerm}" expects "${targetTerm}" in target (TB: ${match.tbName}).`,
     });
+  }
+
+  return issues;
+}
+
+export function evaluateSegmentQa(
+  segment: Segment,
+  options?: {
+    termMatches?: TBMatch[];
+    enabledRuleIds?: SegmentQaRuleId[];
+  },
+): QaIssue[] {
+  const enabledRuleIds = options?.enabledRuleIds ?? DEFAULT_PROJECT_QA_SETTINGS.enabledRuleIds;
+  const issues: QaIssue[] = [];
+
+  if (enabledRuleIds.includes('tag-integrity')) {
+    issues.push(...validateSegmentTags(segment));
+  }
+
+  if (enabledRuleIds.includes('terminology-consistency')) {
+    issues.push(...validateSegmentTerminology(segment, options?.termMatches || []));
   }
 
   return issues;

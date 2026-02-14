@@ -9,6 +9,7 @@ interface ProjectFilesPaneProps {
   onOpenMatchModal: (file: ProjectFile) => void;
   onDeleteFile: (fileId: number, fileName: string) => Promise<void>;
   onExportFile: (fileId: number, fileName: string) => Promise<void>;
+  onRunFileQA: (fileId: number, fileName: string) => Promise<void>;
   ai: ProjectAIController;
   projectType?: ProjectType;
 }
@@ -20,6 +21,7 @@ export function ProjectFilesPane({
   onOpenMatchModal,
   onDeleteFile,
   onExportFile,
+  onRunFileQA,
   ai,
   projectType = 'translation',
 }: ProjectFilesPaneProps) {
@@ -111,6 +113,14 @@ export function ProjectFilesPane({
                           ? 'AI Process'
                           : 'AI Translate'}
                   </button>
+                  {supportsTMWorkflow && (
+                    <button
+                      onClick={() => void onRunFileQA(file.id, file.name)}
+                      className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-bold hover:bg-amber-100"
+                    >
+                      Run QA
+                    </button>
+                  )}
                   <button
                     onClick={() => onOpenFile(file.id)}
                     className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100"

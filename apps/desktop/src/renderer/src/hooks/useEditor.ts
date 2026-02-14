@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
+  DEFAULT_PROJECT_QA_SETTINGS,
   Segment,
   SegmentStatus,
-  QaIssue,
   TBMatch,
+  SegmentQaRuleId,
   Token,
+  evaluateSegmentQa,
   parseEditorTextToTokens,
   serializeTokensToEditorText,
   TagValidator,
-  serializeTokensToDisplayText,
 } from '@cat/core';
 import { apiClient } from '../services/apiClient';
 import type { TMMatch } from '../../../shared/ipc';
@@ -48,82 +49,6 @@ const VALID_SEGMENT_STATUSES: Set<SegmentStatus> = new Set([
   'reviewed',
 ]);
 
-function escapeRegexForTerm(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function findTermPositionsInText(
-  text: string,
-  term: string,
-): Array<{ start: number; end: number }> {
-  const source = text;
-  const target = term.trim();
-  if (!source.trim() || !target) return [];
-
-  const hasCjk = /[\u3400-\u9fff]/u.test(target);
-  if (hasCjk) {
-    const positions: Array<{ start: number; end: number }> = [];
-    const sourceLower = source.toLocaleLowerCase();
-    const targetLower = target.toLocaleLowerCase();
-    let from = 0;
-
-    while (from < sourceLower.length) {
-      const index = sourceLower.indexOf(targetLower, from);
-      if (index < 0) break;
-      positions.push({ start: index, end: index + target.length });
-      from = index + target.length;
-    }
-
-    return positions;
-  }
-
-  const escaped = escapeRegexForTerm(target);
-  const pattern = new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'giu');
-  const positions: Array<{ start: number; end: number }> = [];
-  let match: RegExpExecArray | null;
-
-  while ((match = pattern.exec(source)) !== null) {
-    const start = match.index;
-    const end = start + match[0].length;
-    positions.push({ start, end });
-    if (pattern.lastIndex === start) {
-      pattern.lastIndex += 1;
-    }
-  }
-
-  return positions;
-}
-
-function validateSegmentTerminologyInEditor(segment: Segment, termMatches: TBMatch[]): QaIssue[] {
-  if (!Array.isArray(termMatches) || termMatches.length === 0) return [];
-
-  const targetText = serializeTokensToDisplayText(segment.targetTokens);
-  if (segment.status === 'new' && !targetText.trim()) return [];
-
-  const issues: QaIssue[] = [];
-  const seen = new Set<string>();
-
-  for (const match of termMatches) {
-    const sourceTerm = match.srcTerm?.trim();
-    const targetTerm = match.tgtTerm?.trim();
-    if (!sourceTerm || !targetTerm) continue;
-
-    const dedupeKey = `${match.srcNorm || sourceTerm.toLocaleLowerCase()}::${targetTerm.toLocaleLowerCase()}`;
-    if (seen.has(dedupeKey)) continue;
-    seen.add(dedupeKey);
-
-    if (findTermPositionsInText(targetText, targetTerm).length > 0) continue;
-
-    issues.push({
-      ruleId: 'tb-term-missing',
-      severity: 'warning',
-      message: `Terminology check: source term "${sourceTerm}" expects "${targetTerm}" in target (TB: ${match.tbName}).`,
-    });
-  }
-
-  return issues;
-}
-
 export function createSegmentPersistor(deps: SegmentPersistorDeps): SegmentPersistor {
   const latestRequestVersionBySegment = new Map<string, number>();
 
@@ -159,6 +84,12 @@ export function useEditor({ activeFileId }: UseEditorProps) {
   const MATCH_REQUEST_DEBOUNCE_MS = 150;
   const [segments, setSegments] = useState<Segment[]>([]);
   const [projectId, setProjectId] = useState<number | null>(null);
+  const [enabledQaRuleIds, setEnabledQaRuleIds] = useState<SegmentQaRuleId[]>(
+    DEFAULT_PROJECT_QA_SETTINGS.enabledRuleIds,
+  );
+  const [instantQaOnConfirm, setInstantQaOnConfirm] = useState<boolean>(
+    DEFAULT_PROJECT_QA_SETTINGS.instantQaOnConfirm,
+  );
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
   const [activeMatches, setActiveMatches] = useState<TMMatch[]>([]);
   const [activeTerms, setActiveTerms] = useState<TBMatch[]>([]);
@@ -243,6 +174,8 @@ export function useEditor({ activeFileId }: UseEditorProps) {
     if (activeFileId === null) {
       setSegments([]);
       setProjectId(null);
+      setEnabledQaRuleIds(DEFAULT_PROJECT_QA_SETTINGS.enabledRuleIds);
+      setInstantQaOnConfirm(DEFAULT_PROJECT_QA_SETTINGS.instantQaOnConfirm);
       setSegmentSaveErrors({});
       segmentPersistorRef.current?.clear();
       return;
@@ -254,6 +187,16 @@ export function useEditor({ activeFileId }: UseEditorProps) {
       const file = await apiClient.getFile(activeFileId);
       if (file) {
         setProjectId(file.projectId);
+        const project = await apiClient.getProject(file.projectId);
+        const qaSettings = project?.qaSettings || DEFAULT_PROJECT_QA_SETTINGS;
+        setEnabledQaRuleIds(
+          qaSettings.enabledRuleIds || DEFAULT_PROJECT_QA_SETTINGS.enabledRuleIds,
+        );
+        setInstantQaOnConfirm(
+          typeof qaSettings.instantQaOnConfirm === 'boolean'
+            ? qaSettings.instantQaOnConfirm
+            : DEFAULT_PROJECT_QA_SETTINGS.instantQaOnConfirm,
+        );
       }
 
       const segmentsArray: Segment[] = [];
@@ -276,7 +219,6 @@ export function useEditor({ activeFileId }: UseEditorProps) {
           sourceTokens,
           targetTokens,
           status: normalizeStatus(seg.status, targetTokens),
-          qaIssues: undefined,
           autoFixSuggestions: undefined,
         };
       });
@@ -533,34 +475,47 @@ export function useEditor({ activeFileId }: UseEditorProps) {
     const segment = segments.find((s) => s.segmentId === segmentId);
     if (!segment) return;
 
-    const validationResult = tagValidator.validate(segment.sourceTokens, segment.targetTokens);
-    let terminologyIssues: QaIssue[] = [];
-
-    if (projectId !== null) {
-      try {
-        const termMatches = await apiClient.getTermMatches(projectId, segment);
-        terminologyIssues = validateSegmentTerminologyInEditor(segment, termMatches || []);
-      } catch (error) {
-        console.error('[useEditor] Failed to run TB QA check:', error);
+    if (instantQaOnConfirm) {
+      let termMatches: TBMatch[] = [];
+      if (projectId !== null && enabledQaRuleIds.includes('terminology-consistency')) {
+        try {
+          termMatches = (await apiClient.getTermMatches(projectId, segment)) || [];
+        } catch (error) {
+          console.error('[useEditor] Failed to run TB QA check:', error);
+        }
       }
-    }
 
-    const combinedIssues = [...validationResult.issues, ...terminologyIssues];
-    const hasBlockingErrors = combinedIssues.some((issue) => issue.severity === 'error');
+      const combinedIssues = evaluateSegmentQa(segment, {
+        enabledRuleIds: enabledQaRuleIds,
+        termMatches,
+      });
+      const hasBlockingErrors = combinedIssues.some((issue) => issue.severity === 'error');
+      const tagValidationResult = enabledQaRuleIds.includes('tag-integrity')
+        ? tagValidator.validate(segment.sourceTokens, segment.targetTokens)
+        : { issues: [], suggestions: [] };
 
-    setSegments((prev) =>
-      prev.map((seg) => {
-        if (seg.segmentId !== segmentId) return seg;
-        return {
-          ...seg,
-          qaIssues: combinedIssues,
-          autoFixSuggestions: validationResult.suggestions,
-        };
-      }),
-    );
+      setSegments((prev) =>
+        prev.map((seg) => {
+          if (seg.segmentId !== segmentId) return seg;
+          return {
+            ...seg,
+            qaIssues: combinedIssues,
+            autoFixSuggestions: tagValidationResult.suggestions,
+          };
+        }),
+      );
 
-    if (hasBlockingErrors) {
-      return;
+      if (hasBlockingErrors) {
+        return;
+      }
+    } else {
+      setSegments((prev) =>
+        prev.map((seg) =>
+          seg.segmentId === segmentId
+            ? { ...seg, qaIssues: undefined, autoFixSuggestions: undefined }
+            : seg,
+        ),
+      );
     }
 
     // We don't need to manually update state here anymore because the listener will handle it!

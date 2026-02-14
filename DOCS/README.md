@@ -15,6 +15,7 @@
 
 1. `DOCS/WORKTREE_PROTOCOL.md`
 2. `DOCS/worktrees/<branch>.md`
+3. 新 worktree 首次进入先执行 `npm run worktree:deps:link`（如需覆盖本地依赖目录：`npm run worktree:deps:link:force`）。
 
 ## 当前有效（Active）
 

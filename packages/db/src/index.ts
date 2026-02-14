@@ -1,15 +1,17 @@
-import Database from 'better-sqlite3';
+import Database from "better-sqlite3";
 import {
+  ProjectQASettings,
   Project,
   ProjectAIModel,
   ProjectFile,
   ProjectType,
+  QaIssue,
   Segment,
   SegmentStatus,
   TBEntry,
   TMEntry,
   Token,
-} from '@cat/core';
+} from "@cat/core";
 import {
   MountedTBRecord,
   MountedTMRecord,
@@ -19,16 +21,16 @@ import {
   TBRecord,
   TMEntryRow,
   TMRecord,
-  TMType
-} from './types';
+  TMType,
+} from "./types";
 
-import { runMigrations } from './migration/runMigrations';
-import { ProjectRepo } from './repos/ProjectRepo';
-import { SegmentRepo } from './repos/SegmentRepo';
-import { SettingsRepo } from './repos/SettingsRepo';
-import { TBRepo } from './repos/TBRepo';
-import { TMRepo } from './repos/TMRepo';
-export * from './types';
+import { runMigrations } from "./migration/runMigrations";
+import { ProjectRepo } from "./repos/ProjectRepo";
+import { SegmentRepo } from "./repos/SegmentRepo";
+import { SettingsRepo } from "./repos/SettingsRepo";
+import { TBRepo } from "./repos/TBRepo";
+import { TMRepo } from "./repos/TMRepo";
+export * from "./types";
 
 export class CATDatabase {
   private readonly db: Database.Database;
@@ -40,15 +42,17 @@ export class CATDatabase {
 
   constructor(dbPath: string) {
     this.db = new Database(dbPath);
-    this.db.pragma('foreign_keys = ON');
-    this.db.pragma('journal_mode = WAL');
-    this.db.pragma('synchronous = NORMAL');
-    this.db.pragma('temp_store = MEMORY');
+    this.db.pragma("foreign_keys = ON");
+    this.db.pragma("journal_mode = WAL");
+    this.db.pragma("synchronous = NORMAL");
+    this.db.pragma("temp_store = MEMORY");
 
     runMigrations(this.db);
 
     this.projectRepo = new ProjectRepo(this.db);
-    this.segmentRepo = new SegmentRepo(this.db, (fileId) => this.projectRepo.updateFileStats(fileId));
+    this.segmentRepo = new SegmentRepo(this.db, (fileId) =>
+      this.projectRepo.updateFileStats(fileId),
+    );
     this.settingsRepo = new SettingsRepo(this.db);
     this.tbRepo = new TBRepo(this.db);
     this.tmRepo = new TMRepo(this.db);
@@ -58,28 +62,46 @@ export class CATDatabase {
     name: string,
     srcLang: string,
     tgtLang: string,
-    projectType: ProjectType = 'translation',
+    projectType: ProjectType = "translation",
   ): number {
-    const projectId = this.projectRepo.createProject(name, srcLang, tgtLang, projectType);
+    const projectId = this.projectRepo.createProject(
+      name,
+      srcLang,
+      tgtLang,
+      projectType,
+    );
 
-    if (projectType === 'translation') {
-      const workingTmId = this.tmRepo.createTM(`${name} (Working TM)`, srcLang, tgtLang, 'working');
-      this.tmRepo.mountTMToProject(projectId, workingTmId, 0, 'readwrite');
+    if (projectType === "translation") {
+      const workingTmId = this.tmRepo.createTM(
+        `${name} (Working TM)`,
+        srcLang,
+        tgtLang,
+        "working",
+      );
+      this.tmRepo.mountTMToProject(projectId, workingTmId, 0, "readwrite");
     }
 
     return projectId;
   }
 
-  public listProjects(): (ProjectListRecord & { progress: number; fileCount: number })[] {
-    console.log('[DB] Listing projects');
+  public listProjects(): (ProjectListRecord & {
+    progress: number;
+    fileCount: number;
+  })[] {
+    console.log("[DB] Listing projects");
     const projects = this.projectRepo.listProjects();
 
     return projects.map((project) => {
       const stats = this.segmentRepo.getProjectStats(project.id);
       const fileCount = this.projectRepo.countFilesByProject(project.id);
 
-      const total = stats.reduce((sum, statusStat) => sum + statusStat.count, 0);
-      const confirmed = stats.find((statusStat) => statusStat.status === 'confirmed')?.count || 0;
+      const total = stats.reduce(
+        (sum, statusStat) => sum + statusStat.count,
+        0,
+      );
+      const confirmed =
+        stats.find((statusStat) => statusStat.status === "confirmed")?.count ||
+        0;
       const progress = total === 0 ? 0 : Math.round((confirmed / total) * 100);
 
       return { ...project, progress, fileCount };
@@ -100,14 +122,30 @@ export class CATDatabase {
     aiTemperature: number | null,
     aiModel: ProjectAIModel | null,
   ) {
-    this.projectRepo.updateProjectAISettings(projectId, aiPrompt, aiTemperature, aiModel);
+    this.projectRepo.updateProjectAISettings(
+      projectId,
+      aiPrompt,
+      aiTemperature,
+      aiModel,
+    );
+  }
+
+  public updateProjectQASettings(
+    projectId: number,
+    qaSettings: ProjectQASettings,
+  ) {
+    this.projectRepo.updateProjectQASettings(projectId, qaSettings);
   }
 
   public deleteProject(id: number) {
     this.projectRepo.deleteProject(id);
   }
 
-  public createFile(projectId: number, name: string, importOptionsJson?: string): number {
+  public createFile(
+    projectId: number,
+    name: string,
+    importOptionsJson?: string,
+  ): number {
     return this.projectRepo.createFile(projectId, name, importOptionsJson);
   }
 
@@ -131,11 +169,18 @@ export class CATDatabase {
     this.segmentRepo.bulkInsertSegments(segments);
   }
 
-  public getProjectSegmentsByHash(projectId: number, srcHash: string): Segment[] {
+  public getProjectSegmentsByHash(
+    projectId: number,
+    srcHash: string,
+  ): Segment[] {
     return this.segmentRepo.getProjectSegmentsByHash(projectId, srcHash);
   }
 
-  public getSegmentsPage(fileId: number, offset: number, limit: number): Segment[] {
+  public getSegmentsPage(
+    fileId: number,
+    offset: number,
+    limit: number,
+  ): Segment[] {
     return this.segmentRepo.getSegmentsPage(fileId, offset, limit);
   }
 
@@ -151,11 +196,21 @@ export class CATDatabase {
     return this.projectRepo.getProjectTypeByFileId(fileId);
   }
 
-  public updateSegmentTarget(segmentId: string, targetTokens: Token[], status: SegmentStatus) {
+  public updateSegmentTarget(
+    segmentId: string,
+    targetTokens: Token[],
+    status: SegmentStatus,
+  ) {
     this.segmentRepo.updateSegmentTarget(segmentId, targetTokens, status);
   }
 
-  public getProjectStats(projectId: number): { status: string; count: number }[] {
+  public updateSegmentQaIssues(segmentId: string, qaIssues: QaIssue[]) {
+    this.segmentRepo.updateSegmentQaIssues(segmentId, qaIssues);
+  }
+
+  public getProjectStats(
+    projectId: number,
+  ): { status: string; count: number }[] {
     return this.segmentRepo.getProjectStats(projectId);
   }
 
@@ -175,7 +230,11 @@ export class CATDatabase {
     return this.tbRepo.listTermBases();
   }
 
-  public createTermBase(name: string, srcLang: string, tgtLang: string): string {
+  public createTermBase(
+    name: string,
+    srcLang: string,
+    tgtLang: string,
+  ): string {
     return this.tbRepo.createTermBase(name, srcLang, tgtLang);
   }
 
@@ -191,7 +250,11 @@ export class CATDatabase {
     return this.tbRepo.getTermBaseStats(tbId);
   }
 
-  public mountTermBaseToProject(projectId: number, tbId: string, priority: number = 10) {
+  public mountTermBaseToProject(
+    projectId: number,
+    tbId: string,
+    priority: number = 10,
+  ) {
     this.tbRepo.mountTermBaseToProject(projectId, tbId, priority);
   }
 
@@ -203,7 +266,11 @@ export class CATDatabase {
     return this.tbRepo.getProjectMountedTermBases(projectId);
   }
 
-  public listTBEntries(tbId: string, limit: number = 500, offset: number = 0): TBEntry[] {
+  public listTBEntries(
+    tbId: string,
+    limit: number = 500,
+    offset: number = 0,
+  ): TBEntry[] {
     return this.tbRepo.listTBEntries(tbId, limit, offset);
   }
 
@@ -241,7 +308,9 @@ export class CATDatabase {
     this.tmRepo.upsertTMEntry(entry);
   }
 
-  public insertTMEntryIfAbsentBySrcHash(entry: TMEntry & { tmId: string }): string | undefined {
+  public insertTMEntryIfAbsentBySrcHash(
+    entry: TMEntry & { tmId: string },
+  ): string | undefined {
     return this.tmRepo.insertTMEntryIfAbsentBySrcHash(entry);
   }
 
@@ -249,11 +318,21 @@ export class CATDatabase {
     return this.tmRepo.upsertTMEntryBySrcHash(entry);
   }
 
-  public insertTMFts(tmId: string, srcText: string, tgtText: string, tmEntryId: string) {
+  public insertTMFts(
+    tmId: string,
+    srcText: string,
+    tgtText: string,
+    tmEntryId: string,
+  ) {
     this.tmRepo.insertTMFts(tmId, srcText, tgtText, tmEntryId);
   }
 
-  public replaceTMFts(tmId: string, srcText: string, tgtText: string, tmEntryId: string) {
+  public replaceTMFts(
+    tmId: string,
+    srcText: string,
+    tgtText: string,
+    tmEntryId: string,
+  ) {
     this.tmRepo.replaceTMFts(tmId, srcText, tgtText, tmEntryId);
   }
 
@@ -263,7 +342,7 @@ export class CATDatabase {
 
   public findTMEntryMetaByHash(
     tmId: string,
-    srcHash: string
+    srcHash: string,
   ): { id: string; usageCount: number; createdAt: string } | undefined {
     return this.tmRepo.findTMEntryMetaByHash(tmId, srcHash);
   }
@@ -280,7 +359,12 @@ export class CATDatabase {
     return this.tmRepo.listTMs(type);
   }
 
-  public createTM(name: string, srcLang: string, tgtLang: string, type: TMType): string {
+  public createTM(
+    name: string,
+    srcLang: string,
+    tgtLang: string,
+    type: TMType,
+  ): string {
     return this.tmRepo.createTM(name, srcLang, tgtLang, type);
   }
 
@@ -288,7 +372,12 @@ export class CATDatabase {
     this.tmRepo.deleteTM(id);
   }
 
-  public mountTMToProject(projectId: number, tmId: string, priority: number = 10, permission: string = 'read') {
+  public mountTMToProject(
+    projectId: number,
+    tmId: string,
+    priority: number = 10,
+    permission: string = "read",
+  ) {
     this.tmRepo.mountTMToProject(projectId, tmId, priority, permission);
   }
 

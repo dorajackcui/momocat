@@ -1,14 +1,19 @@
-import Database from 'better-sqlite3';
-import { randomUUID } from 'crypto';
+import Database from "better-sqlite3";
+import { randomUUID } from "crypto";
+import { DEFAULT_PROJECT_AI_MODEL, PROJECT_AI_MODELS } from "@cat/core";
 
 export function runMigrations(db: Database.Database) {
+  const sqlQuotedProjectAIModels = PROJECT_AI_MODELS.map(
+    (model) => `'${model}'`,
+  ).join(", ");
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_version (
       version INTEGER PRIMARY KEY
     );
   `);
 
-  const versionRow = db.prepare('SELECT version FROM schema_version').get() as
+  const versionRow = db.prepare("SELECT version FROM schema_version").get() as
     | { version: number }
     | undefined;
   const currentVersion = versionRow ? versionRow.version : 0;
@@ -77,18 +82,20 @@ export function runMigrations(db: Database.Database) {
         );
       `);
 
-      const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as {
+      const tables = db
+        .prepare("SELECT name FROM sqlite_master WHERE type='table'")
+        .all() as {
         name: string;
       }[];
-      const hasOldProjects = tables.some((table) => table.name === 'projects');
-      const hasOldFiles = tables.some((table) => table.name === 'files');
-      const hasOldSegments = tables.some((table) => table.name === 'segments');
+      const hasOldProjects = tables.some((table) => table.name === "projects");
+      const hasOldFiles = tables.some((table) => table.name === "files");
+      const hasOldSegments = tables.some((table) => table.name === "segments");
 
       if (hasOldProjects) {
-        const oldProjects = db.prepare('SELECT * FROM projects').all() as any[];
+        const oldProjects = db.prepare("SELECT * FROM projects").all() as any[];
         for (const project of oldProjects) {
           db.prepare(
-            'INSERT INTO projects_v3 (id, uuid, name, srcLang, tgtLang, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)'
+            "INSERT INTO projects_v3 (id, uuid, name, srcLang, tgtLang, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
           ).run(
             project.id,
             randomUUID(),
@@ -96,16 +103,16 @@ export function runMigrations(db: Database.Database) {
             project.srcLang,
             project.tgtLang,
             project.createdAt || new Date().toISOString(),
-            project.updatedAt || new Date().toISOString()
+            project.updatedAt || new Date().toISOString(),
           );
         }
       }
 
       if (hasOldFiles) {
-        const oldFiles = db.prepare('SELECT * FROM files').all() as any[];
+        const oldFiles = db.prepare("SELECT * FROM files").all() as any[];
         for (const file of oldFiles) {
           db.prepare(
-            'INSERT INTO files_v3 (id, uuid, projectId, name, totalSegments, confirmedSegments, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+            "INSERT INTO files_v3 (id, uuid, projectId, name, totalSegments, confirmedSegments, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
           ).run(
             file.id,
             randomUUID(),
@@ -114,16 +121,16 @@ export function runMigrations(db: Database.Database) {
             file.totalSegments,
             file.confirmedSegments,
             file.createdAt || new Date().toISOString(),
-            file.updatedAt || new Date().toISOString()
+            file.updatedAt || new Date().toISOString(),
           );
         }
       }
 
       if (hasOldSegments) {
-        const oldSegments = db.prepare('SELECT * FROM segments').all() as any[];
+        const oldSegments = db.prepare("SELECT * FROM segments").all() as any[];
         for (const segment of oldSegments) {
           db.prepare(
-            'INSERT INTO segments_v3 (segmentId, fileId, orderIndex, sourceTokensJson, targetTokensJson, status, tagsSignature, matchKey, srcHash, metaJson, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            "INSERT INTO segments_v3 (segmentId, fileId, orderIndex, sourceTokensJson, targetTokensJson, status, tagsSignature, matchKey, srcHash, metaJson, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
           ).run(
             segment.segmentId,
             segment.fileId,
@@ -135,7 +142,7 @@ export function runMigrations(db: Database.Database) {
             segment.matchKey,
             segment.srcHash,
             segment.metaJson,
-            segment.updatedAt || new Date().toISOString()
+            segment.updatedAt || new Date().toISOString(),
           );
         }
       }
@@ -157,13 +164,15 @@ export function runMigrations(db: Database.Database) {
       `);
 
       const confirmedSegments = db
-        .prepare(`
+        .prepare(
+          `
           SELECT s.*, f.projectId, p.srcLang, p.tgtLang
           FROM segments s
           JOIN files f ON s.fileId = f.id
           JOIN projects p ON f.projectId = p.id
           WHERE s.status = 'confirmed'
-        `)
+        `,
+        )
         .all() as any[];
 
       for (const _segment of confirmedSegments) {
@@ -171,22 +180,24 @@ export function runMigrations(db: Database.Database) {
       }
 
       if (!versionRow) {
-        db.prepare('INSERT INTO schema_version (version) VALUES (3)').run();
+        db.prepare("INSERT INTO schema_version (version) VALUES (3)").run();
       } else {
-        db.prepare('UPDATE schema_version SET version = 3').run();
+        db.prepare("UPDATE schema_version SET version = 3").run();
       }
     })();
   }
 
   if (currentVersion < 4) {
-    console.log('[DB] Upgrading schema to v4 (Adding importOptionsJson to files)...');
+    console.log(
+      "[DB] Upgrading schema to v4 (Adding importOptionsJson to files)...",
+    );
     db.exec(`
       ALTER TABLE files ADD COLUMN importOptionsJson TEXT;
     `);
   }
 
   if (currentVersion < 5) {
-    console.log('[DB] Upgrading schema to v5 (Multi-TM Architecture)...');
+    console.log("[DB] Upgrading schema to v5 (Multi-TM Architecture)...");
     db.transaction(() => {
       db.exec(`
         CREATE TABLE tms (
@@ -226,32 +237,34 @@ export function runMigrations(db: Database.Database) {
         );
       `);
 
-      const projects = db.prepare('SELECT * FROM projects').all() as any[];
+      const projects = db.prepare("SELECT * FROM projects").all() as any[];
       for (const project of projects) {
         const workingTmId = randomUUID();
         db.prepare(
           `
             INSERT INTO tms (id, name, srcLang, tgtLang, type, createdAt, updatedAt)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-          `
+          `,
         ).run(
           workingTmId,
           `${project.name} (Working TM)`,
           project.srcLang,
           project.tgtLang,
-          'working',
+          "working",
           project.createdAt,
-          project.updatedAt
+          project.updatedAt,
         );
 
         db.prepare(
           `
             INSERT INTO project_tms (projectId, tmId, priority, permission, isEnabled)
             VALUES (?, ?, ?, ?, ?)
-          `
-        ).run(project.id, workingTmId, 0, 'readwrite', 1);
+          `,
+        ).run(project.id, workingTmId, 0, "readwrite", 1);
 
-        const oldEntries = db.prepare('SELECT * FROM tm_entries WHERE projectId = ?').all(project.id) as any[];
+        const oldEntries = db
+          .prepare("SELECT * FROM tm_entries WHERE projectId = ?")
+          .all(project.id) as any[];
         for (const entry of oldEntries) {
           db.prepare(
             `
@@ -260,7 +273,7 @@ export function runMigrations(db: Database.Database) {
                 sourceTokensJson, targetTokensJson, originSegmentId,
                 createdAt, updatedAt, usageCount
               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `
+            `,
           ).run(
             entry.id,
             workingTmId,
@@ -272,7 +285,7 @@ export function runMigrations(db: Database.Database) {
             entry.originSegmentId,
             entry.createdAt,
             entry.updatedAt,
-            entry.usageCount
+            entry.usageCount,
           );
         }
       }
@@ -296,28 +309,27 @@ export function runMigrations(db: Database.Database) {
         );
       `);
 
-      const allEntries = db.prepare('SELECT * FROM tm_entries').all() as any[];
+      const allEntries = db.prepare("SELECT * FROM tm_entries").all() as any[];
       for (const entry of allEntries) {
         const srcText = JSON.parse(entry.sourceTokensJson)
           .map((token: any) => token.content)
-          .join('');
+          .join("");
         const tgtText = JSON.parse(entry.targetTokensJson)
           .map((token: any) => token.content)
-          .join('');
-        db.prepare('INSERT INTO tm_fts (tmId, srcText, tgtText, tmEntryId) VALUES (?, ?, ?, ?)').run(
-          entry.tmId,
-          srcText,
-          tgtText,
-          entry.id
-        );
+          .join("");
+        db.prepare(
+          "INSERT INTO tm_fts (tmId, srcText, tgtText, tmEntryId) VALUES (?, ?, ?, ?)",
+        ).run(entry.tmId, srcText, tgtText, entry.id);
       }
 
-      db.prepare('UPDATE schema_version SET version = 5').run();
+      db.prepare("UPDATE schema_version SET version = 5").run();
     })();
   }
 
   if (currentVersion < 6) {
-    console.log('[DB] Upgrading schema to v6 (Fixing Foreign Keys for Files/Segments)...');
+    console.log(
+      "[DB] Upgrading schema to v6 (Fixing Foreign Keys for Files/Segments)...",
+    );
     db.transaction(() => {
       db.exec(`
         CREATE TABLE files_v6 (
@@ -359,12 +371,12 @@ export function runMigrations(db: Database.Database) {
         ALTER TABLE segments_v6 RENAME TO segments;
       `);
 
-      db.prepare('UPDATE schema_version SET version = 6').run();
+      db.prepare("UPDATE schema_version SET version = 6").run();
     })();
   }
 
   if (currentVersion < 7) {
-    console.log('[DB] Upgrading schema to v7 (AI prompt + app settings)...');
+    console.log("[DB] Upgrading schema to v7 (AI prompt + app settings)...");
     db.transaction(() => {
       db.exec(`
         ALTER TABLE projects ADD COLUMN aiPrompt TEXT;
@@ -376,12 +388,12 @@ export function runMigrations(db: Database.Database) {
         );
       `);
 
-      db.prepare('UPDATE schema_version SET version = 7').run();
+      db.prepare("UPDATE schema_version SET version = 7").run();
     })();
   }
 
   if (currentVersion < 8) {
-    console.log('[DB] Upgrading schema to v8 (TM unique srcHash per TM)...');
+    console.log("[DB] Upgrading schema to v8 (TM unique srcHash per TM)...");
     db.transaction(() => {
       db.exec(`
         DELETE FROM tm_entries
@@ -403,15 +415,19 @@ export function runMigrations(db: Database.Database) {
         ON tm_entries(tmId, srcHash);
       `);
 
-      db.prepare('UPDATE schema_version SET version = 8').run();
+      db.prepare("UPDATE schema_version SET version = 8").run();
     })();
   }
 
   if (currentVersion < 9) {
-    console.log('[DB] Upgrading schema to v9 (Project AI temperature)...');
+    console.log("[DB] Upgrading schema to v9 (Project AI temperature)...");
     db.transaction(() => {
-      const columns = db.prepare('PRAGMA table_info(projects)').all() as Array<{ name: string }>;
-      const hasAiTemperature = columns.some((column) => column.name === 'aiTemperature');
+      const columns = db.prepare("PRAGMA table_info(projects)").all() as Array<{
+        name: string;
+      }>;
+      const hasAiTemperature = columns.some(
+        (column) => column.name === "aiTemperature",
+      );
 
       if (!hasAiTemperature) {
         db.exec(`
@@ -419,12 +435,12 @@ export function runMigrations(db: Database.Database) {
         `);
       }
 
-      db.prepare('UPDATE schema_version SET version = 9').run();
+      db.prepare("UPDATE schema_version SET version = 9").run();
     })();
   }
 
   if (currentVersion < 10) {
-    console.log('[DB] Upgrading schema to v10 (Term Base system)...');
+    console.log("[DB] Upgrading schema to v10 (Term Base system)...");
     db.transaction(() => {
       db.exec(`
         CREATE TABLE IF NOT EXISTS term_bases (
@@ -472,15 +488,19 @@ export function runMigrations(db: Database.Database) {
         ON tb_entries(tbId, srcNorm);
       `);
 
-      db.prepare('UPDATE schema_version SET version = 10').run();
+      db.prepare("UPDATE schema_version SET version = 10").run();
     })();
   }
 
   if (currentVersion < 11) {
-    console.log('[DB] Upgrading schema to v11 (Project type)...');
+    console.log("[DB] Upgrading schema to v11 (Project type)...");
     db.transaction(() => {
-      const columns = db.prepare('PRAGMA table_info(projects)').all() as Array<{ name: string }>;
-      const hasProjectType = columns.some((column) => column.name === 'projectType');
+      const columns = db.prepare("PRAGMA table_info(projects)").all() as Array<{
+        name: string;
+      }>;
+      const hasProjectType = columns.some(
+        (column) => column.name === "projectType",
+      );
 
       if (!hasProjectType) {
         db.exec(`
@@ -494,31 +514,88 @@ export function runMigrations(db: Database.Database) {
         WHERE projectType IS NULL OR TRIM(projectType) = '';
       `);
 
-      db.prepare('UPDATE schema_version SET version = 11').run();
+      db.prepare("UPDATE schema_version SET version = 11").run();
     })();
   }
 
   if (currentVersion < 12) {
-    console.log('[DB] Upgrading schema to v12 (Project AI model)...');
+    console.log("[DB] Upgrading schema to v12 (Project AI model)...");
     db.transaction(() => {
-      const columns = db.prepare('PRAGMA table_info(projects)').all() as Array<{ name: string }>;
-      const hasAiModel = columns.some((column) => column.name === 'aiModel');
+      const columns = db.prepare("PRAGMA table_info(projects)").all() as Array<{
+        name: string;
+      }>;
+      const hasAiModel = columns.some((column) => column.name === "aiModel");
 
       if (!hasAiModel) {
         db.exec(`
-          ALTER TABLE projects ADD COLUMN aiModel TEXT DEFAULT 'gpt-4o';
+          ALTER TABLE projects ADD COLUMN aiModel TEXT DEFAULT '${DEFAULT_PROJECT_AI_MODEL}';
         `);
       }
 
       db.exec(`
         UPDATE projects
-        SET aiModel = 'gpt-4o'
+        SET aiModel = '${DEFAULT_PROJECT_AI_MODEL}'
         WHERE aiModel IS NULL
            OR TRIM(aiModel) = ''
-           OR aiModel NOT IN ('gpt-5.2', 'gpt-5-mini', 'gpt-4o', 'gpt-4.1-mini');
+           OR aiModel NOT IN (${sqlQuotedProjectAIModels});
       `);
 
-      db.prepare('UPDATE schema_version SET version = 12').run();
+      db.prepare("UPDATE schema_version SET version = 12").run();
+    })();
+  }
+
+  if (currentVersion < 13) {
+    console.log("[DB] Upgrading schema to v13 (Project QA settings)...");
+    db.transaction(() => {
+      const columns = db.prepare("PRAGMA table_info(projects)").all() as Array<{
+        name: string;
+      }>;
+      const hasQaSettingsJson = columns.some(
+        (column) => column.name === "qaSettingsJson",
+      );
+
+      if (!hasQaSettingsJson) {
+        db.exec(`
+          ALTER TABLE projects ADD COLUMN qaSettingsJson TEXT;
+        `);
+      }
+
+      db.exec(`
+        UPDATE projects
+        SET qaSettingsJson = '{"enabledRuleIds":["tag-integrity","terminology-consistency"],"instantQaOnConfirm":true}'
+        WHERE qaSettingsJson IS NULL OR TRIM(qaSettingsJson) = '';
+      `);
+
+      db.prepare("UPDATE schema_version SET version = 13").run();
+    })();
+  }
+
+  if (currentVersion < 14) {
+    console.log("[DB] Upgrading schema to v14 (Segment QA issue cache)...");
+    db.transaction(() => {
+      const segmentsTable = db
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'segments'",
+        )
+        .get() as { name: string } | undefined;
+      if (segmentsTable) {
+        const columns = db
+          .prepare("PRAGMA table_info(segments)")
+          .all() as Array<{
+          name: string;
+        }>;
+        const hasQaIssuesJson = columns.some(
+          (column) => column.name === "qaIssuesJson",
+        );
+
+        if (!hasQaIssuesJson) {
+          db.exec(`
+            ALTER TABLE segments ADD COLUMN qaIssuesJson TEXT;
+          `);
+        }
+      }
+
+      db.prepare("UPDATE schema_version SET version = 14").run();
     })();
   }
 }

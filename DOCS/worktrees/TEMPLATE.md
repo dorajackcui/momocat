@@ -26,6 +26,7 @@
 
 ## 5. 验证计划
 
+- 依赖准备命令（仅 agent 新开/接管 worktree 时必填）：`npm run worktree:deps:link`（如需覆盖：`npm run worktree:deps:link:force`）
 - 计划执行命令：
 - 验证通过标准：
 

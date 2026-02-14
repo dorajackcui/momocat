@@ -1,6 +1,8 @@
 import {
+  FileQaReport,
   Project,
   ProjectAIModel as CoreProjectAIModel,
+  ProjectQASettings,
   ProjectType as CoreProjectType,
   Segment,
   SegmentStatus,
@@ -175,6 +177,7 @@ export interface DesktopApi {
     aiTemperature: number | null,
     aiModel: ProjectAIModel | null,
   ) => Promise<void>;
+  updateProjectQASettings: (projectId: number, qaSettings: ProjectQASettings) => Promise<void>;
   getProjectFiles: (projectId: number) => Promise<ProjectFileRecord[]>;
   getFile: (fileId: number) => Promise<ProjectFileRecord | undefined>;
   getFilePreview: (filePath: string) => Promise<SpreadsheetPreviewData>;
@@ -192,6 +195,7 @@ export interface DesktopApi {
     options?: ImportOptions,
     forceExport?: boolean,
   ) => Promise<void>;
+  runFileQA: (fileId: number) => Promise<FileQaReport>;
   updateSegment: (
     segmentId: string,
     targetTokens: Token[],

@@ -1,11 +1,15 @@
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useState } from 'react';
-import { PROJECT_AI_MODELS, Project, ProjectAIModel } from '@cat/core';
+import {
+  DEFAULT_PROJECT_AI_MODEL,
+  Project,
+  ProjectAIModel,
+  normalizeProjectAIModel as normalizeProjectAIModelCore,
+} from '@cat/core';
 import type { JobProgressEvent } from '../../../../shared/ipc';
 import { apiClient } from '../../services/apiClient';
 import { feedbackService } from '../../services/feedbackService';
 
 export const DEFAULT_AI_TEMPERATURE = 0.2;
-export const DEFAULT_PROJECT_AI_MODEL: ProjectAIModel = 'gpt-4o';
 
 export function normalizeTemperatureValue(value: number): number {
   return Math.max(0, Math.min(2, Number(value.toFixed(2))));
@@ -23,14 +27,7 @@ export function parseTemperatureInput(input: string): number | null {
   return normalizeTemperatureValue(parsed);
 }
 
-const PROJECT_AI_MODEL_SET = new Set<string>(PROJECT_AI_MODELS);
-
-export function normalizeProjectAIModel(value: string | null | undefined): ProjectAIModel {
-  if (typeof value === 'string' && PROJECT_AI_MODEL_SET.has(value)) {
-    return value as ProjectAIModel;
-  }
-  return DEFAULT_PROJECT_AI_MODEL;
-}
+export const normalizeProjectAIModel = normalizeProjectAIModelCore;
 
 export interface ProjectAIFlagsInput {
   promptDraft: string;
