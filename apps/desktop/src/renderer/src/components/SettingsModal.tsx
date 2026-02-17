@@ -158,41 +158,52 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         </div>
 
         <div className="p-6 space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
-              OpenAI API Key
-            </label>
-            <input
-              type="password"
-              value={apiKeyInput}
-              onChange={(e) => setApiKeyInput(e.target.value)}
-              placeholder="sk-..."
-              className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-            />
-            {apiKeyHint && (
-              <div className="mt-2 flex items-center justify-between gap-2">
-                <p className="text-[11px] text-gray-500">Saved key: {apiKeyHint}</p>
-                <button
-                  onClick={handleClear}
-                  disabled={busy}
-                  className="text-[11px] font-semibold text-red-600 hover:text-red-700 disabled:opacity-50 transition-colors"
-                >
-                  {clearing ? 'Removing...' : 'Delete Saved Key'}
-                </button>
-              </div>
-            )}
-          </div>
-
-          {status && (
-            <div className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-              {status}
+          <section className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 space-y-3">
+            <h3 className="text-sm font-bold text-gray-800">API Key Settings</h3>
+            <div>
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
+                OpenAI API Key
+              </label>
+              <input
+                type="password"
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                placeholder="sk-..."
+                className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+              />
+              {apiKeyHint && (
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <p className="text-[11px] text-gray-500">Saved key: {apiKeyHint}</p>
+                  <button
+                    onClick={handleClear}
+                    disabled={busy}
+                    className="text-[11px] font-semibold text-red-600 hover:text-red-700 disabled:opacity-50 transition-colors"
+                  >
+                    {clearing ? 'Removing...' : 'Delete Saved Key'}
+                  </button>
+                </div>
+              )}
             </div>
-          )}
+            <div className="flex gap-3">
+              <button
+                onClick={handleTest}
+                disabled={busy}
+                className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 rounded-lg font-bold hover:bg-gray-100 transition-colors"
+              >
+                {testing ? 'Testing...' : 'Test Connection'}
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={busy}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-lg shadow-blue-200"
+              >
+                {loading ? 'Saving...' : 'Save Key'}
+              </button>
+            </div>
+          </section>
 
-          <div className="pt-1 border-t border-gray-100">
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
-              Network Proxy
-            </label>
+          <section className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+            <h3 className="text-sm font-bold text-gray-800">Proxy Settings</h3>
             <div className="space-y-2 text-sm text-gray-700">
               <label className="flex items-center gap-2">
                 <input
@@ -229,39 +240,26 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 value={customProxyUrl}
                 onChange={(e) => setCustomProxyUrl(e.target.value)}
                 placeholder="http://127.0.0.1:7890"
-                className="mt-3 w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
               />
             )}
 
-            <p className="mt-2 text-[11px] text-gray-500">
-              Active proxy: {effectiveProxyUrl || 'None (direct)'}
-            </p>
+            <p className="text-[11px] text-gray-500">Active proxy: {effectiveProxyUrl || 'None (direct)'}</p>
 
             <button
               onClick={handleSaveProxy}
               disabled={busy}
-              className="mt-3 w-full px-4 py-2 border border-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              className="w-full px-4 py-2 border border-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 disabled:opacity-50 transition-colors"
             >
               {savingProxy ? 'Saving Proxy...' : 'Save Proxy Settings'}
             </button>
-          </div>
+          </section>
 
-          <div className="flex gap-3 pt-2">
-            <button
-              onClick={handleTest}
-              disabled={busy}
-              className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 rounded-lg font-bold hover:bg-gray-50 transition-colors"
-            >
-              {testing ? 'Testing...' : 'Test Connection'}
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={busy}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-lg shadow-blue-200"
-            >
-              {loading ? 'Saving...' : 'Save Key'}
-            </button>
-          </div>
+          {status && (
+            <div className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+              {status}
+            </div>
+          )}
         </div>
       </div>
     </div>
