@@ -60,7 +60,6 @@ DOCS/            # 项目文档
 
 - 交接轻入口：`DOCS/HANDOFF_LITE.md`
 - 交接完整版：`DOCS/HANDOFF.md`
-- 并行协议：`DOCS/WORKTREE_PROTOCOL.md`
 - 文档导航：`DOCS/README.md`
 - 当前状态：`DOCS/CURRENT_STATUS.md`
 - 路线图：`DOCS/ROADMAP.md`

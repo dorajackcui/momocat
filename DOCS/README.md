@@ -1,6 +1,6 @@
 # DOCS 文档导航
 
-最后更新：2026-02-14
+最后更新：2026-02-17
 
 本目录已按“规范 / 状态 / 导航 / 历史”分层。默认以代码为准，文档用于快速定位、统一约束、同步进度。
 
@@ -11,11 +11,11 @@
 1. `DOCS/HANDOFF_LITE.md`（默认，1 分钟快速起步）
 2. `DOCS/HANDOFF.md`（复杂任务时使用）
 
-并行 worktree 模式额外必读：
+## 最小阅读路径（默认）
 
-1. `DOCS/WORKTREE_PROTOCOL.md`
-2. `DOCS/worktrees/<branch>.md`
-3. 新 worktree 首次进入先执行 `npm run worktree:deps:link`（如需覆盖本地依赖目录：`npm run worktree:deps:link:force`）。
+1. 读 `DOCS/HANDOFF_LITE.md`。
+2. 读 `DOCS/CURRENT_STATUS.md`。
+3. 开始实现；仅在需要定位代码时再查 `DOCS/PROJECT_MAP_QUICKSTART.md`。
 
 ## 当前有效（Active）
 
@@ -23,10 +23,6 @@
   - 轻量交接入口（新对话默认）
 - `DOCS/HANDOFF.md`
   - 完整交接系统（深度上下文）
-- `DOCS/WORKTREE_PROTOCOL.md`
-  - 并行 worktree 协议
-- `DOCS/worktrees/TEMPLATE.md`
-  - 分支任务卡模板
 - `DOCS/CURRENT_STATUS.md`
   - 当前阶段、门禁结果、阻塞项、近期优先级（实时执行面板）
 - `DOCS/PROJECT_MAP_QUICKSTART.md`
@@ -57,7 +53,6 @@
 
 ## 使用建议
 
-1. 新对话先读 `DOCS/HANDOFF_LITE.md`。
-2. 并行分支场景再读 `DOCS/WORKTREE_PROTOCOL.md` + 分支任务卡。
-3. 复杂任务再升级到 `DOCS/HANDOFF.md` 完整链路。
-4. 历史背景只在需要时查看 `DOCS/archive/*`。
+1. 默认按“最小阅读路径”执行，不做全量通读。
+2. 复杂任务再升级到 `DOCS/HANDOFF.md` 扩展链路。
+3. 历史背景只在需要时查看 `DOCS/archive/*`。

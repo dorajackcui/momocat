@@ -118,7 +118,7 @@ function App(): JSX.Element {
           <button
             onClick={() => setIsSettingsOpen(true)}
             className="px-3 py-2 text-sm font-bold rounded-lg text-gray-500 hover:bg-gray-100 transition-all"
-            title="AI Settings"
+            title="AI & Network Settings"
           >
             Settings
           </button>

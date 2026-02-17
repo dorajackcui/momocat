@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import type { ProxyMode, ProxySettings } from '../../../shared/ipc';
 import { apiClient } from '../services/apiClient';
 
 interface SettingsModalProps {
@@ -9,8 +10,12 @@ interface SettingsModalProps {
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [apiKeyHint, setApiKeyHint] = useState<string | null>(null);
+  const [proxyMode, setProxyMode] = useState<ProxyMode>('system');
+  const [customProxyUrl, setCustomProxyUrl] = useState('');
+  const [effectiveProxyUrl, setEffectiveProxyUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [savingProxy, setSavingProxy] = useState(false);
   const [testing, setTesting] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -21,14 +26,25 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
     const load = async () => {
       try {
-        const settings = await apiClient.getAISettings();
-        if (settings.apiKeySet && settings.apiKeyLast4) {
-          setApiKeyHint(`****${settings.apiKeyLast4}`);
+        const [aiSettings, proxySettings] = await Promise.all([
+          apiClient.getAISettings(),
+          apiClient.getProxySettings(),
+        ]);
+
+        if (aiSettings.apiKeySet && aiSettings.apiKeyLast4) {
+          setApiKeyHint(`****${aiSettings.apiKeyLast4}`);
         } else {
           setApiKeyHint(null);
         }
+
+        setProxyMode(proxySettings.mode);
+        setCustomProxyUrl(proxySettings.customProxyUrl);
+        setEffectiveProxyUrl(proxySettings.effectiveProxyUrl ?? null);
       } catch {
         setApiKeyHint(null);
+        setProxyMode('system');
+        setCustomProxyUrl('');
+        setEffectiveProxyUrl(null);
       }
     };
 
@@ -36,6 +52,19 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const busy = loading || clearing || testing || savingProxy;
+
+  const applyProxySettings = async (): Promise<ProxySettings> => {
+    const updated = await apiClient.setProxySettings({
+      mode: proxyMode,
+      customProxyUrl,
+    });
+    setProxyMode(updated.mode);
+    setCustomProxyUrl(updated.customProxyUrl);
+    setEffectiveProxyUrl(updated.effectiveProxyUrl ?? null);
+    return updated;
+  };
 
   const handleSave = async () => {
     const key = apiKeyInput.trim();
@@ -62,14 +91,37 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setTesting(true);
     setStatus(null);
     try {
+      const proxySettings = await applyProxySettings();
       const key = apiKeyInput.trim() || undefined;
       await apiClient.testAIConnection(key);
-      setStatus('Connection successful.');
+      if (proxySettings.effectiveProxyUrl) {
+        setStatus(`Connection successful via proxy: ${proxySettings.effectiveProxyUrl}`);
+      } else {
+        setStatus('Connection successful with direct connection.');
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setStatus(`Connection failed: ${message}`);
     } finally {
       setTesting(false);
+    }
+  };
+
+  const handleSaveProxy = async () => {
+    setSavingProxy(true);
+    setStatus(null);
+    try {
+      const proxySettings = await applyProxySettings();
+      if (proxySettings.effectiveProxyUrl) {
+        setStatus(`Proxy applied: ${proxySettings.effectiveProxyUrl}`);
+      } else {
+        setStatus('Proxy disabled. Direct connection will be used.');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setStatus(`Failed to save proxy settings: ${message}`);
+    } finally {
+      setSavingProxy(false);
     }
   };
 
@@ -92,7 +144,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-          <h2 className="text-xl font-bold text-gray-900">AI Settings</h2>
+          <h2 className="text-xl font-bold text-gray-900">AI & Network Settings</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -122,7 +174,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 <p className="text-[11px] text-gray-500">Saved key: {apiKeyHint}</p>
                 <button
                   onClick={handleClear}
-                  disabled={clearing || loading || testing}
+                  disabled={busy}
                   className="text-[11px] font-semibold text-red-600 hover:text-red-700 disabled:opacity-50 transition-colors"
                 >
                   {clearing ? 'Removing...' : 'Delete Saved Key'}
@@ -137,17 +189,74 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </div>
           )}
 
+          <div className="pt-1 border-t border-gray-100">
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+              Network Proxy
+            </label>
+            <div className="space-y-2 text-sm text-gray-700">
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="proxy-mode"
+                  checked={proxyMode === 'off'}
+                  onChange={() => setProxyMode('off')}
+                />
+                <span>No Proxy (Direct)</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="proxy-mode"
+                  checked={proxyMode === 'system'}
+                  onChange={() => setProxyMode('system')}
+                />
+                <span>Use System/Environment Proxy</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="proxy-mode"
+                  checked={proxyMode === 'custom'}
+                  onChange={() => setProxyMode('custom')}
+                />
+                <span>Use Custom Proxy URL</span>
+              </label>
+            </div>
+
+            {proxyMode === 'custom' && (
+              <input
+                type="text"
+                value={customProxyUrl}
+                onChange={(e) => setCustomProxyUrl(e.target.value)}
+                placeholder="http://127.0.0.1:7890"
+                className="mt-3 w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+              />
+            )}
+
+            <p className="mt-2 text-[11px] text-gray-500">
+              Active proxy: {effectiveProxyUrl || 'None (direct)'}
+            </p>
+
+            <button
+              onClick={handleSaveProxy}
+              disabled={busy}
+              className="mt-3 w-full px-4 py-2 border border-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            >
+              {savingProxy ? 'Saving Proxy...' : 'Save Proxy Settings'}
+            </button>
+          </div>
+
           <div className="flex gap-3 pt-2">
             <button
               onClick={handleTest}
-              disabled={testing || loading || clearing}
+              disabled={busy}
               className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 rounded-lg font-bold hover:bg-gray-50 transition-colors"
             >
               {testing ? 'Testing...' : 'Test Connection'}
             </button>
             <button
               onClick={handleSave}
-              disabled={loading || testing || clearing}
+              disabled={busy}
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-lg shadow-blue-200"
             >
               {loading ? 'Saving...' : 'Save Key'}

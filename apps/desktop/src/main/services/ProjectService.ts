@@ -29,7 +29,14 @@ import { SqliteTMRepository } from './adapters/SqliteTMRepository';
 import { SqliteTBRepository } from './adapters/SqliteTBRepository';
 import { SqliteSettingsRepository } from './adapters/SqliteSettingsRepository';
 import { SqliteTransactionManager } from './adapters/SqliteTransactionManager';
-import type { ImportOptions, TBImportOptions, TMImportOptions } from '../../shared/ipc';
+import { ProxySettingsManager } from './proxy/ProxySettingsManager';
+import type {
+  ImportOptions,
+  ProxySettings,
+  ProxySettingsInput,
+  TBImportOptions,
+  TMImportOptions,
+} from '../../shared/ipc';
 
 interface ProjectServiceDependencies {
   filter?: SpreadsheetGateway;
@@ -108,7 +115,21 @@ export class ProjectService {
     const aiTransport = deps.aiTransport ?? new OpenAITransport();
     this.aiModule =
       deps.aiModule ??
-      new AIModule(projectRepo, segmentRepo, settingsRepo, this.segmentService, aiTransport);
+      new AIModule(
+        projectRepo,
+        segmentRepo,
+        settingsRepo,
+        this.segmentService,
+        aiTransport,
+        new ProxySettingsManager(),
+      );
+
+    try {
+      this.aiModule.applySavedProxySettings();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[Proxy] Failed to apply saved proxy settings: ${message}`);
+    }
   }
 
   public async createProject(
@@ -331,6 +352,14 @@ export class ProjectService {
 
   public clearAIKey() {
     return this.aiModule.clearAIKey();
+  }
+
+  public getProxySettings(): ProxySettings {
+    return this.aiModule.getProxySettings();
+  }
+
+  public setProxySettings(settings: ProxySettingsInput): ProxySettings {
+    return this.aiModule.setProxySettings(settings);
   }
 
   public async testAIConnection(apiKey?: string) {

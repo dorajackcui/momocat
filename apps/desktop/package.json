@@ -18,9 +18,16 @@
     "productName": "Simple CAT Tool",
     "mac": {
       "target": "dmg",
+      "icon": "build/icon.icns",
       "identity": null,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "win": {
+      "icon": "build/icon.ico"
+    },
+    "linux": {
+      "icon": "build/icon.png"
     },
     "files": [
       "out/**/*",

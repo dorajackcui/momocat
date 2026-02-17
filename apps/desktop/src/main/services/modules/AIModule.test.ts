@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_PROJECT_AI_MODEL, Segment, serializeTokensToDisplayText } from '@cat/core';
 import { AIModule } from './AIModule';
 import { AITransport, ProjectRepository, SegmentRepository, SettingsRepository } from '../ports';
+import type { ProxySettingsApplier } from '../proxy/ProxySettingsManager';
 import { SegmentService } from '../SegmentService';
 
 function createSegment(params: {
@@ -577,5 +578,124 @@ describe('AIModule.aiTranslateFile', () => {
     expect(request.userPrompt).toContain('Input:');
     expect(request.userPrompt).toContain('Input text');
     expect(request.userPrompt).toContain('Context: Additional context');
+  });
+});
+
+describe('AIModule.proxySettings', () => {
+  it('returns system mode by default when no proxy settings are stored', () => {
+    const settingsRepo = {
+      getSetting: vi.fn().mockReturnValue(undefined),
+      setSetting: vi.fn(),
+    } as unknown as SettingsRepository;
+
+    const proxySettingsManager = {
+      getEffectiveProxyUrl: vi.fn().mockReturnValue(undefined),
+      applySettings: vi.fn(),
+    } as unknown as ProxySettingsApplier;
+
+    const module = new AIModule(
+      {} as ProjectRepository,
+      {} as SegmentRepository,
+      settingsRepo,
+      {} as SegmentService,
+      {} as AITransport,
+      proxySettingsManager,
+    );
+
+    expect(module.getProxySettings()).toEqual({
+      mode: 'system',
+      customProxyUrl: '',
+      effectiveProxyUrl: undefined,
+    });
+  });
+
+  it('applies and persists custom proxy settings', () => {
+    const settingsStore = new Map<string, string>();
+    const settingsRepo = {
+      getSetting: vi.fn((key: string) => settingsStore.get(key)),
+      setSetting: vi.fn((key: string, value: string | null) => {
+        if (value === null) {
+          settingsStore.delete(key);
+          return;
+        }
+        settingsStore.set(key, value);
+      }),
+    } as unknown as SettingsRepository;
+
+    const proxySettingsManager = {
+      getEffectiveProxyUrl: vi.fn().mockReturnValue('http://127.0.0.1:7890'),
+      applySettings: vi.fn().mockReturnValue({
+        mode: 'custom',
+        customProxyUrl: 'http://127.0.0.1:7890',
+        effectiveProxyUrl: 'http://127.0.0.1:7890',
+      }),
+    } as unknown as ProxySettingsApplier;
+
+    const module = new AIModule(
+      {} as ProjectRepository,
+      {} as SegmentRepository,
+      settingsRepo,
+      {} as SegmentService,
+      {} as AITransport,
+      proxySettingsManager,
+    );
+
+    const result = module.setProxySettings({
+      mode: 'custom',
+      customProxyUrl: ' http://127.0.0.1:7890 ',
+    });
+
+    expect(proxySettingsManager.applySettings).toHaveBeenCalledWith({
+      mode: 'custom',
+      customProxyUrl: 'http://127.0.0.1:7890',
+    });
+    expect(settingsRepo.setSetting).toHaveBeenCalledWith('app_proxy_mode', 'custom');
+    expect(settingsRepo.setSetting).toHaveBeenCalledWith('app_proxy_url', 'http://127.0.0.1:7890');
+    expect(result).toEqual({
+      mode: 'custom',
+      customProxyUrl: 'http://127.0.0.1:7890',
+      effectiveProxyUrl: 'http://127.0.0.1:7890',
+    });
+  });
+
+  it('applies saved proxy settings on startup', () => {
+    const settingsRepo = {
+      getSetting: vi.fn((key: string) => {
+        if (key === 'app_proxy_mode') return 'custom';
+        if (key === 'app_proxy_url') return 'http://127.0.0.1:7890';
+        return undefined;
+      }),
+      setSetting: vi.fn(),
+    } as unknown as SettingsRepository;
+
+    const proxySettingsManager = {
+      getEffectiveProxyUrl: vi.fn().mockReturnValue('http://127.0.0.1:7890'),
+      applySettings: vi.fn().mockReturnValue({
+        mode: 'custom',
+        customProxyUrl: 'http://127.0.0.1:7890',
+        effectiveProxyUrl: 'http://127.0.0.1:7890',
+      }),
+    } as unknown as ProxySettingsApplier;
+
+    const module = new AIModule(
+      {} as ProjectRepository,
+      {} as SegmentRepository,
+      settingsRepo,
+      {} as SegmentService,
+      {} as AITransport,
+      proxySettingsManager,
+    );
+
+    const result = module.applySavedProxySettings();
+
+    expect(proxySettingsManager.applySettings).toHaveBeenCalledWith({
+      mode: 'custom',
+      customProxyUrl: 'http://127.0.0.1:7890',
+    });
+    expect(result).toEqual({
+      mode: 'custom',
+      customProxyUrl: 'http://127.0.0.1:7890',
+      effectiveProxyUrl: 'http://127.0.0.1:7890',
+    });
   });
 });

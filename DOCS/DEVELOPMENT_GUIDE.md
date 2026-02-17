@@ -1,6 +1,12 @@
-# 开发指南（更新于 2026-02-14）
+# 开发指南（更新于 2026-02-17）
 
 本指南是当前功能开发阶段的执行规范。以下规则来自重构期 gate 与整改文档，仍然必须遵守。
+
+## 阅读策略（避免文档负担）
+
+1. 默认不要求每次执行前通读本文件；先按 `DOCS/HANDOFF_LITE.md` 开工。
+2. 仅在以下场景再回到本文件逐条核对：触达核心边界、`gate:check` 失败、需要调整规则。
+3. 若本文件与代码行为冲突，以代码与测试结果为准，并在同次改动修正文档。
 
 ## 0. 当前阶段定义
 
@@ -80,4 +86,3 @@ npm run gate:check
 1. 开发前先读：`DOCS/HANDOFF_LITE.md`（复杂任务再读 `DOCS/HANDOFF.md`）。
 2. 若改动边界/规则：同步更新本文件与 `DOCS/architecture/GATE05_GUARDRAILS.json`。
 3. 文档与代码冲突时，以代码为准，并在本次改动补齐文档。
-4. 并行 worktree 模式：遵循 `DOCS/WORKTREE_PROTOCOL.md`，并维护 `DOCS/worktrees/<branch>.md`。

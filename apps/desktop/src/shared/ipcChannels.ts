@@ -51,6 +51,8 @@ export const IPC_CHANNELS = {
     getSettings: 'ai-settings-get',
     setKey: 'ai-settings-set',
     clearKey: 'ai-settings-clear',
+    getProxySettings: 'proxy-settings-get',
+    setProxySettings: 'proxy-settings-set',
     testConnection: 'ai-test-connection',
     translateFile: 'ai-translate-file',
     testTranslate: 'ai-test-translate',

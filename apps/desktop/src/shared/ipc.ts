@@ -118,6 +118,19 @@ export interface AISettings {
   apiKeyLast4?: string;
 }
 
+export type ProxyMode = 'off' | 'system' | 'custom';
+
+export interface ProxySettings {
+  mode: ProxyMode;
+  customProxyUrl: string;
+  effectiveProxyUrl?: string;
+}
+
+export interface ProxySettingsInput {
+  mode: ProxyMode;
+  customProxyUrl?: string;
+}
+
 export interface AITestTranslateResult {
   ok: boolean;
   error?: string;
@@ -235,6 +248,8 @@ export interface DesktopApi {
   getAISettings: () => Promise<AISettings>;
   setAIKey: (apiKey: string) => Promise<void>;
   clearAIKey: () => Promise<void>;
+  getProxySettings: () => Promise<ProxySettings>;
+  setProxySettings: (settings: ProxySettingsInput) => Promise<ProxySettings>;
   testAIConnection: (apiKey?: string) => Promise<{ ok: true }>;
   aiTranslateFile: (fileId: number) => Promise<string>;
   aiTestTranslate: (

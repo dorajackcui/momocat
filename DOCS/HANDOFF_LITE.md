@@ -1,41 +1,32 @@
-# HANDOFF_LITE（并行开发快速入口）
+# HANDOFF_LITE（快速入口）
 
-最后更新：2026-02-14
+最后更新：2026-02-17
 
 > 目标：新 agent / 新对话 1 分钟内完成上下文建立。  
 > 默认优先读本文件；需要深度背景时再读 `DOCS/HANDOFF.md`。
 
-## 1. 先读哪些文件（最小集合）
+## 1. 默认只读（最小集合）
 
 1. `DOCS/CURRENT_STATUS.md`  
 获取当前门禁状态、阻塞项、优先级。
 
-2. `DOCS/WORKTREE_PROTOCOL.md`  
-如果是并行 worktree 任务，必须读。
-
-3. `DOCS/worktrees/<branch>.md`（若存在）  
-读取当前分支专属任务卡；不存在时按模板新建。
-
-4. `DOCS/PROJECT_MAP_QUICKSTART.md`（按需）  
+2. `DOCS/PROJECT_MAP_QUICKSTART.md`（按需）  
 快速定位代码入口和调用链。
 
 ## 2. 必须遵守（硬规则）
 
 1. `npm run gate:check` 不通过时，不合并。
-2. 并行新 worktree 开工前先执行 `npm run worktree:deps:link`（已有本地依赖目录需覆盖时用 `npm run worktree:deps:link:force`）。
-3. 触达 `ProjectService` / `CATDatabase` / IPC 契约时，必须补测试。
-4. 不做“顺手扩面重构”；只做当前任务直接相关改动。
-5. 文档与代码冲突时，以代码为准，并在本次改动补文档。
+2. 触达 `ProjectService` / `CATDatabase` / IPC 契约时，必须补测试。
+3. 不做“顺手扩面重构”；只做当前任务直接相关改动。
+4. 文档与代码冲突时，以代码为准，并在本次改动补文档。
 
-## 3. 开工前需要给出的 4 点
+## 3. 开工前最小输出（3 点）
 
 1. 当前阶段与门禁状态（来自 `CURRENT_STATUS.md`）。
 2. 本次会改哪些层和文件。
-3. 本次要遵守的硬规则。
-4. 本次验证命令（lint/typecheck/test/gate）。
+3. 本次验证命令（lint/typecheck/test/gate）。
 
 ## 4. 收工前要更新什么
 
 1. 全局状态变化：更新 `DOCS/CURRENT_STATUS.md`。
-2. 分支进展：更新 `DOCS/worktrees/<branch>.md`。
-3. 若改了规则/边界：更新 `DOCS/DEVELOPMENT_GUIDE.md` 和相关文档。
+2. 若改了规则/边界：更新 `DOCS/DEVELOPMENT_GUIDE.md` 和相关文档。

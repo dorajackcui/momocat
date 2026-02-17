@@ -11,7 +11,9 @@ import {
   serializeTokensToDisplayText,
   serializeTokensToEditorText,
 } from '@cat/core';
+import type { ProxySettings, ProxySettingsInput } from '../../../shared/ipc';
 import { AITransport, ProjectRepository, SegmentRepository, SettingsRepository } from '../ports';
+import { ProxySettingsApplier, ProxySettingsManager } from '../proxy/ProxySettingsManager';
 import { SegmentService } from '../SegmentService';
 import {
   buildAISystemPrompt,
@@ -31,6 +33,9 @@ interface TranslateDebugMeta {
 
 export class AIModule {
   private static readonly SEGMENT_PAGE_SIZE = 1000;
+  private static readonly AI_API_KEY = 'openai_api_key';
+  private static readonly PROXY_MODE_KEY = 'app_proxy_mode';
+  private static readonly PROXY_URL_KEY = 'app_proxy_url';
   private readonly tagValidator = new TagValidator();
 
   constructor(
@@ -39,10 +44,11 @@ export class AIModule {
     private readonly settingsRepo: SettingsRepository,
     private readonly segmentService: SegmentService,
     private readonly transport: AITransport,
+    private readonly proxySettingsManager: ProxySettingsApplier = new ProxySettingsManager(),
   ) {}
 
   public getAISettings(): { apiKeySet: boolean; apiKeyLast4?: string } {
-    const apiKey = this.settingsRepo.getSetting('openai_api_key');
+    const apiKey = this.settingsRepo.getSetting(AIModule.AI_API_KEY);
     if (!apiKey) {
       return { apiKeySet: false };
     }
@@ -50,15 +56,49 @@ export class AIModule {
   }
 
   public setAIKey(apiKey: string) {
-    this.settingsRepo.setSetting('openai_api_key', apiKey);
+    this.settingsRepo.setSetting(AIModule.AI_API_KEY, apiKey);
   }
 
   public clearAIKey() {
-    this.settingsRepo.setSetting('openai_api_key', null);
+    this.settingsRepo.setSetting(AIModule.AI_API_KEY, null);
+  }
+
+  public getProxySettings(): ProxySettings {
+    return {
+      mode: this.readProxyMode(),
+      customProxyUrl: this.readStoredProxyUrl(),
+      effectiveProxyUrl: this.proxySettingsManager.getEffectiveProxyUrl(),
+    };
+  }
+
+  public setProxySettings(settings: ProxySettingsInput): ProxySettings {
+    const mode = settings.mode;
+    const customProxyUrl = settings.customProxyUrl?.trim() ?? this.readStoredProxyUrl();
+    const applied = this.proxySettingsManager.applySettings({ mode, customProxyUrl });
+
+    this.settingsRepo.setSetting(AIModule.PROXY_MODE_KEY, applied.mode);
+    this.settingsRepo.setSetting(AIModule.PROXY_URL_KEY, applied.customProxyUrl || null);
+
+    return {
+      ...applied,
+      effectiveProxyUrl: this.proxySettingsManager.getEffectiveProxyUrl(),
+    };
+  }
+
+  public applySavedProxySettings(): ProxySettings {
+    const mode = this.readProxyMode();
+    const customProxyUrl = this.readStoredProxyUrl();
+    const applied = this.proxySettingsManager.applySettings({ mode, customProxyUrl });
+
+    return {
+      ...applied,
+      customProxyUrl,
+      effectiveProxyUrl: this.proxySettingsManager.getEffectiveProxyUrl(),
+    };
   }
 
   public async testAIConnection(apiKey?: string) {
-    const key = (apiKey && apiKey.trim()) || this.settingsRepo.getSetting('openai_api_key');
+    const key = (apiKey && apiKey.trim()) || this.settingsRepo.getSetting(AIModule.AI_API_KEY);
     if (!key) {
       throw new Error('API key is not set');
     }
@@ -78,7 +118,7 @@ export class AIModule {
     const project = this.projectRepo.getProject(file.projectId);
     if (!project) throw new Error('Project not found');
 
-    const apiKey = this.settingsRepo.getSetting('openai_api_key');
+    const apiKey = this.settingsRepo.getSetting(AIModule.AI_API_KEY);
     if (!apiKey) {
       throw new Error('AI API key is not configured');
     }
@@ -142,7 +182,7 @@ export class AIModule {
     const project = this.projectRepo.getProject(projectId);
     if (!project) throw new Error('Project not found');
 
-    const apiKey = this.settingsRepo.getSetting('openai_api_key');
+    const apiKey = this.settingsRepo.getSetting(AIModule.AI_API_KEY);
     if (!apiKey) {
       throw new Error('AI API key is not configured');
     }
@@ -370,6 +410,18 @@ export class AIModule {
     }
 
     return DEFAULT_PROJECT_AI_MODEL;
+  }
+
+  private readProxyMode(): ProxySettings['mode'] {
+    const mode = this.settingsRepo.getSetting(AIModule.PROXY_MODE_KEY);
+    if (mode === 'off' || mode === 'custom' || mode === 'system') {
+      return mode;
+    }
+    return 'system';
+  }
+
+  private readStoredProxyUrl(): string {
+    return this.settingsRepo.getSetting(AIModule.PROXY_URL_KEY)?.trim() ?? '';
   }
 
   private isTranslatableSegment(segment: Segment): boolean {
