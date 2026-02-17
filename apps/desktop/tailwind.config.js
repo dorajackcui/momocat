@@ -8,6 +8,7 @@ module.exports = {
         surface: 'rgb(var(--color-surface) / <alpha-value>)',
         muted: 'rgb(var(--color-muted) / <alpha-value>)',
         border: 'rgb(var(--color-border) / <alpha-value>)',
+        secondary: 'rgb(var(--color-secondary) / <alpha-value>)',
         text: {
           DEFAULT: 'rgb(var(--color-text) / <alpha-value>)',
           muted: 'rgb(var(--color-text-muted) / <alpha-value>)',

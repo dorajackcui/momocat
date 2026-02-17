@@ -117,12 +117,7 @@ export function ProjectAIPane({ ai, projectType = 'translation' }: ProjectAIPane
             }
             className="flex-1"
           />
-          <Button
-            onClick={() => void ai.testPrompt()}
-            size="sm"
-            variant="soft"
-            className="!bg-success !text-success-contrast hover:!bg-success-hover"
-          >
+          <Button onClick={() => void ai.testPrompt()} size="sm" variant="primary">
             Test Prompt
           </Button>
         </div>

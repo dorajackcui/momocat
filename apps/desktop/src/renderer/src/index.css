@@ -4,37 +4,38 @@
 
 @layer base {
   :root {
-    --color-canvas: 242 246 252;
+    --color-canvas: 196 226 239;
     --color-surface: 255 255 255;
-    --color-muted: 246 249 253;
-    --color-border: 216 225 236;
-    --color-text: 24 34 51;
-    --color-text-muted: 78 95 123;
-    --color-text-faint: 117 133 158;
+    --color-muted: 232 243 248;
+    --color-border: 109 91 83;
+    --color-secondary: 109 91 83;
+    --color-text: 15 11 9;
+    --color-text-muted: 82 68 61;
+    --color-text-faint: 121 104 95;
 
-    --color-brand: 27 92 224;
-    --color-brand-hover: 21 76 188;
-    --color-brand-soft: 231 240 255;
+    --color-brand: 2 116 187;
+    --color-brand-hover: 1 92 149;
+    --color-brand-soft: 224 241 250;
     --color-brand-contrast: 255 255 255;
 
-    --color-success: 19 145 99;
-    --color-success-hover: 15 115 79;
-    --color-success-soft: 229 248 241;
+    --color-success: 1 179 99;
+    --color-success-hover: 1 143 79;
+    --color-success-soft: 225 246 236;
     --color-success-contrast: 255 255 255;
 
-    --color-warning: 181 112 21;
-    --color-warning-hover: 146 88 17;
-    --color-warning-soft: 255 245 219;
+    --color-warning: 232 206 1;
+    --color-warning-hover: 191 169 1;
+    --color-warning-soft: 250 245 217;
     --color-warning-contrast: 255 255 255;
 
-    --color-danger: 204 56 74;
-    --color-danger-hover: 164 45 60;
-    --color-danger-soft: 255 236 239;
+    --color-danger: 251 7 0;
+    --color-danger-hover: 204 6 0;
+    --color-danger-soft: 255 231 230;
     --color-danger-contrast: 255 255 255;
 
-    --color-info: 102 82 220;
-    --color-info-hover: 84 67 184;
-    --color-info-soft: 238 234 255;
+    --color-info: 249 188 125;
+    --color-info-hover: 206 155 103;
+    --color-info-soft: 254 242 228;
     --color-info-contrast: 255 255 255;
 
     --radius-panel: 14px;
@@ -42,7 +43,7 @@
 
     --shadow-panel: 0 1px 2px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.03);
     --shadow-float: 0 18px 50px rgba(15, 23, 42, 0.12);
-    --shadow-focus: 0 0 0 3px rgba(27, 92, 224, 0.2);
+    --shadow-focus: 0 0 0 3px rgba(2, 116, 187, 0.24);
   }
 
   * {
@@ -58,8 +59,8 @@
   body {
     @apply m-0 bg-canvas text-text font-sans antialiased;
     background-image:
-      radial-gradient(circle at 0% 0%, rgba(27, 92, 224, 0.08), transparent 40%),
-      radial-gradient(circle at 100% 0%, rgba(19, 145, 99, 0.06), transparent 34%);
+      radial-gradient(circle at 0% 0%, rgba(2, 116, 187, 0.14), transparent 40%),
+      radial-gradient(circle at 100% 0%, rgba(249, 188, 125, 0.16), transparent 34%);
   }
 
   button,

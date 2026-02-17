@@ -58,7 +58,7 @@ export const TagInsertionUI: React.FC<TagInsertionUIProps> = ({
 
   return (
     <div
-      className="absolute top-full left-0 mt-1 bg-surface border border-border rounded-md shadow-lg z-10 min-w-[200px]"
+      className="absolute top-full left-0 mt-1 bg-surface border border-border rounded-md shadow-lg z-30 min-w-[200px]"
       role="menu"
       aria-label="Tag insertion menu"
     >

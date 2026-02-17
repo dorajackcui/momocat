@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Segment, Token, formatTagAsMemoQMarker, serializeTokensToEditorText } from '@cat/core';
 import { TagInsertionUI } from './TagInsertionUI';
 import { buildHighlightChunks, EditorMatchMode } from './editorFilterUtils';
@@ -72,8 +72,9 @@ export const EditorRow: React.FC<EditorRowProps> = ({
 
   const resizeTextarea = useCallback((el: HTMLTextAreaElement | null) => {
     if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.max(40, el.scrollHeight)}px`;
+    // Reset first, then measure to keep autosize stable when content shrinks/expands.
+    el.style.height = '0px';
+    el.style.height = `${Math.max(36, el.scrollHeight)}px`;
   }, []);
 
   useEffect(() => {
@@ -102,9 +103,17 @@ export const EditorRow: React.FC<EditorRowProps> = ({
     };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     resizeTextarea(textareaRef.current);
   }, [draftText, resizeTextarea]);
+
+  useEffect(() => {
+    const syncHeight = () => {
+      resizeTextarea(textareaRef.current);
+    };
+    window.addEventListener('resize', syncHeight);
+    return () => window.removeEventListener('resize', syncHeight);
+  }, [resizeTextarea]);
 
   const emitTranslationChange = useCallback(
     (nextText: string) => {
@@ -290,16 +299,16 @@ export const EditorRow: React.FC<EditorRowProps> = ({
       }`}
       onClick={() => onActivate(segment.segmentId)}
     >
-      <div className="px-0 py-1 border-r border-border bg-muted/50 flex items-start justify-center">
-        <div className="mt-1 text-[9px] font-medium text-text-faint select-none">{rowNumber}</div>
+      <div className="px-0 py-0.5 border-r border-border bg-muted/50 flex items-start justify-center">
+        <div className="mt-0.5 text-[9px] font-medium text-text-faint select-none">{rowNumber}</div>
       </div>
 
       <div
-        className="px-2 py-2 border-r border-border bg-surface relative"
+        className="px-1.5 py-0.5 border-r border-border bg-surface relative"
         onMouseEnter={() => setIsSourceHovered(true)}
         onMouseLeave={() => setIsSourceHovered(false)}
       >
-        <div className="w-full min-h-[44px] px-1 pr-3 py-1 text-[14px] font-sans text-text-muted leading-relaxed whitespace-pre-wrap break-words select-text">
+        <div className="w-full min-h-[36px] px-0.5 pr-1.5 py-0 text-[14px] font-sans text-text-muted leading-normal whitespace-pre-wrap break-words select-text">
           {renderChunks(sourceHighlightChunks)}
         </div>
         {isSourceHovered && (
@@ -334,7 +343,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
       </div>
 
       <div
-        className={`px-2 py-2 relative ${
+        className={`px-1.5 py-0.5 relative ${
           hasError ? 'bg-danger-soft/40' : hasWarning ? 'bg-warning-soft/35' : 'bg-surface'
         } ${isActive ? 'ring-1 ring-inset ring-brand/50' : ''}`}
       >
@@ -344,28 +353,29 @@ export const EditorRow: React.FC<EditorRowProps> = ({
           readOnly={!isActive}
           onFocus={() => onActivate(segment.segmentId)}
           onChange={(e) => emitTranslationChange(e.target.value)}
+          onInput={(e) => resizeTextarea(e.currentTarget)}
           onKeyDown={handleTargetKeyDown}
           onDoubleClick={(e) => e.currentTarget.select()}
           spellCheck={false}
-          className={`relative z-10 w-full min-h-[44px] px-3 py-3 text-[14px] font-sans leading-relaxed bg-transparent outline-none resize-none overflow-hidden whitespace-pre-wrap break-words text-text ${
+          className={`relative z-10 w-full min-h-[36px] pl-1.5 pr-9 py-0.5 text-[14px] font-sans leading-normal bg-transparent outline-none resize-none overflow-hidden whitespace-pre-wrap break-words text-text ${
             !isActive ? 'pointer-events-none' : ''
           } ${!isActive ? 'caret-transparent' : ''}`}
         />
 
         {showTargetHighlightOverlay && (
-          <div className="pointer-events-none absolute inset-0 px-3 py-3 text-[14px] font-sans text-transparent leading-relaxed whitespace-pre-wrap break-words select-none">
+          <div className="pointer-events-none absolute inset-0 pl-1.5 pr-9 py-0.5 text-[14px] font-sans text-transparent leading-normal whitespace-pre-wrap break-words select-none">
             {renderChunks(targetHighlightChunks)}
           </div>
         )}
 
         {isActive && sourceTags.length > 0 && (
-          <div className="absolute top-2 right-2">
+          <div className="absolute top-1.5 right-1.5 z-20">
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 setShowTagInsertionUI(!showTagInsertionUI);
               }}
-              className="p-1 rounded bg-surface/75 border border-border/80 hover:bg-brand-soft/80 hover:border-brand/40 text-text-muted hover:text-brand transition-all shadow-sm"
+              className="relative z-20 p-1 rounded bg-surface/90 border border-border/80 hover:bg-brand-soft/80 hover:border-brand/40 text-text-muted hover:text-brand transition-all shadow-sm"
               title="Insert tags from source (Ctrl+Shift+1-9)"
               aria-label="Toggle tag insertion menu"
             >
@@ -389,7 +399,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
         />
 
         {qaIssues.length > 0 && (
-          <div className="mt-2 space-y-1">
+          <div className="mt-1 space-y-1">
             {qaIssues.map((issue, idx) => (
               <div
                 key={idx}
@@ -407,14 +417,14 @@ export const EditorRow: React.FC<EditorRowProps> = ({
         )}
 
         {saveError && (
-          <div className="mt-2 text-[10px] flex items-center gap-1.5 px-2 py-0.5 rounded bg-danger-soft text-danger">
+          <div className="mt-1 text-[10px] flex items-center gap-1.5 px-2 py-0.5 rounded bg-danger-soft text-danger">
             <span className="font-bold uppercase text-[8px]">save:</span>
             {saveError}
           </div>
         )}
 
         {segment.meta?.context && (
-          <div className="mt-2 px-1 flex flex-col group">
+          <div className="mt-1 px-1 flex flex-col group">
             <div
               onClick={(event) => void handleCopyContext(event)}
               title="Click to copy context"

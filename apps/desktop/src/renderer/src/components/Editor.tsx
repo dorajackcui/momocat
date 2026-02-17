@@ -616,7 +616,7 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
               </div>
             )}
 
-            <div className="h-64 bg-muted/30" />
+            <div className="h-4" />
           </div>
         </div>
 

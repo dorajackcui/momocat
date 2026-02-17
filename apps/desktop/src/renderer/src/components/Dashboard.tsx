@@ -70,9 +70,6 @@ export function Dashboard({
                     {project.name}
                   </h3>
                   <div className="text-xs text-text-muted mt-1 flex items-center gap-2">
-                    <span className="bg-muted px-2 py-0.5 rounded-control">
-                      {project.createdAt ? new Date(project.createdAt).toLocaleDateString() : 'N/A'}
-                    </span>
                     <span className="bg-brand-soft text-brand px-2 py-0.5 rounded-control font-semibold">
                       {project.fileCount || 0} Files
                     </span>
@@ -132,6 +129,11 @@ export function Dashboard({
                 >
                   Open
                 </button>
+                <div className="mt-2 text-[10px] text-text-faint text-right">
+                  {project.createdAt
+                    ? `Created ${new Date(project.createdAt).toLocaleString()}`
+                    : 'Created time unavailable'}
+                </div>
               </div>
             </div>
           ))}
