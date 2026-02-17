@@ -36,7 +36,7 @@ export function Dashboard({
   };
 
   return (
-    <div className="p-10 max-w-[1000px] mx-auto h-full overflow-y-auto relative">
+    <div className="p-10 max-w-[1024px] mx-auto h-full overflow-y-auto relative custom-scrollbar">
       <CreateProjectModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -45,17 +45,14 @@ export function Dashboard({
       />
 
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold text-gray-800">Projects</h1>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="px-5 py-2.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
-        >
+        <h1 className="text-2xl font-bold text-text">Projects</h1>
+        <button onClick={() => setIsModalOpen(true)} className="btn-primary !px-5 !py-2.5">
           + Create Project
         </button>
       </div>
 
       {projects.length === 0 ? (
-        <div className="text-center p-20 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 text-gray-500">
+        <div className="text-center p-20 surface-subtle border-dashed text-text-muted">
           <div className="text-6xl mb-6">📁</div>
           <h3 className="text-xl font-semibold mb-2">No projects yet</h3>
           <p>Create a project to start translating your documents.</p>
@@ -65,27 +62,27 @@ export function Dashboard({
           {projects.map((project) => (
             <div
               key={project.id}
-              className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm flex flex-col hover:shadow-md transition-all duration-200 border-t-4 border-t-blue-500"
+              className="surface-card p-6 flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:shadow-float border-t-2 border-t-brand/50"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-lg font-bold text-gray-900 truncate" title={project.name}>
+                  <h3 className="text-lg font-bold text-text truncate" title={project.name}>
                     {project.name}
                   </h3>
-                  <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
-                    <span className="bg-gray-100 px-2 py-0.5 rounded">
+                  <div className="text-xs text-text-muted mt-1 flex items-center gap-2">
+                    <span className="bg-muted px-2 py-0.5 rounded-control">
                       {project.createdAt ? new Date(project.createdAt).toLocaleDateString() : 'N/A'}
                     </span>
-                    <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded font-bold">
+                    <span className="bg-brand-soft text-brand px-2 py-0.5 rounded-control font-semibold">
                       {project.fileCount || 0} Files
                     </span>
                     <span
-                      className={`px-2 py-0.5 rounded font-bold ${
+                      className={`px-2 py-0.5 rounded-control font-semibold ${
                         project.projectType === 'review'
-                          ? 'bg-amber-50 text-amber-700'
+                          ? 'bg-warning-soft text-warning'
                           : project.projectType === 'custom'
-                            ? 'bg-emerald-50 text-emerald-700'
-                            : 'bg-slate-100 text-slate-600'
+                            ? 'bg-success-soft text-success'
+                            : 'bg-muted text-text-muted'
                       }`}
                     >
                       {project.projectType === 'review'
@@ -101,7 +98,7 @@ export function Dashboard({
                     e.stopPropagation();
                     onDeleteProject(project.id);
                   }}
-                  className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-all ml-2"
+                  className="p-1.5 text-text-faint hover:text-danger hover:bg-danger-soft rounded-control transition-colors ml-2"
                   title="Delete Project"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -116,13 +113,13 @@ export function Dashboard({
               </div>
 
               <div className="mb-6">
-                <div className="flex justify-between text-[10px] font-bold mb-2 text-gray-400 uppercase tracking-tight">
+                <div className="flex justify-between text-[10px] font-semibold mb-2 text-text-faint uppercase tracking-tight">
                   <span>Total Progress</span>
                   <span>{project.progress}%</span>
                 </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-green-500 rounded-full transition-all duration-500"
+                    className="h-full bg-brand rounded-full transition-all duration-500"
                     style={{ width: `${project.progress}%` }}
                   />
                 </div>
@@ -131,7 +128,7 @@ export function Dashboard({
               <div className="mt-auto">
                 <button
                   onClick={() => onOpenProject(project.id)}
-                  className="w-full py-2.5 bg-gray-900 text-white rounded-lg font-bold hover:bg-gray-800 transition-colors text-sm"
+                  className="btn-primary w-full !py-2.5"
                 >
                   Open
                 </button>

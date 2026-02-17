@@ -46,11 +46,14 @@ export function CreateProjectModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-          <h2 className="text-xl font-bold text-gray-900">Create New Project</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+    <div className="modal-backdrop">
+      <div className="modal-card max-w-md animate-in fade-in zoom-in duration-200">
+        <div className="modal-header">
+          <h2 className="text-xl font-bold text-text">Create New Project</h2>
+          <button
+            onClick={onClose}
+            className="text-text-faint hover:text-text-muted transition-colors"
+          >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -62,19 +65,17 @@ export function CreateProjectModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="modal-body">
           <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
-              Project Type
-            </label>
+            <label className="field-label mb-2">Project Type</label>
             <div className="grid grid-cols-3 gap-3">
               <button
                 type="button"
                 onClick={() => setProjectType('translation')}
-                className={`px-3 py-2 rounded-lg border text-sm font-bold transition-colors ${
+                className={`px-3 py-2 rounded-control border text-sm font-semibold transition-colors ${
                   projectType === 'translation'
-                    ? 'border-blue-300 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                    ? 'border-brand/40 bg-brand-soft text-brand'
+                    : 'border-border bg-surface text-text-muted hover:bg-muted'
                 }`}
               >
                 Translation
@@ -82,10 +83,10 @@ export function CreateProjectModal({
               <button
                 type="button"
                 onClick={() => setProjectType('review')}
-                className={`px-3 py-2 rounded-lg border text-sm font-bold transition-colors ${
+                className={`px-3 py-2 rounded-control border text-sm font-semibold transition-colors ${
                   projectType === 'review'
-                    ? 'border-amber-300 bg-amber-50 text-amber-700'
-                    : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                    ? 'border-warning/40 bg-warning-soft text-warning'
+                    : 'border-border bg-surface text-text-muted hover:bg-muted'
                 }`}
               >
                 Review
@@ -93,10 +94,10 @@ export function CreateProjectModal({
               <button
                 type="button"
                 onClick={() => setProjectType('custom')}
-                className={`px-3 py-2 rounded-lg border text-sm font-bold transition-colors ${
+                className={`px-3 py-2 rounded-control border text-sm font-semibold transition-colors ${
                   projectType === 'custom'
-                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                    : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                    ? 'border-success/40 bg-success-soft text-success'
+                    : 'border-border bg-surface text-text-muted hover:bg-muted'
                 }`}
               >
                 Custom
@@ -105,29 +106,25 @@ export function CreateProjectModal({
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
-              Project Name
-            </label>
+            <label className="field-label">Project Name</label>
             <input
               autoFocus
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Q1 Marketing Campaign"
-              className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+              className="field-input"
               required
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
-                Source Language
-              </label>
+              <label className="field-label">Source Language</label>
               <select
                 value={srcLang}
                 onChange={(e) => setSrcLang(e.target.value)}
-                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                className="field-input"
                 required
               >
                 {LANGUAGE_OPTIONS.map((language) => (
@@ -138,13 +135,11 @@ export function CreateProjectModal({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
-                Target Language
-              </label>
+              <label className="field-label">Target Language</label>
               <select
                 value={tgtLang}
                 onChange={(e) => setTgtLang(e.target.value)}
-                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                className="field-input"
                 required
               >
                 {LANGUAGE_OPTIONS.map((language) => (
@@ -157,17 +152,13 @@ export function CreateProjectModal({
           </div>
 
           <div className="pt-4 flex gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 rounded-lg font-bold hover:bg-gray-50 transition-colors"
-            >
+            <button type="button" onClick={onClose} className="btn-secondary flex-1">
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading || !name.trim() || !srcLang.trim() || !tgtLang.trim()}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-lg shadow-blue-200"
+              className="btn-primary flex-1"
             >
               {loading ? 'Creating...' : 'Create Project'}
             </button>

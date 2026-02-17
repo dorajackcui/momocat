@@ -58,15 +58,15 @@ export const TagInsertionUI: React.FC<TagInsertionUIProps> = ({
 
   return (
     <div
-      className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 min-w-[200px]"
+      className="absolute top-full left-0 mt-1 bg-surface border border-border rounded-md shadow-lg z-10 min-w-[200px]"
       role="menu"
       aria-label="Tag insertion menu"
     >
       {/* Insert All Tags Button */}
-      <div className="p-2 border-b border-gray-100">
+      <div className="p-2 border-b border-border/60">
         <button
           onClick={onInsertAllTags}
-          className="w-full px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded transition-colors"
+          className="w-full px-3 py-1.5 text-xs font-medium text-brand hover:bg-brand-soft rounded transition-colors"
           role="menuitem"
           aria-label="Insert all tags from source"
         >
@@ -83,20 +83,20 @@ export const TagInsertionUI: React.FC<TagInsertionUIProps> = ({
             <button
               key={index}
               onClick={() => onInsertTag(index)}
-              className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center gap-2 transition-colors"
+              className="w-full px-3 py-2 text-left hover:bg-muted flex items-center gap-2 transition-colors"
               role="menuitem"
               aria-label={`Insert tag ${index + 1}: ${tag.content}`}
             >
               {/* Tag Preview Capsule */}
               <span
-                className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold rounded bg-blue-100 text-blue-700 border border-blue-200 flex-shrink-0"
+                className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold rounded bg-brand-soft text-brand border border-brand/30 flex-shrink-0"
                 aria-hidden="true"
               >
                 {marker}
               </span>
 
               {/* Full Tag Content */}
-              <span className="text-xs text-gray-600 truncate">{tag.content}</span>
+              <span className="text-xs text-text-muted truncate">{tag.content}</span>
             </button>
           );
         })}

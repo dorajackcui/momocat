@@ -246,7 +246,7 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
   };
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-canvas">
       <ColumnSelector
         isOpen={fileImport.isSelectorOpen}
         onClose={fileImport.closeSelector}
@@ -288,19 +288,14 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
         saving={qaSettingsSaving}
       />
 
-      <div className="px-10 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+      <div className="px-10 py-4 bg-surface/90 backdrop-blur border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button
             onClick={onBack}
-            className="p-2 hover:bg-gray-200 rounded-full transition-colors"
+            className="p-2 text-text-faint hover:text-text-muted hover:bg-muted rounded-control transition-colors"
             title="Back to Dashboard"
           >
-            <svg
-              className="w-5 h-5 text-gray-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -310,21 +305,21 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
             </svg>
           </button>
           <div>
-            <h2 className="text-xl font-bold text-gray-900">
+            <h2 className="text-xl font-bold text-text">
               {loading ? 'Loading...' : project?.name || 'Project Not Found'}
             </h2>
             {project && (
-              <div className="text-xs text-gray-500 flex items-center gap-2">
+              <div className="text-xs text-text-muted flex items-center gap-2">
                 <span>
                   {project.srcLang} → {project.tgtLang}
                 </span>
                 <span
-                  className={`px-1.5 py-0.5 rounded font-semibold ${
+                  className={`px-1.5 py-0.5 rounded-control font-semibold ${
                     project.projectType === 'review'
-                      ? 'bg-amber-100 text-amber-700'
+                      ? 'bg-warning-soft/80 text-warning'
                       : project.projectType === 'custom'
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : 'bg-blue-100 text-blue-700'
+                        ? 'bg-success-soft/80 text-success'
+                        : 'bg-brand-soft text-brand'
                   }`}
                 >
                   {project.projectType === 'review'
@@ -339,40 +334,40 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
         </div>
 
         <div className="flex items-center gap-4">
-          <div className="flex bg-gray-200/50 p-1 rounded-lg">
+          <div className="flex surface-subtle p-1">
             <button
               onClick={() => setActiveTab('files')}
-              className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
+              className={`px-4 py-1.5 text-xs font-semibold rounded-control transition-colors ${
                 activeTab === 'files'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-surface text-brand shadow-panel'
+                  : 'text-text-muted hover:text-text hover:bg-surface'
               }`}
             >
               Files
             </button>
             <button
               onClick={() => setActiveTab('tm')}
-              className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
+              className={`px-4 py-1.5 text-xs font-semibold rounded-control transition-colors ${
                 activeTab === 'tm'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-surface text-brand shadow-panel'
+                  : 'text-text-muted hover:text-text hover:bg-surface'
               }`}
             >
               Translation Memory
             </button>
             <button
               onClick={() => setActiveTab('tb')}
-              className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
+              className={`px-4 py-1.5 text-xs font-semibold rounded-control transition-colors ${
                 activeTab === 'tb'
-                  ? 'bg-white text-emerald-600 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-surface text-brand shadow-panel'
+                  : 'text-text-muted hover:text-text hover:bg-surface'
               }`}
             >
               Term Bases
             </button>
           </div>
 
-          <div className="h-6 w-[1px] bg-gray-200" />
+          <div className="h-6 w-[1px] bg-border" />
 
           {project && activeTab === 'files' && (
             <div className="flex items-center gap-2">
@@ -380,7 +375,7 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
                 <button
                   onClick={openQaSettings}
                   disabled={loading}
-                  className="px-4 py-2 bg-amber-100 text-amber-800 rounded-lg text-sm font-medium hover:bg-amber-200 disabled:opacity-50"
+                  className="btn-secondary !text-warning !bg-warning-soft hover:!bg-warning-soft/80"
                 >
                   QA Settings
                 </button>
@@ -388,7 +383,7 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
               <button
                 onClick={() => void fileImport.openFileImport()}
                 disabled={loading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                className="btn-primary"
               >
                 + Add File
               </button>
@@ -397,18 +392,18 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-10">
+      <div className="flex-1 overflow-auto p-10 custom-scrollbar">
         {!project ? (
           loading ? (
-            <div className="max-w-4xl mx-auto text-center py-20 bg-gray-50 rounded-xl border border-gray-200">
-              <p className="text-gray-500">Loading project details...</p>
+            <div className="max-w-4xl mx-auto text-center py-20 surface-subtle">
+              <p className="text-text-muted">Loading project details...</p>
             </div>
           ) : (
-            <div className="max-w-4xl mx-auto text-center py-20 bg-red-50 rounded-xl border border-red-100">
-              <p className="text-red-600 font-medium">
+            <div className="max-w-4xl mx-auto text-center py-20 surface-card border-danger/40 bg-danger-soft">
+              <p className="text-danger font-medium">
                 Error: Project with ID {projectId} could not be found.
               </p>
-              <button onClick={onBack} className="mt-4 text-blue-600 font-bold hover:underline">
+              <button onClick={onBack} className="mt-4 text-brand font-semibold hover:underline">
                 Go back to Dashboard
               </button>
             </div>

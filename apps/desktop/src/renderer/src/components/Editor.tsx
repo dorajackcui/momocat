@@ -249,9 +249,9 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-50 text-gray-400">
+      <div className="flex-1 flex items-center justify-center bg-muted text-text-faint">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
           <span className="text-sm font-medium">Loading segments...</span>
         </div>
       </div>
@@ -259,13 +259,13 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
   }
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden bg-gray-50">
+    <div className="h-screen w-screen flex flex-col overflow-hidden bg-muted">
       {/* Editor Header */}
-      <header className="px-6 py-3 border-b border-gray-200 flex justify-between items-center bg-white shadow-sm z-10">
+      <header className="px-6 py-3 border-b border-border flex justify-between items-center bg-surface shadow-sm z-10">
         <div className="flex items-center gap-4">
           <button
             onClick={onBack}
-            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+            className="p-1.5 text-text-faint hover:text-text-muted hover:bg-muted rounded-lg transition-all"
             title="Back to Project"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -278,15 +278,15 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
             </svg>
           </button>
           <div>
-            <h2 className="text-sm font-bold text-gray-900 leading-tight">
+            <h2 className="text-sm font-bold text-text leading-tight">
               {file?.name || 'Loading...'}
             </h2>
             <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-[10px] text-blue-600 font-bold uppercase tracking-wider">
+              <span className="text-[10px] text-brand font-bold uppercase tracking-wider">
                 {project?.name}
               </span>
-              <span className="text-[10px] text-gray-300">•</span>
-              <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wider">
+              <span className="text-[10px] text-text-faint">•</span>
+              <span className="text-[10px] text-text-muted font-medium uppercase tracking-wider">
                 {project?.srcLang} → {project?.tgtLang}
               </span>
             </div>
@@ -295,22 +295,22 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
 
         <div className="flex items-center gap-6">
           {saveErrorCount > 0 && (
-            <div className="px-2.5 py-1 bg-red-50 border border-red-200 rounded-md text-[11px] font-bold text-red-700">
+            <div className="px-2.5 py-1 bg-danger-soft border border-danger/40 rounded-md text-[11px] font-bold text-danger">
               {saveErrorCount} 段保存失败
             </div>
           )}
           <div className="flex items-center gap-3">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+            <span className="text-[10px] font-bold text-text-faint uppercase tracking-widest">
               Progress
             </span>
-            <div className="px-2.5 py-1 bg-gray-100 rounded-md text-[11px] font-bold text-gray-700">
+            <div className="px-2.5 py-1 bg-muted rounded-md text-[11px] font-bold text-text-muted">
               {confirmedSegments}/{totalSegments}
             </div>
           </div>
-          <div className="h-4 w-[1px] bg-gray-200" />
+          <div className="h-4 w-[1px] bg-border" />
           <button
             onClick={handleExport}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded-lg shadow-sm transition-all active:scale-95"
+            className="px-3 py-1.5 bg-brand hover:bg-brand-hover text-white text-[11px] font-bold rounded-lg shadow-sm transition-all active:scale-95"
           >
             Export
           </button>
@@ -320,20 +320,20 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
       <div ref={layoutRef} className="flex-1 flex min-h-0">
         {/* Main Editor Area */}
         <div
-          className="flex-1 overflow-y-auto bg-white custom-scrollbar"
+          className="flex-1 overflow-y-auto bg-surface custom-scrollbar"
           style={{ scrollbarGutter: 'stable' }}
         >
           <div className="min-w-[800px]">
-            <div className="sticky top-0 z-20 bg-white border-b border-gray-200 shadow-sm">
-              <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-50/80 backdrop-blur-sm">
+            <div className="sticky top-0 z-20 bg-surface border-b border-border shadow-sm">
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/80 backdrop-blur-sm">
                 <div ref={sortMenuRef} className="relative shrink-0">
                   <button
                     type="button"
                     onClick={toggleSortMenu}
                     className={`h-8 w-8 rounded-md border transition-colors ${
                       isSortMenuOpen || sortBy !== 'default'
-                        ? 'bg-blue-50 text-blue-600 border-blue-200'
-                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                        ? 'bg-brand-soft text-brand border-brand/30'
+                        : 'bg-surface text-text-muted border-border hover:bg-muted'
                     }`}
                     title="Sort options"
                     aria-label="Sort options"
@@ -354,12 +354,12 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
                   </button>
 
                   {sortBy !== 'default' && (
-                    <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-blue-600" />
+                    <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-brand" />
                   )}
 
                   {isSortMenuOpen && (
-                    <div className="absolute left-0 top-full mt-2 w-64 rounded-lg border border-gray-200 bg-white shadow-lg p-2 z-30 space-y-1">
-                      <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    <div className="absolute left-0 top-full mt-2 w-64 rounded-lg border border-border bg-surface shadow-lg p-2 z-30 space-y-1">
+                      <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-text-faint">
                         Sort
                       </div>
                       {FILTER_SORT_OPTIONS.map((option) => {
@@ -372,8 +372,8 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
                             onClick={() => handleSortChange(option.sortBy, option.sortDirection)}
                             className={`w-full text-left px-2 py-1.5 rounded-md text-[11px] font-bold border transition-colors ${
                               active
-                                ? 'bg-blue-50 text-blue-600 border-blue-200'
-                                : 'bg-white text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50'
+                                ? 'bg-brand-soft text-brand border-brand/30'
+                                : 'bg-surface text-text-muted border-transparent hover:text-text-muted hover:bg-muted'
                             }`}
                           >
                             {option.label}
@@ -392,9 +392,9 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
                     onFocus={handleSearchInputFocus}
                     onBlur={handleSearchInputBlur}
                     placeholder="Filter source text"
-                    className="w-full rounded-xl border border-gray-200 bg-white pl-8 pr-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    className="w-full rounded-xl border border-border bg-surface pl-8 pr-3 py-1.5 text-sm text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/20"
                   />
-                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-faint">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
                         strokeLinecap="round"
@@ -414,9 +414,9 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
                     onFocus={handleSearchInputFocus}
                     onBlur={handleSearchInputBlur}
                     placeholder="Filter target text"
-                    className="w-full rounded-xl border border-gray-200 bg-white pl-8 pr-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    className="w-full rounded-xl border border-border bg-surface pl-8 pr-3 py-1.5 text-sm text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/20"
                   />
-                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-faint">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
                         strokeLinecap="round"
@@ -434,8 +434,8 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
                     onClick={toggleFilterMenu}
                     className={`h-8 w-8 rounded-md border transition-colors ${
                       isFilterMenuOpen || activeFilterCount > 0
-                        ? 'bg-blue-50 text-blue-600 border-blue-200'
-                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                        ? 'bg-brand-soft text-brand border-brand/30'
+                        : 'bg-surface text-text-muted border-border hover:bg-muted'
                     }`}
                     aria-label="Open filters"
                     title="Open filters"
@@ -455,15 +455,15 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
                     </svg>
                   </button>
                   {activeFilterCount > 0 && (
-                    <span className="absolute -top-1 -right-1 rounded-full bg-blue-600 px-1.5 py-0.5 text-[9px] text-white leading-none">
+                    <span className="absolute -top-1 -right-1 rounded-full bg-brand px-1.5 py-0.5 text-[9px] text-white leading-none">
                       {activeFilterCount}
                     </span>
                   )}
 
                   {isFilterMenuOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-80 rounded-lg border border-gray-200 bg-white shadow-lg p-3 z-30 space-y-3">
+                    <div className="absolute right-0 top-full mt-2 w-80 rounded-lg border border-border bg-surface shadow-lg p-3 z-30 space-y-3">
                       <div>
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-text-faint mb-2">
                           Quick Presets
                         </div>
                         <div className="flex flex-wrap gap-1.5">
@@ -476,8 +476,8 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
                                 onClick={() => applyQuickPreset(preset.value)}
                                 className={`px-2.5 py-1 rounded-md text-[11px] font-bold border transition-colors ${
                                   active
-                                    ? 'bg-blue-50 text-blue-600 border-blue-200'
-                                    : 'bg-white text-gray-500 border-gray-200 hover:text-gray-700 hover:bg-gray-50'
+                                    ? 'bg-brand-soft text-brand border-brand/30'
+                                    : 'bg-surface text-text-muted border-border hover:text-text-muted hover:bg-muted'
                                 }`}
                               >
                                 {preset.label}
@@ -488,7 +488,7 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
                       </div>
 
                       <div>
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-text-faint mb-2">
                           Match Mode
                         </div>
                         <div className="flex flex-wrap gap-1.5">
@@ -501,8 +501,8 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
                                 onClick={() => handleMatchModeChange(mode.value)}
                                 className={`px-2.5 py-1 rounded-md text-[11px] font-bold border transition-colors ${
                                   active
-                                    ? 'bg-blue-50 text-blue-600 border-blue-200'
-                                    : 'bg-white text-gray-500 border-gray-200 hover:text-gray-700 hover:bg-gray-50'
+                                    ? 'bg-brand-soft text-brand border-brand/30'
+                                    : 'bg-surface text-text-muted border-border hover:text-text-muted hover:bg-muted'
                                 }`}
                               >
                                 {mode.label}
@@ -513,7 +513,7 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
                       </div>
 
                       <div>
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-text-faint mb-2">
                           Status
                         </div>
                         <div className="flex flex-wrap gap-1.5">
@@ -526,8 +526,8 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
                                 onClick={() => handleStatusFilterChange(option.value)}
                                 className={`px-2.5 py-1 rounded-md text-[11px] font-bold border transition-colors ${
                                   active
-                                    ? 'bg-blue-50 text-blue-600 border-blue-200'
-                                    : 'bg-white text-gray-500 border-gray-200 hover:text-gray-700 hover:bg-gray-50'
+                                    ? 'bg-brand-soft text-brand border-brand/30'
+                                    : 'bg-surface text-text-muted border-border hover:text-text-muted hover:bg-muted'
                                 }`}
                               >
                                 {option.label}
@@ -538,7 +538,7 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
                       </div>
 
                       <div>
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-text-faint mb-2">
                           Quality
                         </div>
                         <div className="flex flex-wrap gap-1.5">
@@ -551,8 +551,8 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
                                 onClick={() => toggleQualityFilter(option.value)}
                                 className={`px-2.5 py-1 rounded-md text-[11px] font-bold border transition-colors ${
                                   active
-                                    ? 'bg-blue-50 text-blue-600 border-blue-200'
-                                    : 'bg-white text-gray-500 border-gray-200 hover:text-gray-700 hover:bg-gray-50'
+                                    ? 'bg-brand-soft text-brand border-brand/30'
+                                    : 'bg-surface text-text-muted border-border hover:text-text-muted hover:bg-muted'
                                 }`}
                               >
                                 {option.label}
@@ -569,7 +569,7 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
                   type="button"
                   onClick={clearFilters}
                   disabled={!hasActiveFilter}
-                  className="h-8 w-8 shrink-0 rounded-md border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="h-8 w-8 shrink-0 rounded-md border border-border bg-surface text-text-muted hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   aria-label="Clear filter"
                   title="Clear filter"
                 >
@@ -611,18 +611,18 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
             ))}
 
             {filteredSegments.length === 0 && (
-              <div className="px-8 py-10 text-center text-sm text-gray-400">
+              <div className="px-8 py-10 text-center text-sm text-text-faint">
                 No segments match current filters.
               </div>
             )}
 
-            <div className="h-64 bg-gray-50/30" />
+            <div className="h-64 bg-muted/30" />
           </div>
         </div>
 
         {/* Right Sidebar */}
         <div
-          className="border-l border-gray-200 bg-gray-50/50 flex-col hidden lg:flex relative"
+          className="border-l border-border bg-muted/50 flex-col hidden lg:flex relative"
           style={{ width: `${sidebarWidth}px` }}
         >
           <button
@@ -634,17 +634,17 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
             }}
             className="absolute -left-1 top-0 h-full w-2 cursor-col-resize group z-20"
           >
-            <span className="absolute left-1/2 -translate-x-1/2 h-full w-[2px] bg-transparent group-hover:bg-blue-300 transition-colors" />
+            <span className="absolute left-1/2 -translate-x-1/2 h-full w-[2px] bg-transparent group-hover:bg-brand/40 transition-colors" />
           </button>
 
           {/* Tabs */}
-          <div className="flex border-b border-gray-200 bg-white">
+          <div className="flex border-b border-border bg-surface">
             <button
               onClick={() => setActiveTab('tm')}
               className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider transition-colors ${
                 activeTab === 'tm'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-400 hover:text-gray-600'
+                  ? 'text-brand border-b-2 border-brand'
+                  : 'text-text-faint hover:text-text-muted'
               }`}
             >
               CAT
@@ -654,8 +654,8 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
               title="Concordance (Ctrl/Cmd+K)"
               className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider transition-colors ${
                 activeTab === 'concordance'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-400 hover:text-gray-600'
+                  ? 'text-brand border-b-2 border-brand'
+                  : 'text-text-faint hover:text-text-muted'
               }`}
             >
               Concordance

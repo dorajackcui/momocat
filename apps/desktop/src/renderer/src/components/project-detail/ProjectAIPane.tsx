@@ -1,5 +1,6 @@
 import { PROJECT_AI_MODELS, ProjectType } from '@cat/core';
 import { ProjectAIController } from '../../hooks/projectDetail/useProjectAI';
+import { Badge, Button, Card, Input, Notice, Select, Textarea } from '../ui';
 
 interface ProjectAIPaneProps {
   ai: ProjectAIController;
@@ -10,58 +11,56 @@ export function ProjectAIPane({ ai, projectType = 'translation' }: ProjectAIPane
   const isReviewProject = projectType === 'review';
   const isCustomProject = projectType === 'custom';
   return (
-    <div className="mb-8 bg-gray-50 border border-gray-200 rounded-xl p-5">
+    <Card variant="subtle" className="mb-8 p-5">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">AI Settings</h3>
+          <h3 className="text-sm font-bold text-text-muted uppercase tracking-wider">
+            AI Settings
+          </h3>
           <div className="mt-1 flex items-center gap-2">
-            <span
-              className={`text-[10px] font-bold uppercase tracking-wider ${
-                ai.hasUnsavedPromptChanges ? 'text-amber-600' : 'text-emerald-600'
-              }`}
-            >
+            <Badge tone={ai.hasUnsavedPromptChanges ? 'warning' : 'success'}>
               {ai.hasUnsavedPromptChanges ? 'Unsaved Changes' : 'Saved'}
-            </span>
+            </Badge>
             {ai.promptSavedAt && !ai.hasUnsavedPromptChanges && (
-              <span className="text-[10px] text-gray-400">at {ai.promptSavedAt}</span>
+              <span className="text-[10px] text-text-faint">at {ai.promptSavedAt}</span>
             )}
           </div>
         </div>
-        <button
+        <Button
           onClick={() => void ai.savePrompt()}
           disabled={ai.savingPrompt || !ai.hasUnsavedPromptChanges || ai.hasInvalidTemperature}
-          className={`px-3 py-1.5 text-white rounded-lg text-xs font-bold disabled:opacity-50 ${
-            ai.hasUnsavedPromptChanges ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600'
-          }`}
+          size="sm"
+          variant={ai.hasUnsavedPromptChanges ? 'primary' : 'soft'}
+          className={!ai.hasUnsavedPromptChanges ? '!bg-success !text-success-contrast' : ''}
         >
           {ai.savingPrompt
             ? 'Saving...'
             : ai.hasUnsavedPromptChanges
               ? 'Save AI Settings'
               : 'AI Settings Saved'}
-        </button>
+        </Button>
       </div>
       <div className="mb-3">
-        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
+        <label className="block text-xs font-bold text-text-faint uppercase tracking-wider mb-1">
           Model
         </label>
-        <select
+        <Select
           value={ai.modelDraft}
           onChange={(event) => ai.setModelDraft(event.target.value as typeof ai.modelDraft)}
-          className="w-52 text-sm bg-white border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-52"
         >
           {PROJECT_AI_MODELS.map((model) => (
             <option key={model} value={model}>
               {model}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
       <div className="mb-3">
-        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
+        <label className="block text-xs font-bold text-text-faint uppercase tracking-wider mb-1">
           Temperature
         </label>
-        <input
+        <Input
           type="number"
           min={0}
           max={2}
@@ -69,22 +68,19 @@ export function ProjectAIPane({ ai, projectType = 'translation' }: ProjectAIPane
           value={ai.temperatureDraft}
           onChange={(event) => ai.setTemperatureDraft(event.target.value)}
           placeholder="0.2"
-          className={`w-40 text-sm bg-white border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 ${
-            ai.hasInvalidTemperature
-              ? 'border-red-300 focus:ring-red-500'
-              : 'border-gray-200 focus:ring-blue-500'
-          }`}
+          tone={ai.hasInvalidTemperature ? 'danger' : 'default'}
+          className="w-40"
         />
-        <p className="mt-1 text-[11px] text-gray-500">
+        <p className="mt-1 text-[11px] text-text-muted">
           Range `0` to `2`. Lower is more deterministic. Default is `0.2`.
         </p>
         {ai.hasInvalidTemperature && (
-          <p className="mt-1 text-[11px] text-red-500">
+          <Notice tone="danger" className="mt-2 text-[11px]">
             Please enter a valid number from `0` to `2`.
-          </p>
+          </Notice>
         )}
       </div>
-      <textarea
+      <Textarea
         value={ai.promptDraft}
         onChange={(event) => ai.setPromptDraft(event.target.value)}
         rows={4}
@@ -95,21 +91,20 @@ export function ProjectAIPane({ ai, projectType = 'translation' }: ProjectAIPane
               ? 'Required. Define full custom processing instructions for input/context/output.'
               : 'Optional. Add project-specific translation instructions (tone, terminology, style).'
         }
-        className="w-full text-sm bg-white border border-gray-200 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
       />
-      <p className="mt-2 text-[11px] text-gray-500">
+      <p className="mt-2 text-[11px] text-text-muted">
         {isReviewProject
           ? 'This prompt will be appended to the default AI review rules.'
           : isCustomProject
             ? 'This prompt is used as the full custom system prompt.'
             : 'This prompt will be appended to the default translation rules.'}
       </p>
-      <div className="mt-4 pt-4 border-t border-gray-200">
-        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
+      <div className="mt-4 pt-4 border-t border-border">
+        <label className="block text-xs font-bold text-text-faint uppercase tracking-wider mb-1">
           {isReviewProject ? 'Test Text' : isCustomProject ? 'Test Input' : 'Test Source'}
         </label>
         <div className="flex gap-2">
-          <input
+          <Input
             type="text"
             value={ai.testSource}
             onChange={(event) => ai.setTestSource(event.target.value)}
@@ -120,19 +115,21 @@ export function ProjectAIPane({ ai, projectType = 'translation' }: ProjectAIPane
                   ? 'Enter a short sentence to test AI custom processing'
                   : 'Enter a short sentence to test AI translation'
             }
-            className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1"
           />
-          <button
+          <Button
             onClick={() => void ai.testPrompt()}
-            className="px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700"
+            size="sm"
+            variant="soft"
+            className="!bg-success !text-success-contrast hover:!bg-success-hover"
           >
             Test Prompt
-          </button>
+          </Button>
         </div>
-        <label className="block mt-2 text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
+        <label className="block mt-2 text-xs font-bold text-text-faint uppercase tracking-wider mb-1">
           Test Context (Optional)
         </label>
-        <input
+        <Input
           type="text"
           value={ai.testContext}
           onChange={(event) => ai.setTestContext(event.target.value)}
@@ -143,87 +140,97 @@ export function ProjectAIPane({ ai, projectType = 'translation' }: ProjectAIPane
                 ? 'Optional context for custom processing'
                 : 'Optional translation context'
           }
-          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         {ai.testResult && (
           <div className="mt-2">
-            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+            <div className="text-[10px] font-bold text-text-faint uppercase tracking-wider mb-1">
               {isReviewProject
                 ? 'Reviewed Text'
                 : isCustomProject
                   ? 'Processed Text'
                   : 'Translated Text'}
             </div>
-            <div className="text-xs text-gray-600 bg-white border border-gray-200 rounded-lg px-3 py-2">
+            <Card variant="surface" className="text-xs text-text-muted px-3 py-2">
               {ai.testResult}
-            </div>
+            </Card>
           </div>
         )}
         {ai.testError && (
           <div className="mt-2">
-            <div className="text-[10px] font-bold text-red-400 uppercase tracking-wider mb-1">
+            <div className="text-[10px] font-bold text-danger/80 uppercase tracking-wider mb-1">
               Error
             </div>
-            <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            <Notice tone="danger" className="text-xs">
               {ai.testError}
-            </div>
+            </Notice>
           </div>
         )}
         {ai.hasTestDetails && (
           <div className="mt-2">
-            <button
+            <Button
               onClick={() => ai.setShowTestDetails((prev) => !prev)}
-              className="text-[10px] text-blue-600 font-bold hover:underline"
+              size="sm"
+              variant="ghost"
+              className="!px-0 !py-0 text-[10px] !text-brand underline-offset-2 hover:underline"
             >
               {ai.showTestDetails ? 'Hide Test Details' : 'Show Test Details'}
-            </button>
+            </Button>
           </div>
         )}
         {ai.hasTestDetails && ai.showTestDetails && (
           <>
             {ai.testMeta && (
               <div className="mt-2">
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                <div className="text-[10px] font-bold text-text-faint uppercase tracking-wider mb-1">
                   Transport
                 </div>
-                <div className="text-[10px] text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                <Card variant="surface" className="text-[10px] text-text-muted px-3 py-2">
                   {ai.testMeta}
-                </div>
+                </Card>
               </div>
             )}
             {ai.testUserMessage && (
               <div className="mt-2">
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                <div className="text-[10px] font-bold text-text-faint uppercase tracking-wider mb-1">
                   User Message
                 </div>
-                <div className="text-[10px] text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-2 whitespace-pre-wrap">
+                <Card
+                  variant="surface"
+                  className="text-[10px] text-text-muted px-3 py-2 whitespace-pre-wrap"
+                >
                   {ai.testUserMessage}
-                </div>
+                </Card>
               </div>
             )}
             {ai.testPromptUsed && (
               <div className="mt-2">
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                <div className="text-[10px] font-bold text-text-faint uppercase tracking-wider mb-1">
                   System Prompt
                 </div>
-                <div className="text-[10px] text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-2 whitespace-pre-wrap">
+                <Card
+                  variant="surface"
+                  className="text-[10px] text-text-muted px-3 py-2 whitespace-pre-wrap"
+                >
                   {ai.testPromptUsed}
-                </div>
+                </Card>
               </div>
             )}
             {ai.testRawResponse && (
               <div className="mt-2">
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                <div className="text-[10px] font-bold text-text-faint uppercase tracking-wider mb-1">
                   Raw OpenAI Response
                 </div>
-                <div className="text-[10px] text-gray-500 bg-white border border-gray-200 rounded-lg px-3 py-2 whitespace-pre-wrap max-h-40 overflow-auto">
+                <Card
+                  variant="surface"
+                  className="text-[10px] text-text-muted px-3 py-2 whitespace-pre-wrap max-h-40 overflow-auto"
+                >
                   {ai.testRawResponse}
-                </div>
+                </Card>
               </div>
             )}
           </>
         )}
       </div>
-    </div>
+    </Card>
   );
 }

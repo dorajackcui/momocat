@@ -77,15 +77,15 @@ export const TagCapsule: React.FC<TagCapsuleProps> = ({
 
   // Color scheme based on source/target
   const colorStyles = isSource
-    ? 'bg-blue-100 text-blue-700 border-blue-200'
-    : 'bg-blue-500 text-white border-blue-600';
+    ? 'bg-brand-soft text-brand border-brand/30'
+    : 'bg-brand text-white border-brand';
 
   // Validation state styling
   const validationStyles =
     validationState === 'error'
-      ? 'ring-2 ring-red-500'
+      ? 'ring-2 ring-danger'
       : validationState === 'warning'
-        ? 'ring-2 ring-yellow-400'
+        ? 'ring-2 ring-warning'
         : '';
 
   // Shape based on tag type
@@ -97,7 +97,7 @@ export const TagCapsule: React.FC<TagCapsuleProps> = ({
         : 'rounded';
 
   // Selection styling
-  const selectionStyles = isSelected ? 'ring-2 ring-blue-400' : '';
+  const selectionStyles = isSelected ? 'ring-2 ring-brand/60' : '';
 
   // Handle click event
   const handleClick = (e: React.MouseEvent) => {

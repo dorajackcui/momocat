@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ProjectType } from '@cat/core';
 import type { ImportOptions, SpreadsheetPreviewData } from '../../../shared/ipc';
+import { Button, Card, IconButton, Select } from './ui';
 
 interface ColumnSelectorProps {
   isOpen: boolean;
@@ -58,12 +59,12 @@ export function ColumnSelector({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
-        <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+    <div className="modal-backdrop !z-[100]">
+      <div className="modal-card max-w-4xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in duration-200">
+        <div className="panel-header px-8 py-6 flex justify-between items-center">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">Import Configuration</h2>
-            <p className="text-sm text-gray-500 mt-1">
+            <h2 className="text-xl font-bold text-text">Import Configuration</h2>
+            <p className="text-sm text-text-muted mt-1">
               {isReviewProject
                 ? 'Select translation/original/output columns for AI review'
                 : isCustomProject
@@ -71,8 +72,8 @@ export function ColumnSelector({
                   : 'Select the columns to import from your spreadsheet'}
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <IconButton onClick={onClose} tone="neutral" aria-label="Close">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -80,53 +81,53 @@ export function ColumnSelector({
                 d="M6 18L18 6M6 6l12 12"
               />
             </svg>
-          </button>
+          </IconButton>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
           <div className="grid grid-cols-3 gap-8 mb-8">
             <div className="space-y-2">
-              <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+              <label className="text-sm font-bold text-text-muted flex items-center gap-2">
+                <span className="w-2 h-2 bg-brand rounded-full"></span>
                 {sourceLabel}
               </label>
-              <select
+              <Select
                 value={sourceCol}
-                onChange={(e) => setSourceCol(parseInt(e.target.value))}
-                className="w-full p-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all"
+                onChange={(e) => setSourceCol(parseInt(e.target.value, 10))}
+                className="!p-2.5"
               >
                 {colIndexes.map((i) => (
                   <option key={i} value={i}>
                     Column {XLSX_COL_NAME(i)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+              <label className="text-sm font-bold text-text-muted flex items-center gap-2">
+                <span className="w-2 h-2 bg-success rounded-full"></span>
                 {targetLabel}
               </label>
-              <select
+              <Select
                 value={targetCol}
-                onChange={(e) => setTargetCol(parseInt(e.target.value))}
-                className="w-full p-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all"
+                onChange={(e) => setTargetCol(parseInt(e.target.value, 10))}
+                className="!p-2.5"
               >
                 {colIndexes.map((i) => (
                   <option key={i} value={i}>
                     Column {XLSX_COL_NAME(i)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
+              <label className="text-sm font-bold text-text-muted flex items-center gap-2">
+                <span className="w-2 h-2 bg-info rounded-full"></span>
                 {contextLabel}
               </label>
-              <select
+              <Select
                 value={
                   contextCol === undefined
                     ? isReviewProject
@@ -135,14 +136,14 @@ export function ColumnSelector({
                     : contextCol
                 }
                 onChange={(e) => {
-                  const val = parseInt(e.target.value);
+                  const val = parseInt(e.target.value, 10);
                   if (!isReviewProject && val === -1) {
                     setContextCol(undefined);
                     return;
                   }
                   setContextCol(val);
                 }}
-                className="w-full p-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all"
+                className="!p-2.5"
               >
                 {!isReviewProject && <option value={-1}>None (Ignore)</option>}
                 {colIndexes.map((i) => (
@@ -150,45 +151,48 @@ export function ColumnSelector({
                     Column {XLSX_COL_NAME(i)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 mb-6 bg-blue-50/50 p-4 rounded-xl border border-blue-100/50">
+          <Card
+            variant="subtle"
+            className="mb-6 p-4 flex items-center gap-3 border-brand/20 bg-brand-soft/50"
+          >
             <input
               type="checkbox"
               id="hasHeader"
               checked={hasHeader}
               onChange={(e) => setHasHeader(e.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+              className="w-4 h-4 accent-brand"
             />
             <label
               htmlFor="hasHeader"
-              className="text-sm font-medium text-gray-700 cursor-pointer select-none"
+              className="text-sm font-medium text-text-muted cursor-pointer select-none"
             >
               First row is a header (Skip it)
             </label>
-          </div>
+          </Card>
 
           <div className="space-y-3">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+            <h3 className="text-xs font-bold text-text-faint uppercase tracking-wider">
               Preview (First 10 rows)
             </h3>
-            <div className="border border-gray-200 rounded-xl overflow-hidden overflow-x-auto shadow-sm">
+            <Card variant="surface" className="table-shell !rounded-xl !shadow-sm">
               <table className="w-full text-sm text-left border-collapse">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead className="table-head">
                   <tr>
                     {colIndexes.map((i) => (
                       <th
                         key={i}
                         className={`px-4 py-3 font-bold text-[11px] uppercase tracking-tight ${
                           i === sourceCol
-                            ? 'text-blue-600 bg-blue-50/50'
+                            ? 'text-brand bg-brand-soft/50'
                             : i === targetCol
-                              ? 'text-green-600 bg-green-50/50'
+                              ? 'text-success bg-success-soft/50'
                               : i === contextCol
-                                ? 'text-purple-600 bg-purple-50/50'
-                                : 'text-gray-500'
+                                ? 'text-info bg-info-soft/50'
+                                : 'text-text-muted'
                         }`}
                       >
                         Col {XLSX_COL_NAME(i)}
@@ -205,22 +209,22 @@ export function ColumnSelector({
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-border/50">
                   {previewData.map((row, rowIndex) => (
                     <tr
                       key={rowIndex}
-                      className={`${hasHeader && rowIndex === 0 ? 'bg-gray-50/80 opacity-60 italic' : 'bg-white'}`}
+                      className={`${hasHeader && rowIndex === 0 ? 'bg-muted/80 opacity-60 italic' : 'bg-surface'}`}
                     >
                       {colIndexes.map((i) => (
                         <td
                           key={i}
                           className={`px-4 py-3 truncate max-w-[200px] text-xs ${
                             i === sourceCol
-                              ? 'bg-blue-50/20 font-medium'
+                              ? 'bg-brand-soft/20 font-medium'
                               : i === targetCol
-                                ? 'bg-green-50/20'
+                                ? 'bg-success-soft/20'
                                 : i === contextCol
-                                  ? 'bg-purple-50/20'
+                                  ? 'bg-info-soft/20'
                                   : ''
                           }`}
                         >
@@ -231,18 +235,15 @@ export function ColumnSelector({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </Card>
           </div>
         </div>
 
-        <div className="px-8 py-6 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-6 py-2.5 text-gray-600 font-bold text-sm hover:bg-gray-200 rounded-lg transition-colors"
-          >
+        <div className="panel-footer px-8 py-6 flex justify-end gap-3">
+          <Button onClick={onClose} variant="secondary" size="lg">
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() =>
               onConfirm({
                 hasHeader,
@@ -251,10 +252,12 @@ export function ColumnSelector({
                 contextCol: isReviewProject ? (contextCol ?? 0) : contextCol,
               })
             }
-            className="px-8 py-2.5 bg-blue-600 text-white font-bold text-sm rounded-lg hover:bg-blue-700 shadow-md shadow-blue-200 transition-all hover:-translate-y-0.5"
+            variant="primary"
+            size="lg"
+            className="!px-8 shadow-md shadow-brand/20 hover:-translate-y-0.5 transition-all"
           >
             Start Import
-          </button>
+          </Button>
         </div>
       </div>
     </div>

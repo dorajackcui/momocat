@@ -141,11 +141,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
-        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-          <h2 className="text-xl font-bold text-gray-900">AI & Network Settings</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+    <div className="modal-backdrop">
+      <div className="modal-card max-w-lg animate-in fade-in zoom-in duration-200">
+        <div className="modal-header">
+          <h2 className="text-xl font-bold text-text">AI & Network Settings</h2>
+          <button
+            onClick={onClose}
+            className="text-text-faint hover:text-text-muted transition-colors"
+          >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -157,27 +160,25 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
-          <section className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 space-y-3">
-            <h3 className="text-sm font-bold text-gray-800">API Key Settings</h3>
+        <div className="modal-body">
+          <section className="surface-subtle p-4 space-y-3">
+            <h3 className="text-sm font-bold text-text">API Key Settings</h3>
             <div>
-              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
-                OpenAI API Key
-              </label>
+              <label className="field-label">OpenAI API Key</label>
               <input
                 type="password"
                 value={apiKeyInput}
                 onChange={(e) => setApiKeyInput(e.target.value)}
                 placeholder="sk-..."
-                className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                className="field-input"
               />
               {apiKeyHint && (
                 <div className="mt-2 flex items-center justify-between gap-2">
-                  <p className="text-[11px] text-gray-500">Saved key: {apiKeyHint}</p>
+                  <p className="text-[11px] text-text-muted">Saved key: {apiKeyHint}</p>
                   <button
                     onClick={handleClear}
                     disabled={busy}
-                    className="text-[11px] font-semibold text-red-600 hover:text-red-700 disabled:opacity-50 transition-colors"
+                    className="text-[11px] font-semibold text-danger hover:text-danger-hover disabled:opacity-50 transition-colors"
                   >
                     {clearing ? 'Removing...' : 'Delete Saved Key'}
                   </button>
@@ -185,32 +186,25 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               )}
             </div>
             <div className="flex gap-3">
-              <button
-                onClick={handleTest}
-                disabled={busy}
-                className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 rounded-lg font-bold hover:bg-gray-100 transition-colors"
-              >
+              <button onClick={handleTest} disabled={busy} className="btn-secondary flex-1">
                 {testing ? 'Testing...' : 'Test Connection'}
               </button>
-              <button
-                onClick={handleSave}
-                disabled={busy}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-lg shadow-blue-200"
-              >
+              <button onClick={handleSave} disabled={busy} className="btn-primary flex-1">
                 {loading ? 'Saving...' : 'Save Key'}
               </button>
             </div>
           </section>
 
-          <section className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
-            <h3 className="text-sm font-bold text-gray-800">Proxy Settings</h3>
-            <div className="space-y-2 text-sm text-gray-700">
+          <section className="surface-card p-4 space-y-3">
+            <h3 className="text-sm font-bold text-text">Proxy Settings</h3>
+            <div className="space-y-2 text-sm text-text-muted">
               <label className="flex items-center gap-2">
                 <input
                   type="radio"
                   name="proxy-mode"
                   checked={proxyMode === 'off'}
                   onChange={() => setProxyMode('off')}
+                  className="accent-brand"
                 />
                 <span>No Proxy (Direct)</span>
               </label>
@@ -220,6 +214,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   name="proxy-mode"
                   checked={proxyMode === 'system'}
                   onChange={() => setProxyMode('system')}
+                  className="accent-brand"
                 />
                 <span>Use System/Environment Proxy</span>
               </label>
@@ -229,6 +224,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   name="proxy-mode"
                   checked={proxyMode === 'custom'}
                   onChange={() => setProxyMode('custom')}
+                  className="accent-brand"
                 />
                 <span>Use Custom Proxy URL</span>
               </label>
@@ -240,26 +236,20 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 value={customProxyUrl}
                 onChange={(e) => setCustomProxyUrl(e.target.value)}
                 placeholder="http://127.0.0.1:7890"
-                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                className="field-input"
               />
             )}
 
-            <p className="text-[11px] text-gray-500">Active proxy: {effectiveProxyUrl || 'None (direct)'}</p>
+            <p className="text-[11px] text-text-muted">
+              Active proxy: {effectiveProxyUrl || 'None (direct)'}
+            </p>
 
-            <button
-              onClick={handleSaveProxy}
-              disabled={busy}
-              className="w-full px-4 py-2 border border-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 disabled:opacity-50 transition-colors"
-            >
+            <button onClick={handleSaveProxy} disabled={busy} className="btn-secondary w-full">
               {savingProxy ? 'Saving Proxy...' : 'Save Proxy Settings'}
             </button>
           </section>
 
-          {status && (
-            <div className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-              {status}
-            </div>
-          )}
+          {status && <div className="status-note">{status}</div>}
         </div>
       </div>
     </div>

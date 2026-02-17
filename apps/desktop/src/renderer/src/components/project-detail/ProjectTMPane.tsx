@@ -1,4 +1,5 @@
 import type { MountedTM, TMWithStats } from '../../../../shared/ipc';
+import { Card, IconButton, Select } from '../ui';
 
 interface ProjectTMPaneProps {
   mountedTMs: MountedTM[];
@@ -19,37 +20,37 @@ export function ProjectTMPane({
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div>
-        <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">
+        <h3 className="text-sm font-bold text-text-faint uppercase tracking-wider mb-4">
           Working Translation Memory
         </h3>
-        <div className="bg-blue-50/50 p-6 rounded-xl border border-blue-100">
+        <Card variant="subtle" className="p-6 border-brand/20 bg-brand-soft/50">
           {workingTMs.map((tm) => (
             <div key={tm.id} className="flex justify-between items-center">
               <div>
-                <h4 className="font-bold text-blue-900">{tm.name}</h4>
-                <p className="text-xs text-blue-600 mt-1">
+                <h4 className="font-bold text-brand">{tm.name}</h4>
+                <p className="text-xs text-brand mt-1">
                   Automatic updates on segment confirmation. Read/Write enabled.
                 </p>
               </div>
               <div className="text-right">
-                <span className="block text-lg font-bold text-blue-900">{tm.entryCount || 0}</span>
-                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-tight">
+                <span className="block text-lg font-bold text-brand">{tm.entryCount || 0}</span>
+                <span className="text-[10px] font-bold text-brand/80 uppercase tracking-tight">
                   Segments
                 </span>
               </div>
             </div>
           ))}
-        </div>
+        </Card>
       </div>
 
       <div>
         <div className="flex justify-between items-end mb-4">
-          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider">
+          <h3 className="text-sm font-bold text-text-faint uppercase tracking-wider">
             Mounted Main TMs (Read-only)
           </h3>
           <div className="flex items-center gap-2">
-            <select
-              className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium outline-none"
+            <Select
+              className="!px-3 !py-1.5 text-xs font-medium"
               onChange={(event) => {
                 if (!event.target.value) return;
                 onMountTM(event.target.value);
@@ -66,23 +67,20 @@ export function ProjectTMPane({
                     {tm.name} ({tm.srcLang}→{tm.tgtLang})
                   </option>
                 ))}
-            </select>
+            </Select>
           </div>
         </div>
 
         {mountedMainTMs.length === 0 ? (
-          <div className="bg-gray-50 rounded-xl border border-dashed border-gray-200 p-8 text-center">
-            <p className="text-xs text-gray-400">No Main TMs mounted to this project yet.</p>
-          </div>
+          <Card variant="subtle" className="p-8 text-center border-dashed">
+            <p className="text-xs text-text-faint">No Main TMs mounted to this project yet.</p>
+          </Card>
         ) : (
           <div className="grid grid-cols-1 gap-3">
             {mountedMainTMs.map((tm) => (
-              <div
-                key={tm.id}
-                className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl"
-              >
+              <Card key={tm.id} variant="surface" className="flex items-center justify-between p-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center text-purple-600">
+                  <div className="w-8 h-8 bg-info-soft/80 rounded-lg flex items-center justify-center text-info">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
                         strokeLinecap="round"
@@ -93,22 +91,23 @@ export function ProjectTMPane({
                     </svg>
                   </div>
                   <div>
-                    <h4 className="font-bold text-gray-800">{tm.name}</h4>
-                    <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">
+                    <h4 className="font-bold text-text">{tm.name}</h4>
+                    <p className="text-[10px] text-text-faint font-medium uppercase tracking-wider">
                       {tm.srcLang} → {tm.tgtLang}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-6">
                   <div className="text-right">
-                    <span className="block text-sm font-bold text-gray-700">
+                    <span className="block text-sm font-bold text-text-muted">
                       {tm.entryCount || 0}
                     </span>
-                    <span className="text-[9px] font-bold text-gray-400 uppercase">Segments</span>
+                    <span className="text-[9px] font-bold text-text-faint uppercase">Segments</span>
                   </div>
-                  <button
+                  <IconButton
                     onClick={() => onUnmountTM(tm.id)}
-                    className="p-1.5 text-gray-300 hover:text-red-500 transition-colors"
+                    tone="danger"
+                    size="sm"
                     title="Unmount from Project"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -119,9 +118,9 @@ export function ProjectTMPane({
                         d="M6 18L18 6M6 6l12 12"
                       />
                     </svg>
-                  </button>
+                  </IconButton>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         )}

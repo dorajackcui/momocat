@@ -112,7 +112,7 @@ export const TagContextMenu: React.FC<TagContextMenuProps> = ({
 
   return (
     <div
-      className="fixed bg-white border border-gray-200 rounded-md shadow-lg z-50 py-1 min-w-[180px]"
+      className="fixed bg-surface border border-border rounded-md shadow-lg z-50 py-1 min-w-[180px]"
       style={{ left: position.x, top: position.y }}
       role="menu"
       aria-label="Tag context menu"
@@ -121,27 +121,27 @@ export const TagContextMenu: React.FC<TagContextMenuProps> = ({
       {/* View Full Content */}
       <button
         onClick={() => handleMenuItemClick(onViewContent)}
-        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
+        className="w-full px-4 py-2 text-left text-sm hover:bg-muted transition-colors flex items-center gap-2"
         role="menuitem"
         aria-label="View full tag content"
       >
-        <span className="text-gray-700">View Full Content</span>
+        <span className="text-text-muted">View Full Content</span>
       </button>
 
       {/* Copy Tag */}
       <button
         onClick={() => handleMenuItemClick(onCopyTag)}
-        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
+        className="w-full px-4 py-2 text-left text-sm hover:bg-muted transition-colors flex items-center gap-2"
         role="menuitem"
         aria-label="Copy tag to clipboard"
       >
-        <span className="text-gray-700">Copy Tag</span>
+        <span className="text-text-muted">Copy Tag</span>
       </button>
 
       {/* Delete Tag */}
       <button
         onClick={() => handleMenuItemClick(onDeleteTag)}
-        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 transition-colors flex items-center gap-2 text-red-600"
+        className="w-full px-4 py-2 text-left text-sm hover:bg-muted transition-colors flex items-center gap-2 text-danger"
         role="menuitem"
         aria-label="Delete tag"
       >
@@ -151,14 +151,14 @@ export const TagContextMenu: React.FC<TagContextMenuProps> = ({
       {/* Jump to Pair - Only shown for paired tags */}
       {pairedTagIndex !== undefined && onJumpToPair && (
         <>
-          <div className="border-t border-gray-100 my-1" role="separator" />
+          <div className="border-t border-border/60 my-1" role="separator" />
           <button
             onClick={() => handleMenuItemClick(onJumpToPair)}
-            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
+            className="w-full px-4 py-2 text-left text-sm hover:bg-muted transition-colors flex items-center gap-2"
             role="menuitem"
             aria-label="Jump to paired tag"
           >
-            <span className="text-gray-700">Jump to Pair</span>
+            <span className="text-text-muted">Jump to Pair</span>
           </button>
         </>
       )}

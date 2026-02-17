@@ -1,4 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Button, Card, Notice } from './ui';
 
 interface Props {
   children: ReactNode;
@@ -50,19 +51,19 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex items-center justify-center h-screen bg-gray-50">
-          <div className="max-w-2xl p-8 bg-white rounded-lg shadow-lg">
-            <h1 className="text-2xl font-bold text-red-600 mb-4">Something went wrong</h1>
-            <div className="mb-4">
-              <p className="text-gray-700 mb-2">
+        <div className="flex items-center justify-center h-screen bg-muted">
+          <Card variant="surface" className="max-w-2xl p-8">
+            <h1 className="text-2xl font-bold text-danger mb-4">Something went wrong</h1>
+            <div className="mb-4 space-y-2">
+              <Notice tone="danger">
                 The application encountered an error. Please try refreshing the page.
-              </p>
+              </Notice>
               {this.state.error && (
                 <details className="mt-4">
-                  <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-800">
+                  <summary className="cursor-pointer text-sm text-text-muted hover:text-text">
                     Error details
                   </summary>
-                  <pre className="mt-2 p-4 bg-gray-100 rounded text-xs overflow-auto max-h-96">
+                  <pre className="mt-2 p-4 bg-muted rounded text-xs overflow-auto max-h-96">
                     {this.state.error.toString()}
                     {this.state.errorInfo?.componentStack}
                   </pre>
@@ -70,20 +71,14 @@ export class ErrorBoundary extends Component<Props, State> {
               )}
             </div>
             <div className="flex gap-4">
-              <button
-                onClick={this.handleReset}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
+              <Button onClick={this.handleReset} variant="primary">
                 Try Again
-              </button>
-              <button
-                onClick={() => window.location.reload()}
-                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
-              >
+              </Button>
+              <Button onClick={() => window.location.reload()} variant="secondary">
                 Reload Page
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
         </div>
       );
     }

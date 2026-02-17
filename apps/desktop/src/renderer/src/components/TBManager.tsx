@@ -133,7 +133,7 @@ export const TBManager: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 p-8 bg-gray-50 overflow-y-auto">
+    <div className="flex-1 p-8 bg-canvas overflow-y-auto custom-scrollbar">
       <TBImportWizard
         isOpen={isImportWizardOpen}
         previewData={importPreview}
@@ -152,25 +152,22 @@ export const TBManager: React.FC = () => {
       <div className="max-w-5xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">TB Management</h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <h1 className="text-2xl font-bold text-text">TB Management</h1>
+            <p className="text-sm text-text-muted mt-1">
               Manage reusable term bases for consistency.
             </p>
           </div>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition-colors shadow-sm"
-          >
+          <button onClick={() => setShowCreate(true)} className="btn-primary">
             Create Term Base
           </button>
         </div>
 
         {importNotice && (
           <div
-            className={`mb-6 rounded-lg border px-4 py-3 text-sm ${
+            className={`mb-6 rounded-control border px-4 py-3 text-sm ${
               importNotice.tone === 'success'
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                : 'border-red-200 bg-red-50 text-red-700'
+                ? 'border-success/40 bg-success-soft text-success'
+                : 'border-danger/40 bg-danger-soft text-danger'
             }`}
           >
             <div className="flex items-center justify-between gap-3">
@@ -178,7 +175,7 @@ export const TBManager: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setImportNotice(null)}
-                className="text-xs font-bold uppercase tracking-wide opacity-70 hover:opacity-100"
+                className="text-xs font-semibold uppercase tracking-wide opacity-70 hover:opacity-100"
               >
                 Dismiss
               </button>
@@ -187,58 +184,47 @@ export const TBManager: React.FC = () => {
         )}
 
         {showCreate && (
-          <div className="mb-8 p-6 bg-white rounded-xl border border-gray-200 shadow-sm animate-in fade-in slide-in-from-top-4">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-4">
-              Create New Term Base
-            </h2>
+          <div className="mb-8 p-6 surface-card animate-in fade-in slide-in-from-top-4">
+            <h2 className="field-label !text-[10px] mb-4">Create New Term Base</h2>
             <form onSubmit={handleCreate} className="grid grid-cols-4 gap-4 items-end">
               <div className="col-span-2">
-                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">
-                  Name
-                </label>
+                <label className="field-label !text-[10px]">Name</label>
                 <input
                   type="text"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+                  className="field-input !px-3 !py-2 text-sm"
                   placeholder="e.g. Product Glossary"
                   autoFocus
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">
-                  Source
-                </label>
+                <label className="field-label !text-[10px]">Source</label>
                 <input
                   type="text"
                   value={newSrc}
                   onChange={(e) => setNewSrc(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+                  className="field-input !px-3 !py-2 text-sm"
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">
-                  Target
-                </label>
+                <label className="field-label !text-[10px]">Target</label>
                 <input
                   type="text"
                   value={newTgt}
                   onChange={(e) => setNewTgt(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+                  className="field-input !px-3 !py-2 text-sm"
                 />
               </div>
               <div className="col-span-4 flex justify-end gap-2 mt-2">
                 <button
                   type="button"
                   onClick={() => setShowCreate(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg"
+                  className="btn-secondary"
                 >
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2 bg-gray-900 text-white rounded-lg text-sm font-bold hover:bg-black transition-colors"
-                >
+                <button type="submit" className="btn-primary !px-6">
                   Save
                 </button>
               </div>
@@ -248,19 +234,19 @@ export const TBManager: React.FC = () => {
 
         {loading ? (
           <div className="text-center py-12">
-            <div className="animate-spin w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-            <p className="text-sm text-gray-400">Loading term bases...</p>
+            <div className="animate-spin w-6 h-6 border-2 border-brand border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-sm text-text-faint">Loading term bases...</p>
           </div>
         ) : tbs.length === 0 ? (
-          <div className="bg-white rounded-xl border border-dashed border-gray-300 p-12 text-center">
+          <div className="surface-card border-dashed p-12 text-center">
             <div className="text-3xl mb-4">📘</div>
-            <h3 className="text-sm font-bold text-gray-900 mb-1">No term base found</h3>
-            <p className="text-xs text-gray-500 mb-6">
+            <h3 className="text-sm font-bold text-text mb-1">No term base found</h3>
+            <p className="text-xs text-text-muted mb-6">
               Create one to enforce terminology consistency.
             </p>
             <button
               onClick={() => setShowCreate(true)}
-              className="text-emerald-600 text-sm font-bold hover:underline"
+              className="text-brand text-sm font-semibold hover:underline"
             >
               + Create your first term base
             </button>
@@ -270,15 +256,15 @@ export const TBManager: React.FC = () => {
             {tbs.map((tb) => (
               <div
                 key={tb.id}
-                className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:border-emerald-200 transition-colors group"
+                className="surface-card p-5 hover:border-brand/40 transition-colors group"
               >
                 <div className="flex justify-between items-start mb-3">
                   <div>
-                    <h3 className="font-bold text-gray-900 group-hover:text-emerald-600 transition-colors">
+                    <h3 className="font-bold text-text group-hover:text-brand transition-colors">
                       {tb.name}
                     </h3>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                      <span className="text-[10px] font-semibold text-brand bg-brand-soft px-1.5 py-0.5 rounded-control uppercase tracking-wider">
                         {tb.srcLang} → {tb.tgtLang}
                       </span>
                     </div>
@@ -286,7 +272,7 @@ export const TBManager: React.FC = () => {
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => handleStartImport(tb.id)}
-                      className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                      className="p-1.5 text-text-faint hover:text-brand hover:bg-brand-soft rounded-control transition-colors"
                       title="Import terms from file"
                     >
                       <svg
@@ -305,7 +291,7 @@ export const TBManager: React.FC = () => {
                     </button>
                     <button
                       onClick={() => handleDelete(tb.id)}
-                      className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                      className="p-1.5 text-text-faint hover:text-danger hover:bg-danger-soft rounded-control transition-colors"
                       title="Delete term base"
                     >
                       <svg
@@ -324,16 +310,16 @@ export const TBManager: React.FC = () => {
                     </button>
                   </div>
                 </div>
-                <div className="flex items-center justify-between pt-4 border-t border-gray-50">
+                <div className="flex items-center justify-between pt-4 border-t border-border/40">
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">
+                    <span className="text-[10px] font-semibold text-text-faint uppercase tracking-widest mb-0.5">
                       Size
                     </span>
-                    <span className="text-sm font-bold text-gray-700">
+                    <span className="text-sm font-semibold text-text-muted">
                       {tb.stats.entryCount} terms
                     </span>
                   </div>
-                  <div className="text-[10px] text-gray-400 font-medium">
+                  <div className="text-[10px] text-text-faint font-medium">
                     Last updated {new Date().toLocaleDateString()}
                   </div>
                 </div>

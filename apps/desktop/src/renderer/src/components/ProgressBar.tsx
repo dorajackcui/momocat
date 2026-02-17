@@ -17,17 +17,17 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ segments, compact }) =
   if (compact) {
     return (
       <div className="flex flex-col gap-1 w-full">
-        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden flex w-full">
+        <div className="h-1.5 bg-muted rounded-full overflow-hidden flex w-full">
           <div
-            className="h-full bg-green-500 transition-all duration-500"
+            className="h-full bg-success transition-all duration-500"
             style={{ width: `${completedPct}%` }}
           />
           <div
-            className="h-full bg-yellow-400 transition-all duration-500"
+            className="h-full bg-warning transition-all duration-500"
             style={{ width: `${draftPct}%` }}
           />
         </div>
-        <div className="flex justify-between text-[8px] font-bold text-gray-400 uppercase tracking-tight">
+        <div className="flex justify-between text-[8px] font-bold text-text-faint uppercase tracking-tight">
           <span>{Math.round(completedPct)}% Confirmed</span>
           <span>{total} Segments</span>
         </div>
@@ -36,28 +36,28 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ segments, compact }) =
   }
 
   return (
-    <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-100 flex flex-col gap-2">
-      <div className="flex justify-between items-center text-xs font-medium text-gray-500">
+    <div className="mb-6 p-4 bg-muted rounded-lg border border-border/60 flex flex-col gap-2">
+      <div className="flex justify-between items-center text-xs font-medium text-text-muted">
         <div className="flex gap-4">
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-green-500" />
+            <span className="w-2 h-2 rounded-full bg-success" />
             Confirmed: {completed}
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-yellow-400" />
+            <span className="w-2 h-2 rounded-full bg-warning" />
             Draft: {draft}
           </span>
         </div>
         <span>Total: {total}</span>
       </div>
 
-      <div className="h-2 bg-gray-200 rounded-full overflow-hidden flex">
+      <div className="h-2 bg-border rounded-full overflow-hidden flex">
         <div
-          className="h-full bg-green-500 transition-all duration-500"
+          className="h-full bg-success transition-all duration-500"
           style={{ width: `${completedPct}%` }}
         />
         <div
-          className="h-full bg-yellow-400 transition-all duration-500"
+          className="h-full bg-warning transition-all duration-500"
           style={{ width: `${draftPct}%` }}
         />
       </div>

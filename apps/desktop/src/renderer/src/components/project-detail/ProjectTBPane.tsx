@@ -1,4 +1,5 @@
 import type { MountedTB, TBWithStats } from '../../../../shared/ipc';
+import { Card, IconButton, Select } from '../ui';
 
 interface ProjectTBPaneProps {
   mountedTBs: MountedTB[];
@@ -12,12 +13,12 @@ export function ProjectTBPane({ mountedTBs, allTBs, onMountTB, onUnmountTB }: Pr
     <div className="max-w-4xl mx-auto space-y-8">
       <div>
         <div className="flex justify-between items-end mb-4">
-          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider">
+          <h3 className="text-sm font-bold text-text-faint uppercase tracking-wider">
             Mounted Term Bases
           </h3>
           <div className="flex items-center gap-2">
-            <select
-              className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-medium outline-none"
+            <Select
+              className="!px-3 !py-1.5 text-xs font-medium"
               onChange={(event) => {
                 if (!event.target.value) return;
                 onMountTB(event.target.value);
@@ -34,23 +35,20 @@ export function ProjectTBPane({ mountedTBs, allTBs, onMountTB, onUnmountTB }: Pr
                     {tb.name} ({tb.srcLang}→{tb.tgtLang})
                   </option>
                 ))}
-            </select>
+            </Select>
           </div>
         </div>
 
         {mountedTBs.length === 0 ? (
-          <div className="bg-gray-50 rounded-xl border border-dashed border-gray-200 p-8 text-center">
-            <p className="text-xs text-gray-400">No term base mounted to this project yet.</p>
-          </div>
+          <Card variant="subtle" className="p-8 text-center border-dashed">
+            <p className="text-xs text-text-faint">No term base mounted to this project yet.</p>
+          </Card>
         ) : (
           <div className="grid grid-cols-1 gap-3">
             {mountedTBs.map((tb) => (
-              <div
-                key={tb.id}
-                className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl"
-              >
+              <Card key={tb.id} variant="surface" className="flex items-center justify-between p-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-600">
+                  <div className="w-8 h-8 bg-success-soft/80 rounded-lg flex items-center justify-center text-success">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
                         strokeLinecap="round"
@@ -61,22 +59,23 @@ export function ProjectTBPane({ mountedTBs, allTBs, onMountTB, onUnmountTB }: Pr
                     </svg>
                   </div>
                   <div>
-                    <h4 className="font-bold text-gray-800">{tb.name}</h4>
-                    <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">
+                    <h4 className="font-bold text-text">{tb.name}</h4>
+                    <p className="text-[10px] text-text-faint font-medium uppercase tracking-wider">
                       {tb.srcLang} → {tb.tgtLang}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-6">
                   <div className="text-right">
-                    <span className="block text-sm font-bold text-gray-700">
+                    <span className="block text-sm font-bold text-text-muted">
                       {tb.stats?.entryCount || 0}
                     </span>
-                    <span className="text-[9px] font-bold text-gray-400 uppercase">Terms</span>
+                    <span className="text-[9px] font-bold text-text-faint uppercase">Terms</span>
                   </div>
-                  <button
+                  <IconButton
                     onClick={() => onUnmountTB(tb.id)}
-                    className="p-1.5 text-gray-300 hover:text-red-500 transition-colors"
+                    tone="danger"
+                    size="sm"
                     title="Unmount from Project"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -87,9 +86,9 @@ export function ProjectTBPane({ mountedTBs, allTBs, onMountTB, onUnmountTB }: Pr
                         d="M6 18L18 6M6 6l12 12"
                       />
                     </svg>
-                  </button>
+                  </IconButton>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         )}

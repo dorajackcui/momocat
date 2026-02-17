@@ -63,6 +63,7 @@
       "updateProjectAISettings",
       "updateProjectQASettings",
       "updateProjectPrompt",
+      "updateSegmentQaIssues",
       "updateSegmentTarget",
       "upsertTBEntryBySrcTerm",
       "upsertTMEntry",

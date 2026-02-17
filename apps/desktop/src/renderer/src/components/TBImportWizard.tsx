@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { apiClient } from '../services/apiClient';
+import { Button, Card, IconButton, Select, Spinner } from './ui';
 import type {
   ImportExecutionResult,
   JobProgressEvent,
@@ -88,40 +89,40 @@ export function TBImportWizard({
     const progressMessage = jobProgress?.message || 'Starting import...';
 
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] backdrop-blur-sm">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center">
+      <div className="modal-backdrop !z-[100]">
+        <div className="modal-card max-w-md p-8 text-center animate-in fade-in zoom-in duration-200">
           <div className="mb-6">
-            <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
-              <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-16 h-16 bg-success-soft rounded-full flex items-center justify-center mx-auto mb-4">
+              <Spinner size="lg" tone="success" />
             </div>
-            <h2 className="text-xl font-bold text-gray-900">Importing Term Base...</h2>
-            <p className="text-sm text-gray-500 mt-1">{progressMessage}</p>
+            <h2 className="text-xl font-bold text-text">Importing Term Base...</h2>
+            <p className="text-sm text-text-muted mt-1">{progressMessage}</p>
           </div>
 
-          <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-emerald-100">
+          <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-success-soft/80">
             <div
               style={{ width: `${clampedProgress}%` }}
-              className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-emerald-500 transition-all duration-300"
+              className="shadow-none flex flex-col text-center whitespace-nowrap text-success-contrast justify-center bg-success transition-all duration-300"
             />
           </div>
-          <p className="text-[10px] text-gray-400 font-medium">Job ID: {jobId}</p>
+          <p className="text-[10px] text-text-faint font-medium">Job ID: {jobId}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
-        <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+    <div className="modal-backdrop !z-[100]">
+      <div className="modal-card max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="panel-header px-8 py-6 flex justify-between items-center">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">Import Terms from File</h2>
-            <p className="text-sm text-gray-500 mt-1">
+            <h2 className="text-xl font-bold text-text">Import Terms from File</h2>
+            <p className="text-sm text-text-muted mt-1">
               Map source/target columns to build your term base.
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <IconButton onClick={onClose} tone="neutral" aria-label="Close">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -129,48 +130,48 @@ export function TBImportWizard({
                 d="M6 18L18 6M6 6l12 12"
               />
             </svg>
-          </button>
+          </IconButton>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
           <div className="grid grid-cols-3 gap-6 mb-8">
             <div>
-              <label className="text-sm font-bold text-gray-700">Source Term Column</label>
-              <select
+              <label className="text-sm font-bold text-text-muted">Source Term Column</label>
+              <Select
                 value={sourceCol}
-                onChange={(e) => setSourceCol(parseInt(e.target.value))}
-                className="mt-2 w-full p-2.5 bg-white border border-gray-200 rounded-lg text-sm"
+                onChange={(e) => setSourceCol(parseInt(e.target.value, 10))}
+                className="mt-2"
               >
                 {colIndexes.map((i) => (
                   <option key={i} value={i}>
                     Column {XLSX_COL_NAME(i)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
-              <label className="text-sm font-bold text-gray-700">Target Term Column</label>
-              <select
+              <label className="text-sm font-bold text-text-muted">Target Term Column</label>
+              <Select
                 value={targetCol}
-                onChange={(e) => setTargetCol(parseInt(e.target.value))}
-                className="mt-2 w-full p-2.5 bg-white border border-gray-200 rounded-lg text-sm"
+                onChange={(e) => setTargetCol(parseInt(e.target.value, 10))}
+                className="mt-2"
               >
                 {colIndexes.map((i) => (
                   <option key={i} value={i}>
                     Column {XLSX_COL_NAME(i)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
-              <label className="text-sm font-bold text-gray-700">Note Column (Optional)</label>
-              <select
+              <label className="text-sm font-bold text-text-muted">Note Column (Optional)</label>
+              <Select
                 value={noteCol ?? -1}
                 onChange={(e) => {
                   const next = parseInt(e.target.value, 10);
                   setNoteCol(next === -1 ? undefined : next);
                 }}
-                className="mt-2 w-full p-2.5 bg-white border border-gray-200 rounded-lg text-sm"
+                className="mt-2"
               >
                 <option value={-1}>Not used</option>
                 {colIndexes.map((i) => (
@@ -178,52 +179,58 @@ export function TBImportWizard({
                     Column {XLSX_COL_NAME(i)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4 mb-6">
-            <label className="flex items-center gap-3 bg-emerald-50/50 p-4 rounded-xl border border-emerald-100/50">
+            <Card
+              variant="subtle"
+              className="flex items-center gap-3 p-4 border-success/30 bg-success-soft/50"
+            >
               <input
                 type="checkbox"
                 checked={hasHeader}
                 onChange={(e) => setHasHeader(e.target.checked)}
-                className="w-4 h-4 text-emerald-600 rounded"
+                className="w-4 h-4 accent-success"
               />
-              <span className="text-sm font-medium text-gray-700">First row is header</span>
-            </label>
-            <label className="flex items-center gap-3 bg-blue-50/50 p-4 rounded-xl border border-blue-100/50">
+              <span className="text-sm font-medium text-text-muted">First row is header</span>
+            </Card>
+            <Card
+              variant="subtle"
+              className="flex items-center gap-3 p-4 border-brand/20 bg-brand-soft/50"
+            >
               <input
                 type="checkbox"
                 checked={overwrite}
                 onChange={(e) => setOverwrite(e.target.checked)}
-                className="w-4 h-4 text-blue-600 rounded"
+                className="w-4 h-4 accent-brand"
               />
-              <span className="text-sm font-medium text-gray-700">
+              <span className="text-sm font-medium text-text-muted">
                 Overwrite existing source terms
               </span>
-            </label>
+            </Card>
           </div>
 
-          <div className="border border-gray-200 rounded-xl overflow-hidden overflow-x-auto shadow-sm">
+          <Card variant="surface" className="table-shell !rounded-xl !shadow-sm">
             <table className="w-full text-sm text-left border-collapse">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="table-head">
                 <tr>
                   {colIndexes.map((i) => (
                     <th
                       key={i}
-                      className="px-4 py-3 font-bold text-[11px] uppercase tracking-tight text-gray-500"
+                      className="px-4 py-3 font-bold text-[11px] uppercase tracking-tight text-text-muted"
                     >
                       Col {XLSX_COL_NAME(i)}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-border/50">
                 {previewData.map((row, rowIndex) => (
                   <tr
                     key={rowIndex}
-                    className={`${hasHeader && rowIndex === 0 ? 'bg-gray-50/80 opacity-60 italic' : 'bg-white'}`}
+                    className={`${hasHeader && rowIndex === 0 ? 'bg-muted/80 opacity-60 italic' : 'bg-surface'}`}
                   >
                     {colIndexes.map((i) => (
                       <td key={i} className="px-4 py-3 truncate max-w-[240px] text-xs">
@@ -234,24 +241,23 @@ export function TBImportWizard({
                 ))}
               </tbody>
             </table>
-          </div>
+          </Card>
         </div>
 
-        <div className="px-8 py-6 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-6 py-2.5 text-gray-600 font-bold text-sm hover:bg-gray-200 rounded-lg transition-colors"
-          >
+        <div className="panel-footer px-8 py-6 flex justify-end gap-3">
+          <Button onClick={onClose} variant="secondary" size="lg">
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => {
               onConfirm({ hasHeader, sourceCol, targetCol, noteCol, overwrite });
             }}
-            className="px-8 py-2.5 bg-emerald-600 text-white font-bold text-sm rounded-lg hover:bg-emerald-700"
+            variant="primary"
+            size="lg"
+            className="!px-8"
           >
             Start Import
-          </button>
+          </Button>
         </div>
       </div>
     </div>

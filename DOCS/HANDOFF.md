@@ -20,19 +20,19 @@
 ## 3. 扩展阅读链路（仅复杂任务）
 
 1. `DOCS/CURRENT_STATUS.md`  
-当前阶段、门禁状态、全局阻塞。
+   当前阶段、门禁状态、全局阻塞。
 
 2. `DOCS/DEVELOPMENT_GUIDE.md`  
-当前开发阶段硬规则。
+   当前开发阶段硬规则。
 
 3. `DOCS/PROJECT_MAP_QUICKSTART.md`  
-任务到代码入口的快速映射。
+   任务到代码入口的快速映射。
 
 4. `DOCS/PROJECT_STRUCTURE.md`  
-目录与分层边界。
+   目录与分层边界。
 
 5. `DOCS/ARCHITECTURE.md`  
-As-Is / To-Be 边界与演进方向。
+   As-Is / To-Be 边界与演进方向。
 
 6. `DOCS/DATABASE_SCHEMA.md`（触达数据层时必读）
 
@@ -57,10 +57,21 @@ As-Is / To-Be 边界与演进方向。
 1. 全局状态变化：更新 `DOCS/CURRENT_STATUS.md`。
 2. 规则/边界变化：更新相应规范文档。
 
+## 8. 渲染层风格统一入口（新增）
+
+1. 主题与语义 token：
+   - `apps/desktop/src/renderer/src/index.css`
+   - `apps/desktop/tailwind.config.js`
+2. UI 基件目录：
+   - `apps/desktop/src/renderer/src/components/ui`
+3. 风格门禁：
+   - `scripts/gate-style-classes.mjs`
+   - `npm run gate:style`（已并入 `npm run gate:check`）
+
 ## 7. 你可直接复用的指令
 
 1. 快速模式：  
-`请先读 DOCS/HANDOFF_LITE.md，再开始任务。`
+   `请先读 DOCS/HANDOFF_LITE.md，再开始任务。`
 
 2. 深度模式：  
-`请先读 DOCS/HANDOFF.md，并按标准阅读链路建立完整上下文后再开始。`
+   `请先读 DOCS/HANDOFF.md，并按标准阅读链路建立完整上下文后再开始。`

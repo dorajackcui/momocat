@@ -187,18 +187,18 @@ export const EditorRow: React.FC<EditorRowProps> = ({
   };
 
   const statusLine = hasError
-    ? 'bg-red-500'
+    ? 'bg-danger'
     : hasWarning
-      ? 'bg-amber-500'
+      ? 'bg-warning'
       : segment.status === 'confirmed'
-        ? 'bg-green-500'
+        ? 'bg-success'
         : segment.status === 'reviewed'
-          ? 'bg-teal-500'
+          ? 'bg-info'
           : segment.status === 'translated'
-            ? 'bg-blue-500'
+            ? 'bg-brand'
             : segment.status === 'draft'
-              ? 'bg-yellow-500'
-              : 'bg-gray-400';
+              ? 'bg-warning'
+              : 'bg-text-faint';
 
   const statusTitle = hasError
     ? `Status: ${segment.status} (QA error)`
@@ -273,7 +273,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
     (chunks: ReturnType<typeof buildHighlightChunks>) =>
       chunks.map((chunk, index) =>
         chunk.isMatch ? (
-          <mark key={index} className="bg-yellow-200/80 text-inherit rounded-[2px]">
+          <mark key={index} className="bg-warning-soft text-inherit rounded-[2px]">
             {chunk.text}
           </mark>
         ) : (
@@ -285,28 +285,28 @@ export const EditorRow: React.FC<EditorRowProps> = ({
 
   return (
     <div
-      className={`group grid grid-cols-[30px_1fr_5px_1fr] border-b border-gray-200 transition-colors ${
-        isActive ? 'bg-blue-50/20' : 'hover:bg-gray-50/30'
+      className={`group grid grid-cols-[30px_1fr_5px_1fr] border-b border-border transition-colors ${
+        isActive ? 'bg-brand-soft/20' : 'hover:bg-muted/30'
       }`}
       onClick={() => onActivate(segment.segmentId)}
     >
-      <div className="px-0 py-1 border-r border-gray-200 bg-gray-50/50 flex items-start justify-center">
-        <div className="mt-1 text-[9px] font-medium text-gray-400 select-none">{rowNumber}</div>
+      <div className="px-0 py-1 border-r border-border bg-muted/50 flex items-start justify-center">
+        <div className="mt-1 text-[9px] font-medium text-text-faint select-none">{rowNumber}</div>
       </div>
 
       <div
-        className="px-2 py-2 border-r border-gray-200 bg-white relative"
+        className="px-2 py-2 border-r border-border bg-surface relative"
         onMouseEnter={() => setIsSourceHovered(true)}
         onMouseLeave={() => setIsSourceHovered(false)}
       >
-        <div className="w-full min-h-[44px] px-1 pr-3 py-1 text-[14px] font-sans text-gray-700 leading-relaxed whitespace-pre-wrap break-words select-text">
+        <div className="w-full min-h-[44px] px-1 pr-3 py-1 text-[14px] font-sans text-text-muted leading-relaxed whitespace-pre-wrap break-words select-text">
           {renderChunks(sourceHighlightChunks)}
         </div>
         {isSourceHovered && (
           <div className="absolute top-2 right-2">
             <button
               onClick={handleCopySourceToTarget}
-              className="p-1 rounded bg-white/75 border border-gray-200/80 hover:bg-blue-50/80 hover:border-blue-300 text-gray-500 hover:text-blue-600 transition-all shadow-sm"
+              className="p-1 rounded bg-surface/75 border border-border/80 hover:bg-brand-soft/80 hover:border-brand/40 text-text-muted hover:text-brand transition-all shadow-sm"
               title="Copy Source to Target"
               aria-label="Copy source to target"
             >
@@ -324,10 +324,10 @@ export const EditorRow: React.FC<EditorRowProps> = ({
       </div>
 
       <div
-        className="relative border-r border-gray-200 overflow-visible bg-gradient-to-b from-transparent via-gray-100/40 to-transparent"
+        className="relative border-r border-border overflow-visible bg-gradient-to-b from-transparent via-gray-100/40 to-transparent"
         title={statusTitle}
       >
-        <div className="absolute left-1/2  -translate-x-1/2 w-[4px]  bg-gray-300/45" />
+        <div className="absolute left-1/2  -translate-x-1/2 w-[4px]  bg-border/50" />
         <div
           className={`absolute left-1/2 top-0.5 bottom-0.5 -translate-x-1/2 w-[4px] ${statusLine}`}
         />
@@ -335,8 +335,8 @@ export const EditorRow: React.FC<EditorRowProps> = ({
 
       <div
         className={`px-2 py-2 relative ${
-          hasError ? 'bg-red-50/40' : hasWarning ? 'bg-amber-50/35' : 'bg-white'
-        } ${isActive ? 'ring-1 ring-inset ring-blue-300' : ''}`}
+          hasError ? 'bg-danger-soft/40' : hasWarning ? 'bg-warning-soft/35' : 'bg-surface'
+        } ${isActive ? 'ring-1 ring-inset ring-brand/50' : ''}`}
       >
         <textarea
           ref={textareaRef}
@@ -347,7 +347,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
           onKeyDown={handleTargetKeyDown}
           onDoubleClick={(e) => e.currentTarget.select()}
           spellCheck={false}
-          className={`relative z-10 w-full min-h-[44px] px-3 py-3 text-[14px] font-sans leading-relaxed bg-transparent outline-none resize-none overflow-hidden whitespace-pre-wrap break-words text-gray-800 ${
+          className={`relative z-10 w-full min-h-[44px] px-3 py-3 text-[14px] font-sans leading-relaxed bg-transparent outline-none resize-none overflow-hidden whitespace-pre-wrap break-words text-text ${
             !isActive ? 'pointer-events-none' : ''
           } ${!isActive ? 'caret-transparent' : ''}`}
         />
@@ -365,7 +365,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
                 e.stopPropagation();
                 setShowTagInsertionUI(!showTagInsertionUI);
               }}
-              className="p-1 rounded bg-white/75 border border-gray-200/80 hover:bg-blue-50/80 hover:border-blue-300 text-gray-500 hover:text-blue-600 transition-all shadow-sm"
+              className="p-1 rounded bg-surface/75 border border-border/80 hover:bg-brand-soft/80 hover:border-brand/40 text-text-muted hover:text-brand transition-all shadow-sm"
               title="Insert tags from source (Ctrl+Shift+1-9)"
               aria-label="Toggle tag insertion menu"
             >
@@ -395,8 +395,8 @@ export const EditorRow: React.FC<EditorRowProps> = ({
                 key={idx}
                 className={`text-[10px] flex items-center gap-1.5 px-2 py-0.5 rounded ${
                   issue.severity === 'error'
-                    ? 'bg-red-50 text-red-600'
-                    : 'bg-yellow-50 text-yellow-700'
+                    ? 'bg-danger-soft text-danger'
+                    : 'bg-warning-soft text-warning'
                 }`}
               >
                 <span className="font-bold uppercase text-[8px]">{issue.severity}:</span>
@@ -407,7 +407,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
         )}
 
         {saveError && (
-          <div className="mt-2 text-[10px] flex items-center gap-1.5 px-2 py-0.5 rounded bg-red-50 text-red-600">
+          <div className="mt-2 text-[10px] flex items-center gap-1.5 px-2 py-0.5 rounded bg-danger-soft text-danger">
             <span className="font-bold uppercase text-[8px]">save:</span>
             {saveError}
           </div>
@@ -418,7 +418,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
             <div
               onClick={(event) => void handleCopyContext(event)}
               title="Click to copy context"
-              className="text-[11px] text-gray-400 italic leading-snug cursor-copy hover:text-gray-500 transition-colors"
+              className="text-[11px] text-text-faint italic leading-snug cursor-copy hover:text-text-muted transition-colors"
             >
               {displayContext}
               {isLongContext && (
@@ -427,14 +427,14 @@ export const EditorRow: React.FC<EditorRowProps> = ({
                     e.stopPropagation();
                     setIsContextExpanded(!isContextExpanded);
                   }}
-                  className="ml-1 text-blue-500 hover:text-blue-700 font-medium not-italic"
+                  className="ml-1 text-brand hover:text-brand font-medium not-italic"
                 >
                   {isContextExpanded ? 'Collapse' : 'more'}
                 </button>
               )}
             </div>
             {contextCopied && (
-              <div className="mt-1 text-[10px] text-emerald-600 font-medium">Copied</div>
+              <div className="mt-1 text-[10px] text-success font-medium">Copied</div>
             )}
           </div>
         )}

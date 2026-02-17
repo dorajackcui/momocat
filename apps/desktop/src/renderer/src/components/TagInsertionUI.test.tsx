@@ -216,7 +216,7 @@ describe('TagInsertionUI', () => {
         'absolute',
         'top-full',
         'left-0',
-        'bg-white',
+        'bg-surface',
         'border',
         'rounded-md',
         'shadow-lg',
@@ -234,7 +234,7 @@ describe('TagInsertionUI', () => {
       );
 
       const capsule = screen.getByText('[1').closest('span');
-      expect(capsule).toHaveClass('bg-blue-100', 'text-blue-700', 'border-blue-200');
+      expect(capsule).toHaveClass('bg-brand-soft', 'text-brand', 'border-brand/30');
     });
   });
 });

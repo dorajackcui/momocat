@@ -1,4 +1,5 @@
 import { DEFAULT_PROJECT_QA_SETTINGS, ProjectQASettings, SEGMENT_QA_RULE_OPTIONS } from '@cat/core';
+import { Button, Card, Modal } from '../ui';
 
 interface ProjectQASettingsModalProps {
   isOpen: boolean;
@@ -33,42 +34,46 @@ export function ProjectQASettingsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4">
-      <div className="w-full max-w-lg rounded-xl bg-white border border-gray-200 shadow-xl p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold text-gray-900">QA Settings</h3>
-          <button
-            onClick={onClose}
-            className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700 rounded hover:bg-gray-100"
-          >
-            Close
-          </button>
-        </div>
-
-        <div className="space-y-3 mb-4">
-          {SEGMENT_QA_RULE_OPTIONS.map((rule) => {
-            const checked = current.enabledRuleIds.includes(rule.id);
-            return (
-              <label
-                key={rule.id}
-                className="flex items-start gap-3 rounded-lg border border-gray-200 p-3 cursor-pointer hover:bg-gray-50"
-              >
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      size="lg"
+      title="QA Settings"
+      footer={
+        <>
+          <Button variant="secondary" size="sm" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" size="sm" onClick={onSave} disabled={saving} loading={saving}>
+            Save
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        {SEGMENT_QA_RULE_OPTIONS.map((rule) => {
+          const checked = current.enabledRuleIds.includes(rule.id);
+          return (
+            <Card key={rule.id} variant="surface" className="p-3">
+              <label className="flex items-start gap-3 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={checked}
                   onChange={() => toggleRule(rule.id)}
-                  className="mt-0.5"
+                  className="mt-0.5 accent-brand"
                 />
                 <span>
-                  <span className="block text-sm font-semibold text-gray-800">{rule.label}</span>
-                  <span className="block text-xs text-gray-500">{rule.description}</span>
+                  <span className="block text-sm font-semibold text-text">{rule.label}</span>
+                  <span className="block text-xs text-text-muted">{rule.description}</span>
                 </span>
               </label>
-            );
-          })}
-        </div>
+            </Card>
+          );
+        })}
+      </div>
 
-        <label className="flex items-start gap-3 rounded-lg border border-gray-200 p-3 cursor-pointer hover:bg-gray-50">
+      <Card variant="subtle" className="p-3">
+        <label className="flex items-start gap-3 cursor-pointer">
           <input
             type="checkbox"
             checked={current.instantQaOnConfirm}
@@ -78,32 +83,16 @@ export function ProjectQASettingsModal({
                 instantQaOnConfirm: e.target.checked,
               })
             }
-            className="mt-0.5"
+            className="mt-0.5 accent-brand"
           />
           <span>
-            <span className="block text-sm font-semibold text-gray-800">Instant QA on Confirm</span>
-            <span className="block text-xs text-gray-500">
+            <span className="block text-sm font-semibold text-text">Instant QA on Confirm</span>
+            <span className="block text-xs text-text-muted">
               Run selected QA rules when confirming a segment in the editor.
             </span>
           </span>
         </label>
-
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onSave}
-            disabled={saving}
-            className="px-3 py-1.5 text-xs font-bold rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : 'Save'}
-          </button>
-        </div>
-      </div>
-    </div>
+      </Card>
+    </Modal>
   );
 }

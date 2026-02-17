@@ -63,21 +63,21 @@ export const ConcordancePanel: React.FC<ConcordancePanelProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-white border-l border-gray-200 w-80">
-      <div className="p-4 border-b border-gray-100 bg-gray-50/50">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
+    <div className="flex flex-col h-full bg-surface border-l border-border w-80">
+      <div className="p-4 border-b border-border/60 bg-muted/50">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-3">
           Concordance Search
         </h3>
         <form onSubmit={handleSearch} className="relative">
           <input
             ref={inputRef}
             type="text"
-            className="w-full pl-8 pr-3 py-1.5 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+            className="w-full pl-8 pr-3 py-1.5 text-sm bg-surface border border-border rounded-lg focus:ring-2 focus:ring-brand/20 outline-none transition-all"
             placeholder="Search TM..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400">
+          <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-faint">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -92,37 +92,37 @@ export const ConcordancePanel: React.FC<ConcordancePanelProps> = ({
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {isSearching ? (
-          <div className="text-center py-8 text-gray-400 text-xs italic">Searching...</div>
+          <div className="text-center py-8 text-text-faint text-xs italic">Searching...</div>
         ) : results.length > 0 ? (
           results.map((entry) => (
-            <div key={entry.id} className="group border-b border-gray-50 pb-4 last:border-0">
-              <div className="text-[13px] text-gray-700 mb-1.5 leading-snug">
+            <div key={entry.id} className="group border-b border-border/40 pb-4 last:border-0">
+              <div className="text-[13px] text-text-muted mb-1.5 leading-snug">
                 {serializeTokensToDisplayText(entry.sourceTokens)}
               </div>
-              <div className="text-[13px] text-blue-600 leading-snug italic">
+              <div className="text-[13px] text-brand leading-snug italic">
                 {serializeTokensToDisplayText(entry.targetTokens)}
               </div>
-              <div className="mt-2 flex items-center justify-between text-[10px] text-gray-400">
+              <div className="mt-2 flex items-center justify-between text-[10px] text-text-faint">
                 <div className="flex items-center gap-2">
                   <span
-                    className={`px-1 py-0.5 rounded-[3px] font-bold uppercase text-[8px] ${entry.tmType === 'working' ? 'bg-blue-50 text-blue-500' : 'bg-purple-50 text-purple-500'}`}
+                    className={`px-1 py-0.5 rounded-[3px] font-bold uppercase text-[8px] ${entry.tmType === 'working' ? 'bg-brand-soft text-brand' : 'bg-info-soft text-info'}`}
                   >
                     {entry.tmType === 'working' ? 'Working' : entry.tmName}
                   </span>
                   <span>Used {entry.usageCount} times</span>
                 </div>
-                <button className="text-blue-500 hover:underline opacity-0 group-hover:opacity-100 transition-opacity">
+                <button className="text-brand hover:underline opacity-0 group-hover:opacity-100 transition-opacity">
                   Apply
                 </button>
               </div>
             </div>
           ))
         ) : query ? (
-          <div className="text-center py-8 text-gray-400 text-xs">
+          <div className="text-center py-8 text-text-faint text-xs">
             No matches found for &quot;{query}&quot;
           </div>
         ) : (
-          <div className="text-center py-8 text-gray-400 text-xs italic">
+          <div className="text-center py-8 text-text-faint text-xs italic">
             Enter keywords to search across project memory.
           </div>
         )}

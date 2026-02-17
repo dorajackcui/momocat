@@ -69,7 +69,7 @@ export const TMPanel: React.FC<TMPanelProps> = ({ matches, termMatches, onApply,
 
   if (combined.length === 0) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-gray-400 p-6 text-center">
+      <div className="h-full flex flex-col items-center justify-center text-text-faint p-6 text-center">
         <div className="mb-2 text-2xl">🔍</div>
         <p className="text-xs">No TM/TB matches found for the current segment.</p>
       </div>
@@ -78,8 +78,8 @@ export const TMPanel: React.FC<TMPanelProps> = ({ matches, termMatches, onApply,
 
   return (
     <div className="h-full flex flex-col">
-      {/* <div className="px-2 py-2 border-b border-gray-100">
-        <span className="text-[10px] text-gray-400">{combined.length} matches found</span>
+      {/* <div className="px-2 py-2 border-b border-border/60">
+        <span className="text-[10px] text-text-faint">{combined.length} matches found</span>
       </div> */}
 
       <div className="flex-1 overflow-y-auto">
@@ -95,11 +95,11 @@ export const TMPanel: React.FC<TMPanelProps> = ({ matches, termMatches, onApply,
             : `Term Base: ${tbMatch!.tbName}`;
           const scoreBg = isTM
             ? tmMatch!.similarity >= 95
-              ? 'bg-emerald-600'
+              ? 'bg-success'
               : tmMatch!.similarity >= 85
-                ? 'bg-blue-600'
-                : 'bg-amber-600'
-            : 'bg-yellow-600';
+                ? 'bg-brand'
+                : 'bg-warning'
+            : 'bg-warning';
           const scoreText = isTM ? String(tmMatch!.similarity) : 'TB';
           const key = item.id;
           const sourceText = item.sourceText;
@@ -109,14 +109,14 @@ export const TMPanel: React.FC<TMPanelProps> = ({ matches, termMatches, onApply,
           const hasLongTarget = targetText.length > 180;
 
           return (
-            <div key={key} className="border-b border-gray-100 last:border-b-0">
-              <div className="px-2 py-1 flex items-center justify-between text-[9px] text-gray-400 bg-gray-50/40">
+            <div key={key} className="border-b border-border/60 last:border-b-0">
+              <div className="px-2 py-1 flex items-center justify-between text-[9px] text-text-faint bg-muted/40">
                 <span className="truncate">{tmLabel}</span>
                 <span>{isTM && ` · ${new Date(tmMatch!.updatedAt).toLocaleDateString()}`}</span>
               </div>
 
               <div
-                className="group grid grid-cols-[1fr_20px_1fr] items-stretch cursor-pointer hover:bg-blue-50/30 transition-colors"
+                className="group grid grid-cols-[1fr_20px_1fr] items-stretch cursor-pointer hover:bg-brand-soft/30 transition-colors"
                 onDoubleClick={() => {
                   if (isTM) {
                     onApply(tmMatch!.targetTokens);
@@ -126,7 +126,7 @@ export const TMPanel: React.FC<TMPanelProps> = ({ matches, termMatches, onApply,
                 }}
                 title="Double click to apply match"
               >
-                <div className="px-2 py-2 border-r border-gray-100 text-xs text-gray-600 leading-snug">
+                <div className="px-2 py-2 border-r border-border/60 text-xs text-text-muted leading-snug">
                   {isExpanded ? sourceText : truncate(sourceText, 170)}
                   {hasLongSource && (
                     <button
@@ -134,7 +134,7 @@ export const TMPanel: React.FC<TMPanelProps> = ({ matches, termMatches, onApply,
                         e.stopPropagation();
                         toggleExpanded(key);
                       }}
-                      className="ml-1 text-[10px] text-blue-500 hover:underline"
+                      className="ml-1 text-[10px] text-brand hover:underline"
                     >
                       {isExpanded ? 'less' : '...'}
                     </button>
@@ -147,7 +147,7 @@ export const TMPanel: React.FC<TMPanelProps> = ({ matches, termMatches, onApply,
                   </span>
                 </div>
 
-                <div className="px-2 py-2 border-l border-gray-100 text-xs text-gray-800 leading-snug">
+                <div className="px-2 py-2 border-l border-border/60 text-xs text-text leading-snug">
                   {isExpanded ? targetText : truncate(targetText, 300)}
                   {hasLongTarget && (
                     <button
@@ -155,7 +155,7 @@ export const TMPanel: React.FC<TMPanelProps> = ({ matches, termMatches, onApply,
                         e.stopPropagation();
                         toggleExpanded(key);
                       }}
-                      className="ml-1 text-[10px] text-blue-500 hover:underline not-italic"
+                      className="ml-1 text-[10px] text-brand hover:underline not-italic"
                     >
                       {isExpanded ? 'less' : '...'}
                     </button>
