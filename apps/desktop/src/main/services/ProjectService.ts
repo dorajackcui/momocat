@@ -122,6 +122,10 @@ export class ProjectService {
         this.segmentService,
         aiTransport,
         new ProxySettingsManager(),
+        {
+          tmService,
+          tbService,
+        },
       );
 
     try {

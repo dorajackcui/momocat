@@ -46,6 +46,57 @@ describe('ai-prompt templates', () => {
     expect(prompt).toContain('Context: UI label');
   });
 
+  it('builds translation user prompt with TM and TB references', () => {
+    const prompt = buildAIUserPrompt('translation', {
+      srcLang: 'en',
+      sourcePayload: 'Hello world',
+      hasProtectedMarkers: false,
+      context: 'UI label',
+      tmReference: {
+        similarity: 98,
+        tmName: 'Main TM',
+        sourceText: 'Hello world',
+        targetText: '你好世界',
+      },
+      tbReferences: [
+        { srcTerm: 'world', tgtTerm: '世界' },
+        { srcTerm: 'hello', tgtTerm: '你好', note: 'prefer short form' },
+      ],
+    });
+
+    expect(prompt).toContain('TM Reference (best match):');
+    expect(prompt).toContain('- Similarity: 98% | TM: Main TM');
+    expect(prompt).toContain('- Source: Hello world');
+    expect(prompt).toContain('- Target: 你好世界');
+    expect(prompt).toContain('Terminology References (hit terms):');
+    expect(prompt).toContain('- world => 世界');
+    expect(prompt).toContain('- hello => 你好 (note: prefer short form)');
+  });
+
+  it('does not include TM/TB sections when translation references are absent', () => {
+    const prompt = buildAIUserPrompt('translation', {
+      srcLang: 'en',
+      sourcePayload: 'Hello world',
+      hasProtectedMarkers: false,
+      context: 'UI label',
+    });
+
+    expect(prompt).not.toContain('TM Reference (best match):');
+    expect(prompt).not.toContain('Terminology References (hit terms):');
+  });
+
+  it('does not include context line for translation user prompt when context is empty', () => {
+    const prompt = buildAIUserPrompt('translation', {
+      srcLang: 'en',
+      sourcePayload: 'Hello world',
+      hasProtectedMarkers: false,
+      context: '   ',
+    });
+
+    expect(prompt).toContain('Source (en):');
+    expect(prompt).not.toContain('Context:');
+  });
+
   it('builds review user prompt with validation feedback', () => {
     const prompt = buildAIUserPrompt('review', {
       srcLang: 'en',

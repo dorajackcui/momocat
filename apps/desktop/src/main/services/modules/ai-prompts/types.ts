@@ -4,10 +4,25 @@ export interface SystemPromptBuildParams {
   projectPrompt?: string;
 }
 
+export interface PromptTMReference {
+  similarity: number;
+  tmName: string;
+  sourceText: string;
+  targetText: string;
+}
+
+export interface PromptTBReference {
+  srcTerm: string;
+  tgtTerm: string;
+  note?: string | null;
+}
+
 export interface UserPromptBuildParams {
   srcLang: string;
   sourcePayload: string;
   hasProtectedMarkers: boolean;
   context?: string;
   validationFeedback?: string;
+  tmReference?: PromptTMReference;
+  tbReferences?: PromptTBReference[];
 }

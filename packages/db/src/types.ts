@@ -4,8 +4,17 @@ export type TMType = 'working' | 'main';
 
 export type ProjectListRecord = Project;
 
+export interface FileSegmentStatusStats {
+  totalSegments: number;
+  qaProblemSegments: number;
+  confirmedSegmentsForBar: number;
+  inProgressSegments: number;
+  newSegments: number;
+}
+
 export type ProjectFileRecord = ProjectFile & {
   importOptionsJson?: string | null;
+  segmentStatusStats?: FileSegmentStatusStats;
 };
 
 export interface TMRecord {

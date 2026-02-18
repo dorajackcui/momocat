@@ -36,7 +36,28 @@ export function buildTranslationUserPrompt(params: UserPromptBuildParams): strin
   ];
 
   const contextText = typeof params.context === 'string' ? params.context.trim() : '';
-  userParts.push('', `Context: ${contextText}`);
+  if (contextText) {
+    userParts.push('', `Context: ${contextText}`);
+  }
+
+  if (params.tmReference) {
+    userParts.push(
+      '',
+      'TM Reference (best match):',
+      `- Similarity: ${params.tmReference.similarity}% | TM: ${params.tmReference.tmName}`,
+      `- Source: ${params.tmReference.sourceText}`,
+      `- Target: ${params.tmReference.targetText}`,
+    );
+  }
+
+  if (params.tbReferences && params.tbReferences.length > 0) {
+    userParts.push('', 'Terminology References (hit terms):');
+    for (const reference of params.tbReferences) {
+      const note = typeof reference.note === 'string' ? reference.note.trim() : '';
+      const noteSuffix = note ? ` (note: ${note})` : '';
+      userParts.push(`- ${reference.srcTerm} => ${reference.tgtTerm}${noteSuffix}`);
+    }
+  }
 
   if (params.validationFeedback) {
     userParts.push('', 'Validation feedback from previous attempt:', params.validationFeedback);

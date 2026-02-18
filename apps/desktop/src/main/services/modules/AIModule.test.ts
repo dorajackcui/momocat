@@ -4,6 +4,8 @@ import { AIModule } from './AIModule';
 import { AITransport, ProjectRepository, SegmentRepository, SettingsRepository } from '../ports';
 import type { ProxySettingsApplier } from '../proxy/ProxySettingsManager';
 import { SegmentService } from '../SegmentService';
+import type { TBService } from '../TBService';
+import type { TMService } from '../TMService';
 
 function createSegment(params: {
   segmentId: string;
@@ -146,6 +148,290 @@ describe('AIModule.aiTranslateFile', () => {
     expect(userPrompt).toContain('Context: UI button label');
   });
 
+  it('injects TM/TB references into translation user prompt', async () => {
+    const segments: Segment[] = [
+      createSegment({ segmentId: 'ref-1', sourceText: 'Hello world', context: 'UI button label' }),
+    ];
+
+    const projectRepo = {
+      getFile: vi.fn().mockReturnValue({ id: 1, projectId: 11, name: 'demo.xlsx' }),
+      getProject: vi.fn().mockReturnValue({
+        id: 11,
+        srcLang: 'en',
+        tgtLang: 'zh',
+        aiPrompt: '',
+        aiTemperature: 0.2,
+      }),
+    } as unknown as ProjectRepository;
+
+    const segmentRepo = {
+      getSegmentsPage: vi.fn().mockReturnValue(segments),
+    } as unknown as SegmentRepository;
+
+    const settingsRepo = {
+      getSetting: vi.fn().mockReturnValue('test-api-key'),
+    } as unknown as SettingsRepository;
+
+    const segmentService = {
+      updateSegment: vi.fn().mockResolvedValue(undefined),
+    } as unknown as SegmentService;
+
+    const transport = {
+      testConnection: vi.fn().mockResolvedValue({ ok: true }),
+      chatCompletions: vi.fn().mockResolvedValue({
+        content: '你好世界',
+        status: 200,
+        endpoint: '/v1/chat/completions',
+      }),
+    } as unknown as AITransport;
+
+    const tmService = {
+      findMatches: vi.fn().mockResolvedValue([
+        {
+          similarity: 100,
+          tmName: 'Main TM',
+          sourceTokens: [{ type: 'text', content: 'Hello world' }],
+          targetTokens: [{ type: 'text', content: '你好世界' }],
+        },
+      ]),
+    } as unknown as Pick<TMService, 'findMatches'>;
+
+    const tbService = {
+      findMatches: vi.fn().mockResolvedValue([
+        { srcTerm: 'world', tgtTerm: '世界', note: null },
+        { srcTerm: 'hello', tgtTerm: '你好', note: 'prefer short form' },
+      ]),
+    } as unknown as Pick<TBService, 'findMatches'>;
+
+    const module = new AIModule(
+      projectRepo,
+      segmentRepo,
+      settingsRepo,
+      segmentService,
+      transport,
+      undefined,
+      { tmService, tbService },
+    );
+
+    await module.aiTranslateFile(1);
+
+    const userPrompt = (transport.chatCompletions as ReturnType<typeof vi.fn>).mock.calls[0][0]
+      .userPrompt;
+    expect(userPrompt).toContain('TM Reference (best match):');
+    expect(userPrompt).toContain('- Similarity: 100% | TM: Main TM');
+    expect(userPrompt).toContain('- Source: Hello world');
+    expect(userPrompt).toContain('- Target: 你好世界');
+    expect(userPrompt).toContain('Terminology References (hit terms):');
+    expect(userPrompt).toContain('- world => 世界');
+    expect(userPrompt).toContain('- hello => 你好 (note: prefer short form)');
+    expect(tmService.findMatches).toHaveBeenCalledTimes(1);
+    expect(tbService.findMatches).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps only top 5 TB references in translation prompt', async () => {
+    const segments: Segment[] = [createSegment({ segmentId: 'ref-2', sourceText: 'Hello world' })];
+
+    const projectRepo = {
+      getFile: vi.fn().mockReturnValue({ id: 1, projectId: 11, name: 'demo.xlsx' }),
+      getProject: vi.fn().mockReturnValue({
+        id: 11,
+        srcLang: 'en',
+        tgtLang: 'zh',
+        aiPrompt: '',
+        aiTemperature: 0.2,
+      }),
+    } as unknown as ProjectRepository;
+
+    const segmentRepo = {
+      getSegmentsPage: vi.fn().mockReturnValue(segments),
+    } as unknown as SegmentRepository;
+
+    const settingsRepo = {
+      getSetting: vi.fn().mockReturnValue('test-api-key'),
+    } as unknown as SettingsRepository;
+
+    const segmentService = {
+      updateSegment: vi.fn().mockResolvedValue(undefined),
+    } as unknown as SegmentService;
+
+    const transport = {
+      testConnection: vi.fn().mockResolvedValue({ ok: true }),
+      chatCompletions: vi.fn().mockResolvedValue({
+        content: '你好世界',
+        status: 200,
+        endpoint: '/v1/chat/completions',
+      }),
+    } as unknown as AITransport;
+
+    const tmService = {
+      findMatches: vi.fn().mockResolvedValue([]),
+    } as unknown as Pick<TMService, 'findMatches'>;
+
+    const tbService = {
+      findMatches: vi.fn().mockResolvedValue([
+        { srcTerm: 't1', tgtTerm: 'v1', note: null },
+        { srcTerm: 't2', tgtTerm: 'v2', note: null },
+        { srcTerm: 't3', tgtTerm: 'v3', note: null },
+        { srcTerm: 't4', tgtTerm: 'v4', note: null },
+        { srcTerm: 't5', tgtTerm: 'v5', note: null },
+        { srcTerm: 't6', tgtTerm: 'v6', note: null },
+      ]),
+    } as unknown as Pick<TBService, 'findMatches'>;
+
+    const module = new AIModule(
+      projectRepo,
+      segmentRepo,
+      settingsRepo,
+      segmentService,
+      transport,
+      undefined,
+      { tmService, tbService },
+    );
+
+    await module.aiTranslateFile(1);
+
+    const userPrompt = (transport.chatCompletions as ReturnType<typeof vi.fn>).mock.calls[0][0]
+      .userPrompt;
+    expect(userPrompt).toContain('- t1 => v1');
+    expect(userPrompt).toContain('- t5 => v5');
+    expect(userPrompt).not.toContain('- t6 => v6');
+  });
+
+  it('does not resolve TM/TB references for review and custom projects', async () => {
+    const tmService = {
+      findMatches: vi.fn().mockResolvedValue([]),
+    } as unknown as Pick<TMService, 'findMatches'>;
+    const tbService = {
+      findMatches: vi.fn().mockResolvedValue([]),
+    } as unknown as Pick<TBService, 'findMatches'>;
+
+    const runCase = async (projectType: 'review' | 'custom') => {
+      const segments: Segment[] = [
+        createSegment({ segmentId: `${projectType}-ref-1`, sourceText: 'Source text' }),
+      ];
+      const projectRepo = {
+        getFile: vi.fn().mockReturnValue({ id: 1, projectId: 11, name: 'demo.xlsx' }),
+        getProject: vi.fn().mockReturnValue({
+          id: 11,
+          srcLang: 'en',
+          tgtLang: 'zh',
+          projectType,
+          aiPrompt: '',
+          aiTemperature: 0.2,
+        }),
+      } as unknown as ProjectRepository;
+      const segmentRepo = {
+        getSegmentsPage: vi.fn().mockReturnValue(segments),
+      } as unknown as SegmentRepository;
+      const settingsRepo = {
+        getSetting: vi.fn().mockReturnValue('test-api-key'),
+      } as unknown as SettingsRepository;
+      const segmentService = {
+        updateSegment: vi.fn().mockResolvedValue(undefined),
+      } as unknown as SegmentService;
+      const transport = {
+        testConnection: vi.fn().mockResolvedValue({ ok: true }),
+        chatCompletions: vi.fn().mockResolvedValue({
+          content: '处理结果',
+          status: 200,
+          endpoint: '/v1/chat/completions',
+        }),
+      } as unknown as AITransport;
+
+      const module = new AIModule(
+        projectRepo,
+        segmentRepo,
+        settingsRepo,
+        segmentService,
+        transport,
+        undefined,
+        { tmService, tbService },
+      );
+      await module.aiTranslateFile(1);
+    };
+
+    await runCase('review');
+    await runCase('custom');
+
+    expect(tmService.findMatches).toHaveBeenCalledTimes(0);
+    expect(tbService.findMatches).toHaveBeenCalledTimes(0);
+  });
+
+  it('continues translation when TM/TB reference resolving fails', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const segments: Segment[] = [
+      createSegment({ segmentId: 'ref-fail-1', sourceText: 'Hello world' }),
+    ];
+
+    const projectRepo = {
+      getFile: vi.fn().mockReturnValue({ id: 1, projectId: 11, name: 'demo.xlsx' }),
+      getProject: vi.fn().mockReturnValue({
+        id: 11,
+        srcLang: 'en',
+        tgtLang: 'zh',
+        aiPrompt: '',
+        aiTemperature: 0.2,
+      }),
+    } as unknown as ProjectRepository;
+
+    const segmentRepo = {
+      getSegmentsPage: vi.fn().mockReturnValue(segments),
+    } as unknown as SegmentRepository;
+
+    const settingsRepo = {
+      getSetting: vi.fn().mockReturnValue('test-api-key'),
+    } as unknown as SettingsRepository;
+
+    const segmentService = {
+      updateSegment: vi.fn().mockResolvedValue(undefined),
+    } as unknown as SegmentService;
+
+    const transport = {
+      testConnection: vi.fn().mockResolvedValue({ ok: true }),
+      chatCompletions: vi.fn().mockResolvedValue({
+        content: '你好世界',
+        status: 200,
+        endpoint: '/v1/chat/completions',
+      }),
+    } as unknown as AITransport;
+
+    const tmService = {
+      findMatches: vi.fn().mockRejectedValue(new Error('tm lookup failed')),
+    } as unknown as Pick<TMService, 'findMatches'>;
+    const tbService = {
+      findMatches: vi.fn().mockRejectedValue(new Error('tb lookup failed')),
+    } as unknown as Pick<TBService, 'findMatches'>;
+
+    try {
+      const module = new AIModule(
+        projectRepo,
+        segmentRepo,
+        settingsRepo,
+        segmentService,
+        transport,
+        undefined,
+        { tmService, tbService },
+      );
+      const result = await module.aiTranslateFile(1);
+
+      expect(result.translated).toBe(1);
+      expect(result.failed).toBe(0);
+      expect(segmentService.updateSegment).toHaveBeenCalledTimes(1);
+      const userPrompt = (transport.chatCompletions as ReturnType<typeof vi.fn>).mock.calls[0][0]
+        .userPrompt;
+      expect(userPrompt).not.toContain('TM Reference (best match):');
+      expect(userPrompt).not.toContain('Terminology References (hit terms):');
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to resolve TM reference for segment ref-fail-1'),
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to resolve TB references for segment ref-fail-1'),
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
   it('uses project-level aiModel for file translation', async () => {
     const segments: Segment[] = [
       createSegment({ segmentId: 'model-1', sourceText: 'Hello world' }),
@@ -281,7 +567,7 @@ describe('AIModule.aiTranslateFile', () => {
     expect(request.model).toBe(DEFAULT_PROJECT_AI_MODEL);
   });
 
-  it('keeps context field in user prompt when imported context is missing', async () => {
+  it('omits context field in user prompt when imported context is missing', async () => {
     const segments: Segment[] = [
       createSegment({ segmentId: 'ctx-empty-1', sourceText: 'Hello world' }),
     ];
@@ -329,7 +615,7 @@ describe('AIModule.aiTranslateFile', () => {
 
     const userPrompt = (transport.chatCompletions as ReturnType<typeof vi.fn>).mock.calls[0][0]
       .userPrompt;
-    expect(userPrompt).toContain('Context: ');
+    expect(userPrompt).not.toContain('Context:');
   });
 
   it('keeps review language instruction when custom review prompt is provided', async () => {

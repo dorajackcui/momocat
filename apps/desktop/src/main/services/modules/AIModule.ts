@@ -15,12 +15,15 @@ import type { ProxySettings, ProxySettingsInput } from '../../../shared/ipc';
 import { AITransport, ProjectRepository, SegmentRepository, SettingsRepository } from '../ports';
 import { ProxySettingsApplier, ProxySettingsManager } from '../proxy/ProxySettingsManager';
 import { SegmentService } from '../SegmentService';
+import type { TBService } from '../TBService';
+import type { TMService } from '../TMService';
 import {
   buildAISystemPrompt,
   buildAIUserPrompt,
   getAIProgressVerb,
   normalizeProjectType,
 } from './ai-prompts';
+import type { PromptTBReference, PromptTMReference } from './ai-prompts/types';
 
 interface TranslateDebugMeta {
   requestId?: string;
@@ -29,6 +32,16 @@ interface TranslateDebugMeta {
   model?: string;
   rawResponseText?: string;
   responseContent?: string;
+}
+
+interface PromptReferenceResolvers {
+  tmService?: Pick<TMService, 'findMatches'>;
+  tbService?: Pick<TBService, 'findMatches'>;
+}
+
+interface TranslationPromptReferences {
+  tmReference?: PromptTMReference;
+  tbReferences?: PromptTBReference[];
 }
 
 export class AIModule {
@@ -45,6 +58,7 @@ export class AIModule {
     private readonly segmentService: SegmentService,
     private readonly transport: AITransport,
     private readonly proxySettingsManager: ProxySettingsApplier = new ProxySettingsManager(),
+    private readonly promptReferenceResolvers: PromptReferenceResolvers = {},
   ) {}
 
   public getAISettings(): { apiKeySet: boolean; apiKeyLast4?: string } {
@@ -150,6 +164,10 @@ export class AIModule {
       );
       const context = seg.meta?.context ? String(seg.meta.context).trim() : '';
       const aiStatus: SegmentStatus = projectType === 'review' ? 'reviewed' : 'translated';
+      const promptReferences =
+        projectType === 'translation'
+          ? await this.resolveTranslationPromptReferences(file.projectId, seg)
+          : {};
 
       try {
         const targetTokens = await this.translateSegment({
@@ -164,6 +182,8 @@ export class AIModule {
           sourceText,
           sourceTagPreservedText,
           context,
+          tmReference: promptReferences.tmReference,
+          tbReferences: promptReferences.tbReferences,
         });
 
         await this.segmentService.updateSegment(seg.segmentId, targetTokens, aiStatus);
@@ -267,6 +287,8 @@ export class AIModule {
     sourceText: string;
     sourceTagPreservedText: string;
     context?: string;
+    tmReference?: PromptTMReference;
+    tbReferences?: PromptTBReference[];
   }): Promise<Token[]> {
     const maxAttempts = 3;
     let validationFeedback: string | undefined;
@@ -284,6 +306,8 @@ export class AIModule {
         sourceText: params.sourceText,
         sourceTagPreservedText: params.sourceTagPreservedText,
         context: params.context,
+        tmReference: params.tmReference,
+        tbReferences: params.tbReferences,
         validationFeedback,
         allowUnchanged: normalizedType === 'review' || normalizedType === 'custom',
       });
@@ -326,6 +350,8 @@ export class AIModule {
     sourceText: string;
     sourceTagPreservedText?: string;
     context?: string;
+    tmReference?: PromptTMReference;
+    tbReferences?: PromptTBReference[];
     validationFeedback?: string;
     debug?: TranslateDebugMeta;
     allowUnchanged?: boolean;
@@ -346,6 +372,8 @@ export class AIModule {
       sourcePayload,
       hasProtectedMarkers,
       context: params.context,
+      tmReference: params.tmReference,
+      tbReferences: params.tbReferences,
       validationFeedback: params.validationFeedback,
     });
 
@@ -422,6 +450,59 @@ export class AIModule {
 
   private readStoredProxyUrl(): string {
     return this.settingsRepo.getSetting(AIModule.PROXY_URL_KEY)?.trim() ?? '';
+  }
+
+  private async resolveTranslationPromptReferences(
+    projectId: number,
+    segment: Segment,
+  ): Promise<TranslationPromptReferences> {
+    const references: TranslationPromptReferences = {};
+
+    if (this.promptReferenceResolvers.tmService) {
+      try {
+        const tmMatches = await this.promptReferenceResolvers.tmService.findMatches(
+          projectId,
+          segment,
+        );
+        const bestMatch = tmMatches[0];
+        if (bestMatch) {
+          references.tmReference = {
+            similarity: bestMatch.similarity,
+            tmName: bestMatch.tmName,
+            sourceText: serializeTokensToDisplayText(bestMatch.sourceTokens),
+            targetText: serializeTokensToDisplayText(bestMatch.targetTokens),
+          };
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(
+          `[AIModule] Failed to resolve TM reference for segment ${segment.segmentId}: ${message}`,
+        );
+      }
+    }
+
+    if (this.promptReferenceResolvers.tbService) {
+      try {
+        const tbMatches = await this.promptReferenceResolvers.tbService.findMatches(
+          projectId,
+          segment,
+        );
+        if (tbMatches.length > 0) {
+          references.tbReferences = tbMatches.slice(0, 5).map((match) => ({
+            srcTerm: match.srcTerm,
+            tgtTerm: match.tgtTerm,
+            note: match.note ?? null,
+          }));
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(
+          `[AIModule] Failed to resolve TB references for segment ${segment.segmentId}: ${message}`,
+        );
+      }
+    }
+
+    return references;
   }
 
   private isTranslatableSegment(segment: Segment): boolean {

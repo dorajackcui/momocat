@@ -168,6 +168,117 @@ describe("CATDatabase", () => {
     expect(file?.confirmedSegments).toBe(1);
   });
 
+  it("should include per-file segment status stats for progress bar rendering", () => {
+    const projectId = db.createProject("File Status Stats Project", "en", "zh");
+    const fileId = db.createFile(projectId, "status-breakdown.xlsx");
+
+    db.bulkInsertSegments([
+      {
+        segmentId: "s-new",
+        fileId,
+        orderIndex: 0,
+        sourceTokens: [{ type: "text", content: "new" }],
+        targetTokens: [],
+        status: "new",
+        tagsSignature: "",
+        matchKey: "new",
+        srcHash: "hash-new",
+        meta: { updatedAt: new Date().toISOString() },
+      },
+      {
+        segmentId: "s-draft",
+        fileId,
+        orderIndex: 1,
+        sourceTokens: [{ type: "text", content: "draft" }],
+        targetTokens: [{ type: "text", content: "草稿" }],
+        status: "draft",
+        tagsSignature: "",
+        matchKey: "draft",
+        srcHash: "hash-draft",
+        meta: { updatedAt: new Date().toISOString() },
+      },
+      {
+        segmentId: "s-translated",
+        fileId,
+        orderIndex: 2,
+        sourceTokens: [{ type: "text", content: "translated" }],
+        targetTokens: [{ type: "text", content: "已翻译" }],
+        status: "translated",
+        tagsSignature: "",
+        matchKey: "translated",
+        srcHash: "hash-translated",
+        meta: { updatedAt: new Date().toISOString() },
+      },
+      {
+        segmentId: "s-reviewed",
+        fileId,
+        orderIndex: 3,
+        sourceTokens: [{ type: "text", content: "reviewed" }],
+        targetTokens: [{ type: "text", content: "已润色" }],
+        status: "reviewed",
+        tagsSignature: "",
+        matchKey: "reviewed",
+        srcHash: "hash-reviewed",
+        meta: { updatedAt: new Date().toISOString() },
+      },
+      {
+        segmentId: "s-confirmed",
+        fileId,
+        orderIndex: 4,
+        sourceTokens: [{ type: "text", content: "confirmed" }],
+        targetTokens: [{ type: "text", content: "已确认" }],
+        status: "confirmed",
+        tagsSignature: "",
+        matchKey: "confirmed",
+        srcHash: "hash-confirmed",
+        meta: { updatedAt: new Date().toISOString() },
+      },
+      {
+        segmentId: "s-qa-problem",
+        fileId,
+        orderIndex: 5,
+        sourceTokens: [{ type: "text", content: "qa" }],
+        targetTokens: [{ type: "text", content: "有问题" }],
+        status: "draft",
+        tagsSignature: "",
+        matchKey: "qa",
+        srcHash: "hash-qa",
+        meta: { updatedAt: new Date().toISOString() },
+        qaIssues: [{ ruleId: "tag-order", severity: "warning", message: "order mismatch" }],
+      },
+      {
+        segmentId: "s-confirmed-qa-problem",
+        fileId,
+        orderIndex: 6,
+        sourceTokens: [{ type: "text", content: "confirmed-qa" }],
+        targetTokens: [{ type: "text", content: "确认但有问题" }],
+        status: "confirmed",
+        tagsSignature: "",
+        matchKey: "confirmed-qa",
+        srcHash: "hash-confirmed-qa",
+        meta: { updatedAt: new Date().toISOString() },
+        qaIssues: [{ ruleId: "tag-missing", severity: "error", message: "missing tag" }],
+      },
+    ]);
+
+    const files = db.listFiles(projectId);
+    expect(files).toHaveLength(1);
+    const stats = files[0].segmentStatusStats;
+    expect(stats).toBeDefined();
+    expect(stats?.totalSegments).toBe(7);
+    expect(stats?.qaProblemSegments).toBe(2);
+    expect(stats?.confirmedSegmentsForBar).toBe(1);
+    expect(stats?.inProgressSegments).toBe(3);
+    expect(stats?.newSegments).toBe(1);
+
+    const totalFromBuckets =
+      (stats?.qaProblemSegments ?? 0) +
+      (stats?.confirmedSegmentsForBar ?? 0) +
+      (stats?.inProgressSegments ?? 0) +
+      (stats?.newSegments ?? 0);
+    expect(totalFromBuckets).toBe(stats?.totalSegments);
+  });
+
   it("should persist qa issues and clear them after segment update", () => {
     const projectId = db.createProject("QA Cache Project", "en", "zh");
     const fileId = db.createFile(projectId, "qa-cache.xlsx");

@@ -2,6 +2,7 @@ import { ProjectFile, ProjectType } from '@cat/core';
 import { ProjectAIController } from '../../hooks/projectDetail/useProjectAI';
 import { Button, Card, IconButton } from '../ui';
 import { ProjectAIPane } from './ProjectAIPane';
+import { deriveFileProgressBuckets, toPercent } from './fileProgressStats';
 
 interface ProjectFilesPaneProps {
   files: ProjectFile[];
@@ -44,10 +45,8 @@ export function ProjectFilesPane({
       ) : (
         <div className="space-y-4">
           {files.map((file) => {
-            const progress =
-              file.totalSegments === 0
-                ? 0
-                : Math.round((file.confirmedSegments / file.totalSegments) * 100);
+            const progressBuckets = deriveFileProgressBuckets(file);
+            const progress = toPercent(progressBuckets);
             const job = ai.getFileJob(file.id);
             const jobRunning = job?.status === 'running';
 
@@ -60,11 +59,23 @@ export function ProjectFilesPane({
                 <div className="flex-1 cursor-pointer" onClick={() => onOpenFile(file.id)}>
                   <h4 className="font-bold text-text group-hover:text-brand">{file.name}</h4>
                   <div className="flex items-center gap-4 mt-1">
-                    <div className="w-32 h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-success" style={{ width: `${progress}%` }} />
+                    <div className="w-32 h-1.5 bg-muted rounded-full overflow-hidden flex">
+                      <div
+                        className="h-full bg-danger"
+                        style={{ width: `${progress.qaProblemPct}%` }}
+                      />
+                      <div
+                        className="h-full bg-success"
+                        style={{ width: `${progress.confirmedPct}%` }}
+                      />
+                      <div
+                        className="h-full bg-warning"
+                        style={{ width: `${progress.inProgressPct}%` }}
+                      />
                     </div>
                     <span className="text-[10px] text-text-faint font-medium">
-                      {progress}% ({file.confirmedSegments}/{file.totalSegments})
+                      {progress.confirmedDisplayPct}% ({progressBuckets.confirmedSegmentsForBar}/
+                      {progressBuckets.totalSegments})
                     </span>
                   </div>
                   {job && (

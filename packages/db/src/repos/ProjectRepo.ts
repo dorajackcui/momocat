@@ -7,7 +7,13 @@ import {
   ProjectType,
 } from '@cat/core';
 import { randomUUID } from 'crypto';
-import type { ProjectFileRecord } from '../types';
+import type { FileSegmentStatusStats, ProjectFileRecord } from '../types';
+
+interface FileWithSegmentStatsRow extends Omit<ProjectFileRecord, 'segmentStatusStats'> {
+  qaProblemSegments?: number | null;
+  confirmedSegmentsForBar?: number | null;
+  inProgressSegments?: number | null;
+}
 
 export class ProjectRepo {
   constructor(private readonly db: Database.Database) {}
@@ -123,7 +129,67 @@ export class ProjectRepo {
   }
 
   public listFiles(projectId: number): ProjectFileRecord[] {
-    return this.db.prepare('SELECT * FROM files WHERE projectId = ? ORDER BY createdAt DESC').all(projectId) as ProjectFileRecord[];
+    const rows = this.db
+      .prepare(
+        `
+        SELECT
+          f.*,
+          COALESCE(s.qaProblemSegments, 0) as qaProblemSegments,
+          COALESCE(s.confirmedSegmentsForBar, 0) as confirmedSegmentsForBar,
+          COALESCE(s.inProgressSegments, 0) as inProgressSegments
+        FROM files f
+        LEFT JOIN (
+          SELECT
+            fileId,
+            SUM(CASE WHEN qaIssuesJson IS NOT NULL AND qaIssuesJson <> '' AND qaIssuesJson <> '[]' THEN 1 ELSE 0 END) as qaProblemSegments,
+            SUM(CASE
+              WHEN status = 'confirmed' AND (qaIssuesJson IS NULL OR qaIssuesJson = '' OR qaIssuesJson = '[]')
+              THEN 1
+              ELSE 0
+            END) as confirmedSegmentsForBar,
+            SUM(CASE
+              WHEN status IN ('draft', 'translated', 'reviewed') AND (qaIssuesJson IS NULL OR qaIssuesJson = '' OR qaIssuesJson = '[]')
+              THEN 1
+              ELSE 0
+            END) as inProgressSegments
+          FROM segments
+          GROUP BY fileId
+        ) s ON s.fileId = f.id
+        WHERE f.projectId = ?
+        ORDER BY f.createdAt DESC
+        `,
+      )
+      .all(projectId) as FileWithSegmentStatsRow[];
+
+    return rows.map((row) => {
+      const qaProblemSegments = Math.max(0, Number(row.qaProblemSegments ?? 0));
+      const confirmedSegmentsForBar = Math.max(0, Number(row.confirmedSegmentsForBar ?? 0));
+      const inProgressSegments = Math.max(0, Number(row.inProgressSegments ?? 0));
+      const newSegments = Math.max(
+        0,
+        row.totalSegments - qaProblemSegments - confirmedSegmentsForBar - inProgressSegments,
+      );
+      const segmentStatusStats: FileSegmentStatusStats = {
+        totalSegments: row.totalSegments,
+        qaProblemSegments,
+        confirmedSegmentsForBar,
+        inProgressSegments,
+        newSegments,
+      };
+
+      return {
+        id: row.id,
+        uuid: row.uuid,
+        projectId: row.projectId,
+        name: row.name,
+        totalSegments: row.totalSegments,
+        confirmedSegments: row.confirmedSegments,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        importOptionsJson: row.importOptionsJson ?? null,
+        segmentStatusStats,
+      };
+    });
   }
 
   public getFile(id: number): ProjectFileRecord | undefined {

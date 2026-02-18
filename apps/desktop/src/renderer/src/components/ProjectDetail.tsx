@@ -12,6 +12,7 @@ import { ProjectFilesPane } from './project-detail/ProjectFilesPane';
 import { ProjectTMPane } from './project-detail/ProjectTMPane';
 import { ProjectTBPane } from './project-detail/ProjectTBPane';
 import { ProjectQASettingsModal } from './project-detail/ProjectQASettingsModal';
+import { runFileQaWithRefresh } from './project-detail/runFileQaWithRefresh';
 
 interface ProjectDetailProps {
   projectId: number;
@@ -224,7 +225,12 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
 
   const handleRunFileQA = async (fileId: number, fileName: string) => {
     try {
-      const report = await runMutation(async () => apiClient.runFileQA(fileId));
+      const report = await runFileQaWithRefresh({
+        fileId,
+        runMutation,
+        runFileQA: (nextFileId: number) => apiClient.runFileQA(nextFileId),
+        loadData,
+      });
       if (report.errorCount === 0 && report.warningCount === 0) {
         feedbackService.success(
           `QA passed for "${fileName}" (${report.checkedSegments} segments).`,
