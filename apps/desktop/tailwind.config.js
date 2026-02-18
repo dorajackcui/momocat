@@ -55,7 +55,14 @@ module.exports = {
         focus: 'var(--shadow-focus)',
       },
       fontFamily: {
-        sans: ['"Avenir Next"', '"Segoe UI"', '"PingFang SC"', '"Noto Sans CJK SC"', 'sans-serif'],
+        sans: [
+          '"Source Sans 3"',
+          '"Noto Sans"',
+          '"Segoe UI"',
+          '"PingFang SC"',
+          '"Noto Sans CJK SC"',
+          'sans-serif',
+        ],
       },
     },
   },

@@ -31,6 +31,7 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [isSearchInputFocused, setIsSearchInputFocused] = useState(false);
   const [manualActivationSegmentId, setManualActivationSegmentId] = useState<string | null>(null);
+  const [suppressAutoFocusSegmentId, setSuppressAutoFocusSegmentId] = useState<string | null>(null);
   const layoutRef = useRef<HTMLDivElement>(null);
   const sourceSearchInputRef = useRef<HTMLInputElement>(null);
   const targetSearchInputRef = useRef<HTMLInputElement>(null);
@@ -107,13 +108,19 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
     requestAnimationFrame(syncSearchInputFocus);
   };
 
-  const handleRowActivate = (segmentId: string) => {
+  const handleRowActivate = (segmentId: string, options?: { autoFocusTarget?: boolean }) => {
     setManualActivationSegmentId(segmentId);
+    if (options?.autoFocusTarget === false) {
+      setSuppressAutoFocusSegmentId(segmentId);
+    } else {
+      setSuppressAutoFocusSegmentId(null);
+    }
     setActiveSegmentId(segmentId);
   };
 
   const handleRowAutoFocus = (segmentId: string) => {
     setManualActivationSegmentId((prev) => (prev === segmentId ? null : prev));
+    setSuppressAutoFocusSegmentId((prev) => (prev === segmentId ? null : prev));
   };
 
   useEffect(() => {
@@ -597,7 +604,8 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
                 rowNumber={item.segment.meta?.rowRef || item.originalIndex + 1}
                 isActive={item.segment.segmentId === activeSegmentId}
                 disableAutoFocus={
-                  isSearchInputFocused && manualActivationSegmentId !== item.segment.segmentId
+                  (isSearchInputFocused && manualActivationSegmentId !== item.segment.segmentId) ||
+                  suppressAutoFocusSegmentId === item.segment.segmentId
                 }
                 onActivate={handleRowActivate}
                 onAutoFocus={handleRowAutoFocus}

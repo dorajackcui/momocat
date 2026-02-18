@@ -12,7 +12,7 @@ interface EditorRowProps {
   sourceHighlightQuery?: string;
   targetHighlightQuery?: string;
   highlightMode?: EditorMatchMode;
-  onActivate: (id: string) => void;
+  onActivate: (id: string, options?: { autoFocusTarget?: boolean }) => void;
   onAutoFocus?: (id: string) => void;
   onChange: (id: string, value: string) => void;
   onConfirm: (id: string) => void;
@@ -174,6 +174,11 @@ export const EditorRow: React.FC<EditorRowProps> = ({
     });
   };
 
+  const handleSourceCellClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    onActivate(segment.segmentId, { autoFocusTarget: false });
+  };
+
   const handleTargetKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
@@ -277,6 +282,8 @@ export const EditorRow: React.FC<EditorRowProps> = ({
     [draftText, targetHighlightQuery, highlightMode],
   );
   const showTargetHighlightOverlay = targetHighlightQuery.trim().length > 0;
+  const targetTextLayerClass =
+    'w-full min-h-[36px] pl-1.5 pr-9 py-0.5 text-[14px] font-sans leading-normal whitespace-pre-wrap break-words';
 
   const renderChunks = useCallback(
     (chunks: ReturnType<typeof buildHighlightChunks>) =>
@@ -294,7 +301,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
 
   return (
     <div
-      className={`group grid grid-cols-[30px_1fr_5px_1fr] border-b border-border transition-colors ${
+      className={`group grid grid-cols-[30px_1fr_4px_1fr] border-b border-border transition-colors ${
         isActive ? 'bg-brand-soft/20' : 'hover:bg-muted/30'
       }`}
       onClick={() => onActivate(segment.segmentId)}
@@ -304,9 +311,10 @@ export const EditorRow: React.FC<EditorRowProps> = ({
       </div>
 
       <div
-        className="px-1.5 py-0.5 border-r border-border bg-surface relative"
+        className="px-1.5 py-0.5 bg-surface relative"
         onMouseEnter={() => setIsSourceHovered(true)}
         onMouseLeave={() => setIsSourceHovered(false)}
+        onClick={handleSourceCellClick}
       >
         <div className="w-full min-h-[36px] px-0.5 pr-1.5 py-0 text-[14px] font-sans text-text-muted leading-normal whitespace-pre-wrap break-words select-text">
           {renderChunks(sourceHighlightChunks)}
@@ -332,14 +340,8 @@ export const EditorRow: React.FC<EditorRowProps> = ({
         )}
       </div>
 
-      <div
-        className="relative border-r border-border overflow-visible bg-gradient-to-b from-transparent via-gray-100/40 to-transparent"
-        title={statusTitle}
-      >
-        <div className="absolute left-1/2  -translate-x-1/2 w-[4px]  bg-border/50" />
-        <div
-          className={`absolute left-1/2 top-0.5 bottom-0.5 -translate-x-1/2 w-[4px] ${statusLine}`}
-        />
+      <div className="relative overflow-visible" title={statusTitle}>
+        <div className={`absolute inset-0 w-full ${statusLine}`} />
       </div>
 
       <div
@@ -347,26 +349,31 @@ export const EditorRow: React.FC<EditorRowProps> = ({
           hasError ? 'bg-danger-soft/40' : hasWarning ? 'bg-warning-soft/35' : 'bg-surface'
         } ${isActive ? 'ring-1 ring-inset ring-brand/50' : ''}`}
       >
-        <textarea
-          ref={textareaRef}
-          value={draftText}
-          readOnly={!isActive}
-          onFocus={() => onActivate(segment.segmentId)}
-          onChange={(e) => emitTranslationChange(e.target.value)}
-          onInput={(e) => resizeTextarea(e.currentTarget)}
-          onKeyDown={handleTargetKeyDown}
-          onDoubleClick={(e) => e.currentTarget.select()}
-          spellCheck={false}
-          className={`relative z-10 w-full min-h-[36px] pl-1.5 pr-9 py-0.5 text-[14px] font-sans leading-normal bg-transparent outline-none resize-none overflow-hidden whitespace-pre-wrap break-words text-text ${
-            !isActive ? 'pointer-events-none' : ''
-          } ${!isActive ? 'caret-transparent' : ''}`}
-        />
+        <div className="relative">
+          <textarea
+            ref={textareaRef}
+            value={draftText}
+            readOnly={!isActive}
+            onFocus={() => onActivate(segment.segmentId)}
+            onChange={(e) => emitTranslationChange(e.target.value)}
+            onInput={(e) => resizeTextarea(e.currentTarget)}
+            onKeyDown={handleTargetKeyDown}
+            onDoubleClick={(e) => e.currentTarget.select()}
+            spellCheck={false}
+            className={`${targetTextLayerClass} relative z-10 bg-transparent outline-none resize-none overflow-hidden text-text ${
+              !isActive ? 'pointer-events-none' : ''
+            } ${!isActive ? 'caret-transparent' : ''}`}
+          />
 
-        {showTargetHighlightOverlay && (
-          <div className="pointer-events-none absolute inset-0 pl-1.5 pr-9 py-0.5 text-[14px] font-sans text-transparent leading-normal whitespace-pre-wrap break-words select-none">
-            {renderChunks(targetHighlightChunks)}
-          </div>
-        )}
+          {showTargetHighlightOverlay && (
+            <div
+              aria-hidden="true"
+              className={`${targetTextLayerClass} pointer-events-none absolute inset-0 overflow-hidden text-transparent select-none`}
+            >
+              {renderChunks(targetHighlightChunks)}
+            </div>
+          )}
+        </div>
 
         {isActive && sourceTags.length > 0 && (
           <div className="absolute top-1.5 right-1.5 z-20">
