@@ -423,8 +423,15 @@ export const EditorRow: React.FC<EditorRowProps> = ({
       <div
         className={`px-1.5 py-0.5 relative ${
           hasError ? 'bg-danger-soft/40' : hasWarning ? 'bg-warning-soft/35' : 'editor-cell-bg'
-        } ${isActive ? 'ring-1 ring-inset ring-brand/50' : ''}`}
+        }`}
       >
+        <div
+          aria-hidden="true"
+          className={`pointer-events-none absolute -top-px -bottom-px left-0 right-0 z-20 border-t-[3px] border-r-[3px] border-b-[3px] border-sky-400/90 transition-opacity duration-150 ${
+            isActive ? 'opacity-100 shadow-[0_0_6px_rgba(56,189,248,0.18)]' : 'opacity-0'
+          }`}
+        />
+
         <div className="relative">
           <textarea
             ref={textareaRef}
@@ -615,7 +622,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
         )}
 
         {segment.meta?.context && (
-          <div className="mt-1 px-1 flex flex-col group">
+          <div className="mt-1 px-1 group">
             <div
               onClick={(event) => void handleCopyContext(event)}
               title="Click to copy context"
@@ -633,10 +640,23 @@ export const EditorRow: React.FC<EditorRowProps> = ({
                   {isContextExpanded ? 'Collapse' : 'more'}
                 </button>
               )}
+              <span className="ml-1 inline-flex h-3 w-3 items-center justify-center text-success">
+                <svg
+                  className={`w-3 h-3 transition-opacity duration-150 ${contextCopied ? 'opacity-100' : 'opacity-0'}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-label={contextCopied ? 'Context copied' : undefined}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              </span>
             </div>
-            {contextCopied && (
-              <div className="mt-1 text-[10px] text-success font-medium">Copied</div>
-            )}
           </div>
         )}
       </div>

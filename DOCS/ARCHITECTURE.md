@@ -31,6 +31,10 @@
   - Concordance 与编辑器 TM fuzzy 匹配共享同一候选查询，当前统一候选上限为 `10`。
   - `TMService.findMatches` 在 100% 命中后执行 fuzzy 复合打分（Levenshtein + bigram Dice + bonus），阈值 `70`，最终返回 Top `10`。
   - 渲染层 `TMPanel` 对 TM 卡片做防御性截断，最多显示 `5` 条（TB 不受该上限约束）。
+- AI 单段链路（As-Is）：
+  - `AIModule.aiTranslateSegment` 与 `AIModule.aiRefineSegment` 共享 `translateSegment` + Tag 校验重试机制。
+  - 微调场景通过 `ai-refine-segment` IPC 进入主进程，在 translation prompt 中追加“当前译文 + 微调指示”区块（`Current Translation` / `Refinement Instruction`）。
+  - 微调沿用 TM/TB 引用注入与状态回写策略（`review` -> `reviewed`，其余 -> `translated`）。
 - 架构守卫（Gate-05）限制：
   - `ProjectService` 只做编排。
   - `CATDatabase` 不新增跨 repo 编排。

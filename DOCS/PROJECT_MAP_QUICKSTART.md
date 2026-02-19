@@ -50,7 +50,7 @@ Renderer (React 组件 + Hooks)
   - `ProjectFileModule`：项目/文件导入导出
   - `TMModule`：TM 管理、匹配、导入、批量应用、commit
   - `TBModule`：TB 管理、匹配、导入
-  - `AIModule`：AI 配置、测试翻译、单段 AI 翻译、批量 AI 预翻译
+  - `AIModule`：AI 配置、测试翻译、单段 AI 翻译、单段 AI 微调、批量 AI 预翻译
 - `services/SegmentService.ts`：段落更新、确认后传播、事件广播。
 - `filters/SpreadsheetFilter.ts`：CSV/XLSX 导入导出（文件过滤器）。
 - `JobManager.ts`：长任务进度（AI 翻译 + TM/TB 导入）统一事件中心。
@@ -162,6 +162,17 @@ AI Translate Segment (EditorRow):
   -> AIModule.aiTranslateSegment
   -> SegmentService.updateSegment(status=translated/reviewed)
 
+AI Refine Segment (EditorRow):
+  -> useEditor.refineSegmentWithAI
+  -> apiClient.aiRefineSegment
+  -> ipc "ai-refine-segment"
+  -> ProjectService.aiRefineSegment
+  -> AIModule.aiRefineSegment
+  -> translation user prompt 追加:
+     - Current Translation
+     - Refinement Instruction
+  -> SegmentService.updateSegment(status=translated/reviewed)
+
 AI Translate File:
   -> apiClient.aiTranslateFile
   -> ipc "ai-translate-file" 立即返回 jobId
@@ -169,6 +180,11 @@ AI Translate File:
   -> AIModule.aiTranslateFile 逐段翻译空白 target
   -> SegmentService.updateSegment(status=translated)
 ```
+
+补充行为（2026-02-19）：
+- 微调按钮仅在 active 行且目标列已有文本时出现。
+- 微调输入框为右侧半透明悬浮层，不挤占译文文本区域；提交快捷键为 Enter，取消为 Escape。
+- 单段 AI 翻译与单段 AI 微调共享同一段落级并发锁（同一段同时只允许一个 AI 请求）。
 
 ### 3.6 TM/TB 导入任务（Job 化）
 

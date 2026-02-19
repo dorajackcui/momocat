@@ -22,6 +22,11 @@
 - 已修复 `gate:arch` 漂移：`DOCS/architecture/GATE05_GUARDRAILS.json` 已补齐 `getProjectTypeByFileId`。
 - 已完成首轮 warning 压降：`apps/desktop` 从 `555` 降到 `0`。
 - 编辑器已支持“单段 AI 翻译”（与批量翻译使用同一套 Prompt/TM/TB/Tag 校验规则），并在 `EditorRow` 增加半透明按钮；当同时存在 Insert Tag 与 AI 按钮时采用纵向排列避免遮挡。
+- 编辑器已新增“单段 AI 微调”（2026-02-19）：
+  - 仅当目标列已有译文且当前行为 active 时显示魔法棒按钮，点击后出现右侧半透明悬浮输入框，回车提交微调提示词。
+  - 新增 IPC 契约 `ai-refine-segment`（`shared/ipc.ts` + `shared/ipcChannels.ts` + `preload/api/aiApi.ts` + `main/ipc/aiHandlers.ts` 全链路打通）。
+  - `AIModule.aiRefineSegment` 将“源文 + 当前译文 + 微调指示”拼入 prompt（translation 模板新增 `Current Translation` / `Refinement Instruction` 区块），并继续复用 TM/TB 引用注入与 Tag 校验重试。
+  - 状态回写策略与单段 AI 翻译一致：`review` 项目写回 `reviewed`，其余项目写回 `translated`。
 - 已完成 TM 匹配链路升级（2026-02-19）：
   - `TMRepo.searchConcordance` 统一上限为 `10`，并保留 `bm25` + CJK `LIKE` 回退（同样作用于 Concordance 面板）。
   - `TMService.findMatches` 改为复合相似度（Levenshtein + bigram Dice + 轻量 bonus），最小阈值保持 `70`，最终返回 Top `10`。
