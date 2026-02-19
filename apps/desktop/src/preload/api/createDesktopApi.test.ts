@@ -18,6 +18,7 @@ describe('createDesktopApi smoke', () => {
     await api.getAISettings();
     await api.getProxySettings();
     await api.setProxySettings({ mode: 'off' });
+    await api.aiTranslateSegment('seg-1');
     await api.openFileDialog([]);
     await api.runFileQA(1);
 
@@ -27,6 +28,7 @@ describe('createDesktopApi smoke', () => {
     expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.ai.getSettings);
     expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.ai.getProxySettings);
     expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.ai.setProxySettings, { mode: 'off' });
+    expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.ai.translateSegment, 'seg-1');
     expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.dialog.openFile, []);
     expect(invoke).toHaveBeenCalledWith(IPC_CHANNELS.file.runQA, 1);
   });

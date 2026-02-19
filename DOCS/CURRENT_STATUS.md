@@ -1,4 +1,4 @@
-# 当前开发状态（更新于 2026-02-17）
+# 当前开发状态（更新于 2026-02-19）
 
 > 这是“执行面板”文档：记录当前阶段、门禁状态、近期优先级。  
 > 需要实时准确，过时信息优先改这里。
@@ -21,6 +21,7 @@
 
 - 已修复 `gate:arch` 漂移：`DOCS/architecture/GATE05_GUARDRAILS.json` 已补齐 `getProjectTypeByFileId`。
 - 已完成首轮 warning 压降：`apps/desktop` 从 `555` 降到 `0`。
+- 编辑器已支持“单段 AI 翻译”（与批量翻译使用同一套 Prompt/TM/TB/Tag 校验规则），并在 `EditorRow` 增加半透明按钮；当同时存在 Insert Tag 与 AI 按钮时采用纵向排列避免遮挡。
 - 当前 warning 分布（root lint）：
   - `packages/core`: `24`
   - `packages/db`: `19`

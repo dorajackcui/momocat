@@ -15,7 +15,9 @@ interface EditorRowProps {
   onActivate: (id: string, options?: { autoFocusTarget?: boolean }) => void;
   onAutoFocus?: (id: string) => void;
   onChange: (id: string, value: string) => void;
+  onAITranslate: (id: string) => void;
   onConfirm: (id: string) => void;
+  isAITranslating?: boolean;
 }
 
 export const EditorRow: React.FC<EditorRowProps> = ({
@@ -30,7 +32,9 @@ export const EditorRow: React.FC<EditorRowProps> = ({
   onActivate,
   onAutoFocus,
   onChange,
+  onAITranslate,
   onConfirm,
+  isAITranslating = false,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isContextExpanded, setIsContextExpanded] = useState(false);
@@ -282,8 +286,12 @@ export const EditorRow: React.FC<EditorRowProps> = ({
     [draftText, targetHighlightQuery, highlightMode],
   );
   const showTargetHighlightOverlay = targetHighlightQuery.trim().length > 0;
-  const targetTextLayerClass =
-    'w-full min-h-[36px] pl-1.5 pr-9 py-0.5 text-[14px] font-sans leading-normal whitespace-pre-wrap break-words';
+  const canInsertTags = sourceTags.length > 0;
+  const canAITranslate = sourceEditorText.trim().length > 0;
+  const showTargetActionButtons = isActive && (canInsertTags || canAITranslate);
+  const targetTextLayerClass = showTargetActionButtons
+    ? 'editor-target-text-layer pr-12'
+    : 'editor-target-text-layer';
 
   const renderChunks = useCallback(
     (chunks: ReturnType<typeof buildHighlightChunks>) =>
@@ -311,14 +319,12 @@ export const EditorRow: React.FC<EditorRowProps> = ({
       </div>
 
       <div
-        className="px-1.5 py-0.5 bg-surface relative"
+        className="px-1.5 py-0.5 editor-cell-bg relative"
         onMouseEnter={() => setIsSourceHovered(true)}
         onMouseLeave={() => setIsSourceHovered(false)}
         onClick={handleSourceCellClick}
       >
-        <div className="w-full min-h-[36px] px-0.5 pr-1.5 py-0 text-[14px] font-sans text-text-muted leading-normal whitespace-pre-wrap break-words select-text">
-          {renderChunks(sourceHighlightChunks)}
-        </div>
+        <div className="editor-source-text">{renderChunks(sourceHighlightChunks)}</div>
         {isSourceHovered && (
           <div className="absolute top-2 right-2">
             <button
@@ -346,7 +352,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
 
       <div
         className={`px-1.5 py-0.5 relative ${
-          hasError ? 'bg-danger-soft/40' : hasWarning ? 'bg-warning-soft/35' : 'bg-surface'
+          hasError ? 'bg-danger-soft/40' : hasWarning ? 'bg-warning-soft/35' : 'editor-cell-bg'
         } ${isActive ? 'ring-1 ring-inset ring-brand/50' : ''}`}
       >
         <div className="relative">
@@ -360,7 +366,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
             onKeyDown={handleTargetKeyDown}
             onDoubleClick={(e) => e.currentTarget.select()}
             spellCheck={false}
-            className={`${targetTextLayerClass} relative z-10 bg-transparent outline-none resize-none overflow-hidden text-text ${
+            className={`${targetTextLayerClass} relative z-10 bg-transparent outline-none resize-none overflow-hidden ${
               !isActive ? 'pointer-events-none' : ''
             } ${!isActive ? 'caret-transparent' : ''}`}
           />
@@ -375,26 +381,73 @@ export const EditorRow: React.FC<EditorRowProps> = ({
           )}
         </div>
 
-        {isActive && sourceTags.length > 0 && (
-          <div className="absolute top-1.5 right-1.5 z-20">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowTagInsertionUI(!showTagInsertionUI);
-              }}
-              className="relative z-20 p-1 rounded bg-surface/90 border border-border/80 hover:bg-brand-soft/80 hover:border-brand/40 text-text-muted hover:text-brand transition-all shadow-sm"
-              title="Insert tags from source (Ctrl+Shift+1-9)"
-              aria-label="Toggle tag insertion menu"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
-                />
-              </svg>
-            </button>
+        {showTargetActionButtons && (
+          <div className="absolute top-1.5 right-1.5 z-20 flex flex-col items-end gap-1">
+            {canAITranslate && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onAITranslate(segment.segmentId);
+                }}
+                disabled={isAITranslating}
+                className="relative z-20 p-1 rounded bg-surface/70 border border-border/70 hover:bg-brand-soft/75 hover:border-brand/40 text-text-muted hover:text-brand transition-all shadow-sm disabled:opacity-60 disabled:cursor-wait"
+                title="AI translate this segment"
+                aria-label="AI translate this segment"
+              >
+                {isAITranslating ? (
+                  <svg
+                    className="w-3.5 h-3.5 animate-spin"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v4m0 8v4m8-8h-4M8 12H4m12.364 5.364l-2.828-2.828M9.464 9.464L6.636 6.636m9.728 0l-2.828 2.828m-4.072 4.072l-2.828 2.828"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 3l2.5 5.5L20 11l-5.5 2.5L12 19l-2.5-5.5L4 11l5.5-2.5L12 3z"
+                    />
+                  </svg>
+                )}
+              </button>
+            )}
+
+            {canInsertTags && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setShowTagInsertionUI(!showTagInsertionUI);
+                }}
+                className="relative z-20 p-1 rounded bg-surface/90 border border-border/80 hover:bg-brand-soft/80 hover:border-brand/40 text-text-muted hover:text-brand transition-all shadow-sm"
+                title="Insert tags from source (Ctrl+Shift+1-9)"
+                aria-label="Toggle tag insertion menu"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
+                  />
+                </svg>
+              </button>
+            )}
           </div>
         )}
 

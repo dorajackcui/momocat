@@ -145,6 +145,11 @@ export interface AITestTranslateResult {
   responseContent?: string;
 }
 
+export interface AISegmentTranslateResult {
+  segmentId: string;
+  status: SegmentStatus;
+}
+
 export interface SegmentsUpdatedEvent {
   segmentId: string;
   targetTokens: Token[];
@@ -251,6 +256,7 @@ export interface DesktopApi {
   getProxySettings: () => Promise<ProxySettings>;
   setProxySettings: (settings: ProxySettingsInput) => Promise<ProxySettings>;
   testAIConnection: (apiKey?: string) => Promise<{ ok: true }>;
+  aiTranslateSegment: (segmentId: string) => Promise<AISegmentTranslateResult>;
   aiTranslateFile: (fileId: number) => Promise<string>;
   aiTestTranslate: (
     projectId: number,

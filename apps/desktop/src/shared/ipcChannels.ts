@@ -54,6 +54,7 @@ export const IPC_CHANNELS = {
     getProxySettings: 'proxy-settings-get',
     setProxySettings: 'proxy-settings-set',
     testConnection: 'ai-test-connection',
+    translateSegment: 'ai-translate-segment',
     translateFile: 'ai-translate-file',
     testTranslate: 'ai-test-translate',
   },

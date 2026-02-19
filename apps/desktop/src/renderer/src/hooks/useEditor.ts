@@ -8,6 +8,7 @@ import {
   Token,
   evaluateSegmentQa,
   parseEditorTextToTokens,
+  serializeTokensToDisplayText,
   serializeTokensToEditorText,
   TagValidator,
 } from '@cat/core';
@@ -94,6 +95,9 @@ export function useEditor({ activeFileId }: UseEditorProps) {
   const [activeMatches, setActiveMatches] = useState<TMMatch[]>([]);
   const [activeTerms, setActiveTerms] = useState<TBMatch[]>([]);
   const [segmentSaveErrors, setSegmentSaveErrors] = useState<Record<string, string>>({});
+  const [aiTranslatingSegmentIds, setAiTranslatingSegmentIds] = useState<Record<string, boolean>>(
+    {},
+  );
   const [loading, setLoading] = useState(false);
   const tagValidator = new TagValidator();
   const matchRequestSeqRef = useRef(0);
@@ -177,6 +181,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
       setEnabledQaRuleIds(DEFAULT_PROJECT_QA_SETTINGS.enabledRuleIds);
       setInstantQaOnConfirm(DEFAULT_PROJECT_QA_SETTINGS.instantQaOnConfirm);
       setSegmentSaveErrors({});
+      setAiTranslatingSegmentIds({});
       segmentPersistorRef.current?.clear();
       return;
     }
@@ -224,6 +229,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
       });
       setSegments(normalized);
       setSegmentSaveErrors({});
+      setAiTranslatingSegmentIds({});
       segmentPersistorRef.current?.clear();
       setActiveSegmentId((prev) => {
         if (prev && normalized.some((seg) => seg.segmentId === prev)) return prev;
@@ -530,6 +536,47 @@ export function useEditor({ activeFileId }: UseEditorProps) {
 
   const getActiveSegment = () => segments.find((s) => s.segmentId === activeSegmentId);
 
+  const translateSegmentWithAI = useCallback(
+    async (segmentId: string) => {
+      if (aiTranslatingSegmentIds[segmentId]) {
+        return;
+      }
+
+      const segment = segments.find((item) => item.segmentId === segmentId);
+      if (!segment) return;
+
+      const sourceText = serializeTokensToDisplayText(segment.sourceTokens).trim();
+      if (!sourceText) {
+        setSegmentSaveError(segmentId, 'AI 翻译失败：源文为空');
+        return;
+      }
+
+      setAiTranslatingSegmentIds((prev) => {
+        if (prev[segmentId]) return prev;
+        return {
+          ...prev,
+          [segmentId]: true,
+        };
+      });
+      clearSegmentSaveError(segmentId);
+
+      try {
+        await apiClient.aiTranslateSegment(segmentId);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setSegmentSaveError(segmentId, `AI 翻译失败：${message}`);
+      } finally {
+        setAiTranslatingSegmentIds((prev) => {
+          if (!prev[segmentId]) return prev;
+          const next = { ...prev };
+          delete next[segmentId];
+          return next;
+        });
+      }
+    },
+    [aiTranslatingSegmentIds, clearSegmentSaveError, segments, setSegmentSaveError],
+  );
+
   return {
     segments,
     projectId,
@@ -539,7 +586,9 @@ export function useEditor({ activeFileId }: UseEditorProps) {
     segmentSaveErrors,
     setActiveSegmentId,
     loading,
+    aiTranslatingSegmentIds,
     handleTranslationChange,
+    translateSegmentWithAI,
     confirmSegment,
     handleApplyMatch,
     handleApplyTerm,

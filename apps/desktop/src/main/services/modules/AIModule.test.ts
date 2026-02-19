@@ -867,6 +867,140 @@ describe('AIModule.aiTranslateFile', () => {
   });
 });
 
+describe('AIModule.aiTranslateSegment', () => {
+  it('translates one segment with the same prompt references as file translation', async () => {
+    const segment = createSegment({
+      segmentId: 'single-1',
+      sourceText: 'Hello world',
+      context: 'UI button label',
+      targetText: '旧译文',
+      status: 'draft',
+    });
+
+    const projectRepo = {
+      getFile: vi.fn().mockReturnValue({ id: 1, projectId: 11, name: 'demo.xlsx' }),
+      getProject: vi.fn().mockReturnValue({
+        id: 11,
+        srcLang: 'en',
+        tgtLang: 'zh',
+        aiPrompt: '',
+        aiTemperature: 0.2,
+      }),
+    } as unknown as ProjectRepository;
+
+    const segmentRepo = {
+      getSegment: vi.fn().mockReturnValue(segment),
+    } as unknown as SegmentRepository;
+
+    const settingsRepo = {
+      getSetting: vi.fn().mockReturnValue('test-api-key'),
+    } as unknown as SettingsRepository;
+
+    const segmentService = {
+      updateSegment: vi.fn().mockResolvedValue(undefined),
+    } as unknown as SegmentService;
+
+    const transport = {
+      testConnection: vi.fn().mockResolvedValue({ ok: true }),
+      chatCompletions: vi.fn().mockResolvedValue({
+        content: '你好世界',
+        status: 200,
+        endpoint: '/v1/chat/completions',
+      }),
+    } as unknown as AITransport;
+
+    const tmService = {
+      findMatches: vi.fn().mockResolvedValue([
+        {
+          similarity: 99,
+          tmName: 'Main TM',
+          sourceTokens: [{ type: 'text', content: 'Hello world' }],
+          targetTokens: [{ type: 'text', content: '你好世界' }],
+        },
+      ]),
+    } as unknown as Pick<TMService, 'findMatches'>;
+
+    const tbService = {
+      findMatches: vi.fn().mockResolvedValue([{ srcTerm: 'world', tgtTerm: '世界', note: null }]),
+    } as unknown as Pick<TBService, 'findMatches'>;
+
+    const module = new AIModule(
+      projectRepo,
+      segmentRepo,
+      settingsRepo,
+      segmentService,
+      transport,
+      undefined,
+      { tmService, tbService },
+    );
+
+    const result = await module.aiTranslateSegment('single-1');
+
+    expect(result).toEqual({ segmentId: 'single-1', status: 'translated' });
+    expect(segmentService.updateSegment).toHaveBeenCalledWith(
+      'single-1',
+      expect.any(Array),
+      'translated',
+    );
+    const request = (transport.chatCompletions as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(request.userPrompt).toContain('Context: UI button label');
+    expect(request.userPrompt).toContain('TM Reference (best match):');
+    expect(request.userPrompt).toContain('Terminology References (hit terms):');
+  });
+
+  it('returns reviewed status for review project', async () => {
+    const segment = createSegment({
+      segmentId: 'single-review-1',
+      sourceText: 'Review this text',
+      targetText: '初稿',
+      status: 'draft',
+    });
+
+    const projectRepo = {
+      getFile: vi.fn().mockReturnValue({ id: 1, projectId: 11, name: 'demo.xlsx' }),
+      getProject: vi.fn().mockReturnValue({
+        id: 11,
+        srcLang: 'en',
+        tgtLang: 'zh',
+        projectType: 'review',
+        aiPrompt: '',
+        aiTemperature: 0.2,
+      }),
+    } as unknown as ProjectRepository;
+
+    const segmentRepo = {
+      getSegment: vi.fn().mockReturnValue(segment),
+    } as unknown as SegmentRepository;
+
+    const settingsRepo = {
+      getSetting: vi.fn().mockReturnValue('test-api-key'),
+    } as unknown as SettingsRepository;
+
+    const segmentService = {
+      updateSegment: vi.fn().mockResolvedValue(undefined),
+    } as unknown as SegmentService;
+
+    const transport = {
+      testConnection: vi.fn().mockResolvedValue({ ok: true }),
+      chatCompletions: vi.fn().mockResolvedValue({
+        content: 'Review this text',
+        status: 200,
+        endpoint: '/v1/chat/completions',
+      }),
+    } as unknown as AITransport;
+
+    const module = new AIModule(projectRepo, segmentRepo, settingsRepo, segmentService, transport);
+    const result = await module.aiTranslateSegment('single-review-1');
+
+    expect(result).toEqual({ segmentId: 'single-review-1', status: 'reviewed' });
+    expect(segmentService.updateSegment).toHaveBeenCalledWith(
+      'single-review-1',
+      expect.any(Array),
+      'reviewed',
+    );
+  });
+});
+
 describe('AIModule.proxySettings', () => {
   it('returns system mode by default when no proxy settings are stored', () => {
     const settingsRepo = {

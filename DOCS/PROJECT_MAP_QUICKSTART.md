@@ -1,6 +1,6 @@
 # 项目上手地图（快速定位版）
 
-最后更新：2026-02-14
+最后更新：2026-02-19
 
 这份文档的目标不是“讲全”，而是帮你在改功能时 1-2 分钟内找到入口，不再迷路。
 
@@ -50,7 +50,7 @@ Renderer (React 组件 + Hooks)
   - `ProjectFileModule`：项目/文件导入导出
   - `TMModule`：TM 管理、匹配、导入、批量应用、commit
   - `TBModule`：TB 管理、匹配、导入
-  - `AIModule`：AI 配置、测试翻译、批量 AI 预翻译
+  - `AIModule`：AI 配置、测试翻译、单段 AI 翻译、批量 AI 预翻译
 - `services/SegmentService.ts`：段落更新、确认后传播、事件广播。
 - `filters/SpreadsheetFilter.ts`：CSV/XLSX 导入导出（文件过滤器）。
 - `JobManager.ts`：长任务进度（AI 翻译 + TM/TB 导入）统一事件中心。
@@ -140,6 +140,14 @@ ProjectAIPane (保存 prompt/temperature, test)
   -> AIModule
   -> OpenAITransport (chat completions)
 
+AI Translate Segment (EditorRow):
+  -> useEditor.translateSegmentWithAI
+  -> apiClient.aiTranslateSegment
+  -> ipc "ai-translate-segment"
+  -> ProjectService.aiTranslateSegment
+  -> AIModule.aiTranslateSegment
+  -> SegmentService.updateSegment(status=translated/reviewed)
+
 AI Translate File:
   -> apiClient.aiTranslateFile
   -> ipc "ai-translate-file" 立即返回 jobId
@@ -184,6 +192,8 @@ TMImportWizard / TBImportWizard
 - `packages/db/src/repos/TBRepo.ts`
 
 ### 4.5 想改“AI Prompt/温度/翻译容错”
+- `apps/desktop/src/renderer/src/components/EditorRow.tsx`
+- `apps/desktop/src/renderer/src/hooks/useEditor.ts`
 - `apps/desktop/src/renderer/src/hooks/projectDetail/useProjectAI.ts`
 - `apps/desktop/src/main/services/modules/AIModule.ts`
 - `apps/desktop/src/main/services/providers/OpenAITransport.ts`

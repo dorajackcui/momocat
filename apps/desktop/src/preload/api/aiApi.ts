@@ -9,6 +9,7 @@ type AIApiKeys =
   | 'getProxySettings'
   | 'setProxySettings'
   | 'testAIConnection'
+  | 'aiTranslateSegment'
   | 'aiTranslateFile'
   | 'aiTestTranslate';
 
@@ -31,6 +32,10 @@ export function createAIApi(ipcRenderer: IpcRendererLike): DesktopApiSlice<AIApi
     testAIConnection: (apiKey) =>
       ipcRenderer.invoke(IPC_CHANNELS.ai.testConnection, apiKey) as ReturnType<
         DesktopApi['testAIConnection']
+      >,
+    aiTranslateSegment: (segmentId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.ai.translateSegment, segmentId) as ReturnType<
+        DesktopApi['aiTranslateSegment']
       >,
     aiTranslateFile: (fileId) =>
       ipcRenderer.invoke(IPC_CHANNELS.ai.translateFile, fileId) as ReturnType<

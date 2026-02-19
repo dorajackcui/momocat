@@ -53,6 +53,15 @@ export function registerAIHandlers({ ipcMain, projectService, jobManager }: AIHa
 
   registerHandle(
     { ipcMain, projectService, jobManager },
+    IPC_CHANNELS.ai.translateSegment,
+    (_event, ...args) => {
+      const [segmentId] = args as [string];
+      return projectService.aiTranslateSegment(segmentId);
+    },
+  );
+
+  registerHandle(
+    { ipcMain, projectService, jobManager },
     IPC_CHANNELS.ai.translateFile,
     (_event, ...args) => {
       const [fileId] = args as [number];

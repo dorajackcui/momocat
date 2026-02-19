@@ -198,6 +198,66 @@ export class AIModule {
     return { translated, skipped, failed, total: totalSegments };
   }
 
+  public async aiTranslateSegment(
+    segmentId: string,
+    options?: {
+      model?: string;
+    },
+  ): Promise<{ segmentId: string; status: SegmentStatus }> {
+    const segment = this.segmentRepo.getSegment(segmentId);
+    if (!segment) throw new Error('Segment not found');
+
+    const file = this.projectRepo.getFile(segment.fileId);
+    if (!file) throw new Error('File not found');
+
+    const project = this.projectRepo.getProject(file.projectId);
+    if (!project) throw new Error('Project not found');
+
+    const apiKey = this.settingsRepo.getSetting(AIModule.AI_API_KEY);
+    if (!apiKey) {
+      throw new Error('AI API key is not configured');
+    }
+
+    const sourceText = serializeTokensToDisplayText(segment.sourceTokens);
+    if (!sourceText.trim()) {
+      throw new Error('Source segment is empty');
+    }
+
+    const sourceTagPreservedText = serializeTokensToEditorText(
+      segment.sourceTokens,
+      segment.sourceTokens,
+    );
+    const context = segment.meta?.context ? String(segment.meta.context).trim() : '';
+    const projectType = project.projectType || 'translation';
+    const aiStatus: SegmentStatus = projectType === 'review' ? 'reviewed' : 'translated';
+    const model = this.resolveModel(options?.model, project.aiModel);
+    const temperature = this.resolveTemperature(project.aiTemperature);
+    const promptReferences =
+      projectType === 'translation'
+        ? await this.resolveTranslationPromptReferences(file.projectId, segment)
+        : {};
+
+    const targetTokens = await this.translateSegment({
+      apiKey,
+      model,
+      projectPrompt: project.aiPrompt || '',
+      projectType,
+      temperature,
+      srcLang: project.srcLang,
+      tgtLang: project.tgtLang,
+      sourceTokens: segment.sourceTokens,
+      sourceText,
+      sourceTagPreservedText,
+      context,
+      tmReference: promptReferences.tmReference,
+      tbReferences: promptReferences.tbReferences,
+    });
+
+    await this.segmentService.updateSegment(segment.segmentId, targetTokens, aiStatus);
+
+    return { segmentId: segment.segmentId, status: aiStatus };
+  }
+
   public async aiTestTranslate(projectId: number, sourceText: string, contextText?: string) {
     const project = this.projectRepo.getProject(projectId);
     if (!project) throw new Error('Project not found');
