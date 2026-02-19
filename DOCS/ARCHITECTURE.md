@@ -1,6 +1,6 @@
 # Simple CAT Tool 架构说明
 
-最后更新：2026-02-14
+最后更新：2026-02-19
 
 > 文档定位：描述“当前实现边界 + 演进目标”。  
 > 若与代码冲突，以代码为准；优先参考：`DOCS/PROJECT_STRUCTURE.md`、`DOCS/DATABASE_SCHEMA.md`、`DOCS/DEVELOPMENT_GUIDE.md`。
@@ -26,6 +26,11 @@
 
 - 默认离线优先：SQLite（`@cat/db`）为主存储。
 - Segment/TM/TB 均以 Token 序列为核心数据结构。
+- TM 查询链路（As-Is）：
+  - `TMRepo.searchConcordance` 使用 `tm_fts` + `bm25` 作为候选召回主路径，并在 CJK 连续文本场景增加 `LIKE` 回退。
+  - Concordance 与编辑器 TM fuzzy 匹配共享同一候选查询，当前统一候选上限为 `10`。
+  - `TMService.findMatches` 在 100% 命中后执行 fuzzy 复合打分（Levenshtein + bigram Dice + bonus），阈值 `70`，最终返回 Top `10`。
+  - 渲染层 `TMPanel` 对 TM 卡片做防御性截断，最多显示 `5` 条（TB 不受该上限约束）。
 - 架构守卫（Gate-05）限制：
   - `ProjectService` 只做编排。
   - `CATDatabase` 不新增跨 repo 编排。

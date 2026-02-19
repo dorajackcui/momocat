@@ -450,6 +450,98 @@ describe("CATDatabase", () => {
       expect(allResults).toHaveLength(1);
       expect(allResults[0].srcHash).toBe("h2");
     });
+
+    it("should keep highly relevant hit in top candidates under common-term noise", () => {
+      const projectId = db.createProject("Concordance Ranking Project", "zh", "fr");
+
+      const mainTmId = db.createTM("Main Corpus", "zh", "fr", "main");
+      db.mountTMToProject(projectId, mainTmId, 10, "read");
+
+      for (let i = 0; i < 70; i += 1) {
+        db.upsertTMEntry({
+          id: `noise-${i}`,
+          tmId: mainTmId,
+          srcHash: `noise-hash-${i}`,
+          matchKey: `noise-${i}`,
+          tagsSignature: "",
+          sourceTokens: [{ type: "text", content: `没关系，这是一条噪声语料 ${i}` }],
+          targetTokens: [{ type: "text", content: `Bruit ${i}` }],
+          usageCount: 1,
+        } as any);
+      }
+
+      db.upsertTMEntry({
+        id: "target-entry",
+        tmId: mainTmId,
+        srcHash: "target-hash",
+        matchKey: "target",
+        tagsSignature: "",
+        sourceTokens: [
+          {
+            type: "text",
+            content: "小绵菊从种下到长大是需要时间的，没关系，我等你！",
+          },
+        ],
+        targetTokens: [
+          {
+            type: "text",
+            content:
+              "Les paquerettes prennent leur temps pour grandir. Ce n'est pas grave, je t'attends !",
+          },
+        ],
+        usageCount: 1,
+      } as any);
+
+      const results = db.searchConcordance(
+        projectId,
+        "小绵菊从种下到长大是需要时间的 OR 没关系 OR 我等你们",
+      );
+      expect(results).toHaveLength(10);
+      expect(results[0].srcHash).toBe("target-hash");
+      expect(results.some((row) => row.srcHash === "target-hash")).toBe(true);
+    });
+
+    it("should find CJK sentence by inner phrase in concordance search", () => {
+      const projectId = db.createProject("Concordance CJK Substring", "zh", "fr");
+      const mainTmId = db.createTM("Main CJK", "zh", "fr", "main");
+      db.mountTMToProject(projectId, mainTmId, 10, "read");
+
+      db.upsertTMEntry({
+        id: "cjk-substring-entry",
+        tmId: mainTmId,
+        srcHash: "cjk-substring-hash",
+        matchKey: "cjk-substring",
+        tagsSignature: "",
+        sourceTokens: [{ type: "text", content: "老大是怎么成为遗忘者聚落的领袖的？" }],
+        targetTokens: [{ type: "text", content: "Comment est-il devenu le chef du camp des Oublies ?" }],
+        usageCount: 1,
+      } as any);
+
+      const results = db.searchConcordance(projectId, "是怎么成为遗忘者聚落的领袖的？");
+      expect(results.length).toBeLessThanOrEqual(10);
+      expect(results.some((row) => row.srcHash === "cjk-substring-hash")).toBe(true);
+    });
+
+    it("should find near-identical CJK sentence when first character differs", () => {
+      const projectId = db.createProject("Concordance CJK Near Match", "zh", "fr");
+      const mainTmId = db.createTM("Main Near Match", "zh", "fr", "main");
+      db.mountTMToProject(projectId, mainTmId, 10, "read");
+
+      db.upsertTMEntry({
+        id: "cjk-near-entry",
+        tmId: mainTmId,
+        srcHash: "cjk-near-hash",
+        matchKey: "cjk-near",
+        tagsSignature: "",
+        sourceTokens: [{ type: "text", content: "老大是怎么成为遗忘者聚落的领袖的？" }],
+        targetTokens: [{ type: "text", content: "Comment est-il devenu le chef du camp des Oublies ?" }],
+        usageCount: 1,
+      } as any);
+
+      const results = db.searchConcordance(projectId, "老三是怎么成为遗忘者聚落的领袖的？");
+      expect(results.length).toBeLessThanOrEqual(10);
+      expect(results.some((row) => row.srcHash === "cjk-near-hash")).toBe(true);
+    });
   });
 
   describe("Term Base System (v10)", () => {

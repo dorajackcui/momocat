@@ -1,0 +1,199 @@
+import { describe, expect, it, vi } from 'vitest';
+import { Segment, TMEntry } from '@cat/core';
+import { TMService } from './TMService';
+import { ProjectRepository, TMRepository } from './ports';
+
+function createSegment(sourceText: string, srcHash: string): Segment {
+  return {
+    segmentId: `seg-${srcHash}`,
+    fileId: 1,
+    orderIndex: 0,
+    sourceTokens: [{ type: 'text', content: sourceText }],
+    targetTokens: [],
+    status: 'new',
+    tagsSignature: '',
+    matchKey: sourceText.toLowerCase(),
+    srcHash,
+    meta: { updatedAt: new Date().toISOString() },
+  };
+}
+
+function createTMEntry(params: {
+  srcHash: string;
+  sourceText: string;
+  targetText?: string;
+  usageCount?: number;
+}): TMEntry {
+  const now = new Date().toISOString();
+  return {
+    id: `entry-${params.srcHash}`,
+    projectId: 1,
+    srcLang: 'zh-CN',
+    tgtLang: 'fr-FR',
+    srcHash: params.srcHash,
+    matchKey: params.sourceText.toLowerCase(),
+    tagsSignature: '',
+    sourceTokens: [{ type: 'text', content: params.sourceText }],
+    targetTokens: [{ type: 'text', content: params.targetText ?? `tgt-${params.srcHash}` }],
+    usageCount: params.usageCount ?? 1,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function createConcordanceEntry(
+  tmId: string,
+  params: {
+    srcHash: string;
+    sourceText: string;
+    targetText?: string;
+    usageCount?: number;
+  },
+): TMEntry & { tmId: string } {
+  return {
+    ...createTMEntry(params),
+    tmId,
+  };
+}
+
+function createService(params: {
+  mountedTMs: Array<{ id: string; name: string; type: 'working' | 'main' }>;
+  exactMatchByHash?: Record<string, TMEntry | undefined>;
+  concordanceEntries?: Array<TMEntry & { tmId: string }>;
+}): TMService {
+  const projectRepo = {
+    getProject: vi.fn().mockReturnValue({
+      id: 1,
+      srcLang: 'zh-CN',
+      tgtLang: 'fr-FR',
+    }),
+  } as unknown as ProjectRepository;
+
+  const tmRepo = {
+    getProjectMountedTMs: vi.fn().mockReturnValue(
+      params.mountedTMs.map((tm) => ({
+        ...tm,
+        srcLang: 'zh-CN',
+        tgtLang: 'fr-FR',
+        priority: 10,
+        permission: tm.type === 'working' ? 'readwrite' : 'read',
+        isEnabled: 1,
+      })),
+    ),
+    findTMEntryByHash: vi
+      .fn()
+      .mockImplementation((_: string, srcHash: string) => params.exactMatchByHash?.[srcHash]),
+    searchConcordance: vi.fn().mockReturnValue(params.concordanceEntries ?? []),
+  } as unknown as TMRepository;
+
+  return new TMService(projectRepo, tmRepo);
+}
+
+describe('TMService.findMatches', () => {
+  it('returns at most top 10 matches', async () => {
+    const source = '这是一个用于测试TM匹配结果截断的示例句子';
+    const service = createService({
+      mountedTMs: [{ id: 'tm-main', name: 'Main TM', type: 'main' }],
+      concordanceEntries: Array.from({ length: 25 }, (_, index) =>
+        createConcordanceEntry('tm-main', {
+          srcHash: `cand-${index}`,
+          sourceText: `${source}${index}`,
+          usageCount: 25 - index,
+        }),
+      ),
+    });
+
+    const matches = await service.findMatches(1, createSegment(source, 'source-hash'));
+    expect(matches.length).toBe(10);
+  });
+
+  it('matches near-identical CJK sentence when one character differs at the beginning', async () => {
+    const source = '老三是怎么成为遗忘者聚落的领袖的？';
+    const service = createService({
+      mountedTMs: [{ id: 'tm-main', name: 'Main TM', type: 'main' }],
+      concordanceEntries: [
+        createConcordanceEntry('tm-main', {
+          srcHash: 'near-hash',
+          sourceText: '老大是怎么成为遗忘者聚落的领袖的？',
+          usageCount: 1,
+        }),
+        createConcordanceEntry('tm-main', {
+          srcHash: 'noise-hash',
+          sourceText: '今天遗忘者聚落天气怎么样？',
+          usageCount: 20,
+        }),
+      ],
+    });
+
+    const matches = await service.findMatches(1, createSegment(source, 'source-hash'));
+    const nearMatch = matches.find((match) => match.srcHash === 'near-hash');
+    expect(nearMatch).toBeDefined();
+    if (!nearMatch) return;
+
+    const noiseMatch = matches.find((match) => match.srcHash === 'noise-hash');
+    if (noiseMatch) {
+      expect(nearMatch.similarity).toBeGreaterThan(noiseMatch.similarity);
+    }
+  });
+
+  it('matches near-identical CJK sentence when pronoun differs at tail position', async () => {
+    const source = '小绵菊从种下到长大是需要时间的，没关系，我等你们！';
+    const service = createService({
+      mountedTMs: [{ id: 'tm-main', name: 'Main TM', type: 'main' }],
+      concordanceEntries: [
+        createConcordanceEntry('tm-main', {
+          srcHash: 'near-hash',
+          sourceText: '小绵菊从种下到长大是需要时间的，没关系，我等你！',
+          usageCount: 1,
+        }),
+        createConcordanceEntry('tm-main', {
+          srcHash: 'noise-hash',
+          sourceText: '没关系，我们有办法。',
+          usageCount: 10,
+        }),
+      ],
+    });
+
+    const matches = await service.findMatches(1, createSegment(source, 'source-hash'));
+    const nearMatch = matches.find((match) => match.srcHash === 'near-hash');
+    expect(nearMatch).toBeDefined();
+    if (!nearMatch) return;
+    expect(nearMatch.similarity).toBeGreaterThanOrEqual(90);
+  });
+
+  it('keeps exact hash match at similarity 100 ahead of fuzzy 99 matches and sorts fuzzy ties by usage', async () => {
+    const source = 'Hello world from CAT tool';
+    const exactHash = 'exact-hash';
+    const service = createService({
+      mountedTMs: [{ id: 'tm-main', name: 'Main TM', type: 'main' }],
+      exactMatchByHash: {
+        [exactHash]: createTMEntry({
+          srcHash: exactHash,
+          sourceText: source,
+          usageCount: 1,
+        }),
+      },
+      concordanceEntries: [
+        createConcordanceEntry('tm-main', {
+          srcHash: 'fuzzy-high-usage',
+          sourceText: source,
+          usageCount: 8,
+        }),
+        createConcordanceEntry('tm-main', {
+          srcHash: 'fuzzy-low-usage',
+          sourceText: source,
+          usageCount: 2,
+        }),
+      ],
+    });
+
+    const matches = await service.findMatches(1, createSegment(source, exactHash));
+    expect(matches[0].srcHash).toBe(exactHash);
+    expect(matches[0].similarity).toBe(100);
+
+    const fuzzyMatches = matches.filter((match) => match.similarity === 99);
+    expect(fuzzyMatches[0].srcHash).toBe('fuzzy-high-usage');
+    expect(fuzzyMatches[1].srcHash).toBe('fuzzy-low-usage');
+  });
+});
+

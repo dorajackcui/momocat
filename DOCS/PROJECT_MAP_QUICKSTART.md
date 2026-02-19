@@ -132,6 +132,20 @@ TMManager/TBManager 或 ProjectDetail TM/TB Tab
   -> TMRepo/TBRepo 持久化 + project_tms / project_term_bases 挂载关系
 ```
 
+### 3.4.1 编辑器 TM 实时匹配（2026-02-19）
+
+```text
+Editor active segment 变化
+  -> useEditor 调 apiClient.getMatches(projectId, segment)
+  -> TMService.findMatches
+     1) 先走 100% srcHash 命中
+     2) 再走 fuzzy：TMRepo.searchConcordance 候选 + 复合相似度重排
+  -> 返回 Top 10 TM 结果（threshold=70）
+  -> TMPanel 仅展示前 5 条 TM（TB 结果不受此上限影响）
+```
+
+Concordance 搜索当前同样复用 `TMRepo.searchConcordance`，统一最多返回 10 条候选。
+
 ### 3.5 AI 流程
 
 ```text
@@ -185,6 +199,11 @@ TMImportWizard / TBImportWizard
 - `apps/desktop/src/main/services/TMService.ts`
 - `apps/desktop/src/main/services/modules/TMModule.ts`
 - `packages/db/src/repos/TMRepo.ts`
+
+当前行为（2026-02-19）：
+- `TMRepo.searchConcordance`：`bm25` 排序 + CJK `LIKE` 回退，统一上限 10（TM match 与 Concordance 共用）。
+- `TMService.findMatches`：最小阈值 `70`，复合分（Levenshtein + bigram Dice + bonus）重排，最终 Top 10。
+- `TMPanel`：仅渲染 Top 5 TM 卡片（TB 不截断）。
 
 ### 4.4 想改“TB 命中规则（词边界/CJK）”
 - `apps/desktop/src/main/services/TBService.ts`

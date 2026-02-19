@@ -22,6 +22,10 @@
 - 已修复 `gate:arch` 漂移：`DOCS/architecture/GATE05_GUARDRAILS.json` 已补齐 `getProjectTypeByFileId`。
 - 已完成首轮 warning 压降：`apps/desktop` 从 `555` 降到 `0`。
 - 编辑器已支持“单段 AI 翻译”（与批量翻译使用同一套 Prompt/TM/TB/Tag 校验规则），并在 `EditorRow` 增加半透明按钮；当同时存在 Insert Tag 与 AI 按钮时采用纵向排列避免遮挡。
+- 已完成 TM 匹配链路升级（2026-02-19）：
+  - `TMRepo.searchConcordance` 统一上限为 `10`，并保留 `bm25` + CJK `LIKE` 回退（同样作用于 Concordance 面板）。
+  - `TMService.findMatches` 改为复合相似度（Levenshtein + bigram Dice + 轻量 bonus），最小阈值保持 `70`，最终返回 Top `10`。
+  - `TMPanel` 对 TM 结果增加 UI 防御上限，最多展示 `5` 条（TB 行为不变）。
 - 当前 warning 分布（root lint）：
   - `packages/core`: `24`
   - `packages/db`: `19`

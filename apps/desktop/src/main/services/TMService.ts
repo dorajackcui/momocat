@@ -15,6 +15,11 @@ export interface TMMatch extends TMEntry {
 }
 
 export class TMService {
+  private static readonly TM_MATCH_RESULT_LIMIT = 10;
+  private static readonly MIN_SIMILARITY = 70;
+  private static readonly LEVENSHTEIN_WEIGHT = 0.75;
+  private static readonly DICE_WEIGHT = 0.25;
+
   private projectRepo: ProjectRepository;
   private tmRepo: TMRepository;
 
@@ -75,6 +80,7 @@ export class TMService {
     if (mountedTMs.length === 0) return [];
 
     const sourceTextOnly = serializeTokensToTextOnly(segment.sourceTokens);
+    const sourceNormalized = this.normalizeForSimilarity(sourceTextOnly);
 
     const results: TMMatch[] = [];
     const seenHashes = new Set<string>();
@@ -108,20 +114,33 @@ export class TMService {
         if (seenHashes.has(cand.srcHash)) continue;
 
         const candTextOnly = serializeTokensToTextOnly(cand.sourceTokens);
+        const candNormalized = this.normalizeForSimilarity(candTextOnly);
 
         let similarity = 0;
 
         // Logic A: Text is identical, but Tags are different
-        if (sourceTextOnly.toLowerCase() === candTextOnly.toLowerCase()) {
+        if (sourceNormalized === candNormalized) {
           similarity = 99; // Penalty for tag mismatch
         } else {
-          // Logic B: Text is different, use Levenshtein on text-only content
-          const levDist = distance(sourceTextOnly.toLowerCase(), candTextOnly.toLowerCase());
-          const maxLen = Math.max(sourceTextOnly.length, candTextOnly.length);
-          similarity = Math.round((1 - levDist / maxLen) * 100);
+          const maxPossibleByLength = this.computeMaxLengthBound(sourceNormalized, candNormalized);
+          if (maxPossibleByLength < TMService.MIN_SIMILARITY) {
+            continue;
+          }
+
+          const levSimilarity = this.computeLevenshteinSimilarity(sourceNormalized, candNormalized);
+          const diceSimilarity = this.computeDiceSimilarity(sourceNormalized, candNormalized);
+          const bonus = this.computeSimilarityBonus(sourceNormalized, candNormalized);
+          similarity = Math.min(
+            100,
+            Math.round(
+              levSimilarity * TMService.LEVENSHTEIN_WEIGHT +
+                diceSimilarity * TMService.DICE_WEIGHT +
+                bonus,
+            ),
+          );
         }
 
-        if (similarity >= 70) {
+        if (similarity >= TMService.MIN_SIMILARITY) {
           const tm = mountedTMs.find((t) => t.id === cand.tmId);
           results.push({
             ...cand,
@@ -138,7 +157,7 @@ export class TMService {
     return results.sort((a, b) => {
       if (b.similarity !== a.similarity) return b.similarity - a.similarity;
       return b.usageCount - a.usageCount;
-    });
+    }).slice(0, TMService.TM_MATCH_RESULT_LIMIT);
   }
 
   public async find100Match(projectId: number, srcHash: string) {
@@ -158,5 +177,75 @@ export class TMService {
     }
 
     return null;
+  }
+
+  private normalizeForSimilarity(text: string): string {
+    return text.toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+
+  private computeMaxLengthBound(a: string, b: string): number {
+    const maxLen = Math.max(a.length, b.length);
+    if (maxLen === 0) return 100;
+    return Math.floor((1 - Math.abs(a.length - b.length) / maxLen) * 100);
+  }
+
+  private computeLevenshteinSimilarity(a: string, b: string): number {
+    const maxLen = Math.max(a.length, b.length);
+    if (maxLen === 0) return 100;
+    const levDist = distance(a, b);
+    return Math.max(0, Math.round((1 - levDist / maxLen) * 100));
+  }
+
+  private computeDiceSimilarity(a: string, b: string): number {
+    if (!a && !b) return 100;
+    if (!a || !b) return 0;
+    if (a === b) return 100;
+    if (a.length < 2 || b.length < 2) return 0;
+
+    const aBigrams = this.buildBigramCounts(a);
+    const bBigrams = this.buildBigramCounts(b);
+
+    let overlap = 0;
+    let aCount = 0;
+    let bCount = 0;
+
+    for (const count of aBigrams.values()) {
+      aCount += count;
+    }
+    for (const count of bBigrams.values()) {
+      bCount += count;
+    }
+    for (const [gram, aGramCount] of aBigrams.entries()) {
+      const bGramCount = bBigrams.get(gram) ?? 0;
+      overlap += Math.min(aGramCount, bGramCount);
+    }
+
+    if (aCount + bCount === 0) return 0;
+    return Math.round((2 * overlap / (aCount + bCount)) * 100);
+  }
+
+  private buildBigramCounts(text: string): Map<string, number> {
+    const counts = new Map<string, number>();
+    for (let i = 0; i < text.length - 1; i += 1) {
+      const gram = text.slice(i, i + 2);
+      counts.set(gram, (counts.get(gram) ?? 0) + 1);
+    }
+    return counts;
+  }
+
+  private computeSimilarityBonus(a: string, b: string): number {
+    const shorterLen = Math.min(a.length, b.length);
+    let bonus = 0;
+
+    if (shorterLen >= 6 && (a.includes(b) || b.includes(a))) {
+      bonus += 4;
+    }
+
+    const prefixLength = Math.min(4, shorterLen);
+    if (prefixLength > 0 && a.slice(0, prefixLength) === b.slice(0, prefixLength)) {
+      bonus += 2;
+    }
+
+    return bonus;
   }
 }

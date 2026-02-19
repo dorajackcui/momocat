@@ -32,20 +32,13 @@ type CombinedMatch =
       payload: TBMatch;
     };
 
-export const TMPanel: React.FC<TMPanelProps> = ({ matches, termMatches, onApply, onApplyTerm }) => {
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-
-  const truncate = (text: string, limit: number) => {
-    if (text.length <= limit) return text;
-    return `${text.slice(0, limit)}...`;
-  };
-
-  const toggleExpanded = (key: string) => {
-    setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const combined: CombinedMatch[] = [
-    ...(matches || []).map((match, idx) => ({
+export function buildCombinedMatches(
+  matches: TMMatch[],
+  termMatches: TBMatch[],
+  tmRenderLimit: number,
+): CombinedMatch[] {
+  return [
+    ...(matches || []).slice(0, tmRenderLimit).map((match, idx) => ({
       kind: 'tm' as const,
       rank: match.similarity,
       id: `tm-${match.id}-${idx}`,
@@ -66,6 +59,22 @@ export const TMPanel: React.FC<TMPanelProps> = ({ matches, termMatches, onApply,
     if (a.kind !== b.kind) return a.kind === 'tm' ? -1 : 1;
     return 0;
   });
+}
+
+export const TMPanel: React.FC<TMPanelProps> = ({ matches, termMatches, onApply, onApplyTerm }) => {
+  const TM_RENDER_LIMIT = 5;
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  const truncate = (text: string, limit: number) => {
+    if (text.length <= limit) return text;
+    return `${text.slice(0, limit)}...`;
+  };
+
+  const toggleExpanded = (key: string) => {
+    setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const combined = buildCombinedMatches(matches, termMatches, TM_RENDER_LIMIT);
 
   if (combined.length === 0) {
     return (
