@@ -257,6 +257,7 @@ export interface DesktopApi {
   setProxySettings: (settings: ProxySettingsInput) => Promise<ProxySettings>;
   testAIConnection: (apiKey?: string) => Promise<{ ok: true }>;
   aiTranslateSegment: (segmentId: string) => Promise<AISegmentTranslateResult>;
+  aiRefineSegment: (segmentId: string, instruction: string) => Promise<AISegmentTranslateResult>;
   aiTranslateFile: (fileId: number) => Promise<string>;
   aiTestTranslate: (
     projectId: number,

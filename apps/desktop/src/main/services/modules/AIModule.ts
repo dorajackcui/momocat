@@ -258,6 +258,83 @@ export class AIModule {
     return { segmentId: segment.segmentId, status: aiStatus };
   }
 
+  public async aiRefineSegment(
+    segmentId: string,
+    instruction: string,
+    options?: {
+      model?: string;
+    },
+  ): Promise<{ segmentId: string; status: SegmentStatus }> {
+    const segment = this.segmentRepo.getSegment(segmentId);
+    if (!segment) throw new Error('Segment not found');
+
+    const file = this.projectRepo.getFile(segment.fileId);
+    if (!file) throw new Error('File not found');
+
+    const project = this.projectRepo.getProject(file.projectId);
+    if (!project) throw new Error('Project not found');
+
+    const apiKey = this.settingsRepo.getSetting(AIModule.AI_API_KEY);
+    if (!apiKey) {
+      throw new Error('AI API key is not configured');
+    }
+
+    const refinementInstruction = instruction.trim();
+    if (!refinementInstruction) {
+      throw new Error('Refinement instruction is empty');
+    }
+
+    const sourceText = serializeTokensToDisplayText(segment.sourceTokens);
+    if (!sourceText.trim()) {
+      throw new Error('Source segment is empty');
+    }
+
+    const currentTranslationText = serializeTokensToDisplayText(segment.targetTokens);
+    if (!currentTranslationText.trim()) {
+      throw new Error('Target segment is empty');
+    }
+
+    const sourceTagPreservedText = serializeTokensToEditorText(
+      segment.sourceTokens,
+      segment.sourceTokens,
+    );
+    const currentTranslationTagPreservedText = serializeTokensToEditorText(
+      segment.targetTokens,
+      segment.sourceTokens,
+    );
+    const context = segment.meta?.context ? String(segment.meta.context).trim() : '';
+    const projectType = project.projectType || 'translation';
+    const aiStatus: SegmentStatus = projectType === 'review' ? 'reviewed' : 'translated';
+    const model = this.resolveModel(options?.model, project.aiModel);
+    const temperature = this.resolveTemperature(project.aiTemperature);
+    const promptReferences =
+      projectType === 'translation'
+        ? await this.resolveTranslationPromptReferences(file.projectId, segment)
+        : {};
+
+    const targetTokens = await this.translateSegment({
+      apiKey,
+      model,
+      projectPrompt: project.aiPrompt || '',
+      projectType,
+      temperature,
+      srcLang: project.srcLang,
+      tgtLang: project.tgtLang,
+      sourceTokens: segment.sourceTokens,
+      sourceText,
+      sourceTagPreservedText,
+      context,
+      currentTranslationPayload: currentTranslationTagPreservedText,
+      refinementInstruction,
+      tmReference: promptReferences.tmReference,
+      tbReferences: promptReferences.tbReferences,
+    });
+
+    await this.segmentService.updateSegment(segment.segmentId, targetTokens, aiStatus);
+
+    return { segmentId: segment.segmentId, status: aiStatus };
+  }
+
   public async aiTestTranslate(projectId: number, sourceText: string, contextText?: string) {
     const project = this.projectRepo.getProject(projectId);
     if (!project) throw new Error('Project not found');
@@ -347,6 +424,8 @@ export class AIModule {
     sourceText: string;
     sourceTagPreservedText: string;
     context?: string;
+    currentTranslationPayload?: string;
+    refinementInstruction?: string;
     tmReference?: PromptTMReference;
     tbReferences?: PromptTBReference[];
   }): Promise<Token[]> {
@@ -366,6 +445,8 @@ export class AIModule {
         sourceText: params.sourceText,
         sourceTagPreservedText: params.sourceTagPreservedText,
         context: params.context,
+        currentTranslationPayload: params.currentTranslationPayload,
+        refinementInstruction: params.refinementInstruction,
         tmReference: params.tmReference,
         tbReferences: params.tbReferences,
         validationFeedback,
@@ -410,6 +491,8 @@ export class AIModule {
     sourceText: string;
     sourceTagPreservedText?: string;
     context?: string;
+    currentTranslationPayload?: string;
+    refinementInstruction?: string;
     tmReference?: PromptTMReference;
     tbReferences?: PromptTBReference[];
     validationFeedback?: string;
@@ -432,6 +515,8 @@ export class AIModule {
       sourcePayload,
       hasProtectedMarkers,
       context: params.context,
+      currentTranslationPayload: params.currentTranslationPayload,
+      refinementInstruction: params.refinementInstruction,
       tmReference: params.tmReference,
       tbReferences: params.tbReferences,
       validationFeedback: params.validationFeedback,

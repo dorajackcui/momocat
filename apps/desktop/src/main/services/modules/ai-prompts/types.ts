@@ -22,6 +22,8 @@ export interface UserPromptBuildParams {
   sourcePayload: string;
   hasProtectedMarkers: boolean;
   context?: string;
+  currentTranslationPayload?: string;
+  refinementInstruction?: string;
   validationFeedback?: string;
   tmReference?: PromptTMReference;
   tbReferences?: PromptTBReference[];

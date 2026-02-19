@@ -97,6 +97,34 @@ describe('ai-prompt templates', () => {
     expect(prompt).not.toContain('Context:');
   });
 
+  it('builds translation user prompt with refinement instruction and current translation', () => {
+    const prompt = buildAIUserPrompt('translation', {
+      srcLang: 'en',
+      sourcePayload: 'Hello world',
+      hasProtectedMarkers: false,
+      context: 'UI label',
+      currentTranslationPayload: '你好，世界',
+      refinementInstruction: 'Make tone more concise',
+    });
+
+    expect(prompt).toContain('Current Translation:');
+    expect(prompt).toContain('你好，世界');
+    expect(prompt).toContain('Refinement Instruction:');
+    expect(prompt).toContain('Make tone more concise');
+  });
+
+  it('does not include refinement section when only one refinement field is present', () => {
+    const prompt = buildAIUserPrompt('translation', {
+      srcLang: 'en',
+      sourcePayload: 'Hello world',
+      hasProtectedMarkers: false,
+      currentTranslationPayload: '你好，世界',
+    });
+
+    expect(prompt).not.toContain('Current Translation:');
+    expect(prompt).not.toContain('Refinement Instruction:');
+  });
+
   it('builds review user prompt with validation feedback', () => {
     const prompt = buildAIUserPrompt('review', {
       srcLang: 'en',

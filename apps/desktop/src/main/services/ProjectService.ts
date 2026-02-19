@@ -389,6 +389,16 @@ export class ProjectService {
     return this.aiModule.aiTranslateSegment(segmentId, options);
   }
 
+  public async aiRefineSegment(
+    segmentId: string,
+    instruction: string,
+    options?: {
+      model?: string;
+    },
+  ) {
+    return this.aiModule.aiRefineSegment(segmentId, instruction, options);
+  }
+
   public async aiTestTranslate(projectId: number, sourceText: string, contextText?: string) {
     return this.aiModule.aiTestTranslate(projectId, sourceText, contextText);
   }

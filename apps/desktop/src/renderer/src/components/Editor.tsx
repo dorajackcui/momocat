@@ -49,6 +49,7 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
     setActiveSegmentId,
     handleTranslationChange,
     translateSegmentWithAI,
+    refineSegmentWithAI,
     confirmSegment,
     handleApplyMatch,
     handleApplyTerm,
@@ -613,8 +614,10 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
                 onAutoFocus={handleRowAutoFocus}
                 onChange={handleTranslationChange}
                 onAITranslate={translateSegmentWithAI}
+                onAIRefine={refineSegmentWithAI}
                 onConfirm={confirmSegment}
                 isAITranslating={Boolean(aiTranslatingSegmentIds[item.segment.segmentId])}
+                isAIRefining={Boolean(aiTranslatingSegmentIds[item.segment.segmentId])}
                 saveError={segmentSaveErrors[item.segment.segmentId]}
                 sourceHighlightQuery={debouncedSourceQuery}
                 targetHighlightQuery={debouncedTargetQuery}

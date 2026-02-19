@@ -40,6 +40,23 @@ export function buildTranslationUserPrompt(params: UserPromptBuildParams): strin
     userParts.push('', `Context: ${contextText}`);
   }
 
+  const currentTranslationText =
+    typeof params.currentTranslationPayload === 'string'
+      ? params.currentTranslationPayload.trim()
+      : '';
+  const refinementInstructionText =
+    typeof params.refinementInstruction === 'string' ? params.refinementInstruction.trim() : '';
+  if (currentTranslationText && refinementInstructionText) {
+    userParts.push(
+      '',
+      'Current Translation:',
+      currentTranslationText,
+      '',
+      'Refinement Instruction:',
+      refinementInstructionText,
+    );
+  }
+
   if (params.tmReference) {
     userParts.push(
       '',

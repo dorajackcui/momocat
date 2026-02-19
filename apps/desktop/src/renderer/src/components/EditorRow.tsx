@@ -16,8 +16,22 @@ interface EditorRowProps {
   onAutoFocus?: (id: string) => void;
   onChange: (id: string, value: string) => void;
   onAITranslate: (id: string) => void;
+  onAIRefine: (id: string, instruction: string) => void;
   onConfirm: (id: string) => void;
   isAITranslating?: boolean;
+  isAIRefining?: boolean;
+}
+
+export function hasRefinableTargetText(text: string): boolean {
+  return text.trim().length > 0;
+}
+
+export function shouldShowAIRefineControl(isActive: boolean, targetText: string): boolean {
+  return isActive && hasRefinableTargetText(targetText);
+}
+
+export function normalizeRefinementInstruction(instruction: string): string {
+  return instruction.trim();
 }
 
 export const EditorRow: React.FC<EditorRowProps> = ({
@@ -33,13 +47,18 @@ export const EditorRow: React.FC<EditorRowProps> = ({
   onAutoFocus,
   onChange,
   onAITranslate,
+  onAIRefine,
   onConfirm,
   isAITranslating = false,
+  isAIRefining = false,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const aiRefineInputRef = useRef<HTMLInputElement>(null);
   const [isContextExpanded, setIsContextExpanded] = useState(false);
   const [contextCopied, setContextCopied] = useState(false);
   const [showTagInsertionUI, setShowTagInsertionUI] = useState(false);
+  const [showAIRefineInput, setShowAIRefineInput] = useState(false);
+  const [aiRefineDraft, setAiRefineDraft] = useState('');
   const [draftText, setDraftText] = useState('');
   const [isSourceHovered, setIsSourceHovered] = useState(false);
   const contextCopiedTimerRef = useRef<number | null>(null);
@@ -96,8 +115,18 @@ export const EditorRow: React.FC<EditorRowProps> = ({
       // Reset transient insertion UI when row loses focus.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowTagInsertionUI(false);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setShowAIRefineInput(false);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setAiRefineDraft('');
     }
   }, [disableAutoFocus, isActive, onAutoFocus, segment.segmentId]);
+
+  useEffect(() => {
+    if (!showAIRefineInput || !isActive) return;
+    aiRefineInputRef.current?.focus();
+    aiRefineInputRef.current?.select();
+  }, [isActive, showAIRefineInput]);
 
   useEffect(() => {
     return () => {
@@ -182,6 +211,44 @@ export const EditorRow: React.FC<EditorRowProps> = ({
     event.stopPropagation();
     onActivate(segment.segmentId, { autoFocusTarget: false });
   };
+
+  const submitAIRefinement = useCallback(() => {
+    if (isAIRefining) return;
+    const instruction = normalizeRefinementInstruction(aiRefineDraft);
+    if (!instruction) return;
+    onAIRefine(segment.segmentId, instruction);
+    setShowAIRefineInput(false);
+    setAiRefineDraft('');
+  }, [aiRefineDraft, isAIRefining, onAIRefine, segment.segmentId]);
+
+  const toggleAIRefineInput = useCallback(() => {
+    setShowAIRefineInput((prev) => {
+      const next = !prev;
+      if (!next) {
+        setAiRefineDraft('');
+      }
+      return next;
+    });
+  }, []);
+
+  const handleAIRefineInputKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        event.stopPropagation();
+        submitAIRefinement();
+        return;
+      }
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        setShowAIRefineInput(false);
+        setAiRefineDraft('');
+      }
+    },
+    [submitAIRefinement],
+  );
 
   const handleTargetKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -288,7 +355,10 @@ export const EditorRow: React.FC<EditorRowProps> = ({
   const showTargetHighlightOverlay = targetHighlightQuery.trim().length > 0;
   const canInsertTags = sourceTags.length > 0;
   const canAITranslate = sourceEditorText.trim().length > 0;
-  const showTargetActionButtons = isActive && (canInsertTags || canAITranslate);
+  const hasRefinableTarget = hasRefinableTargetText(draftText);
+  const showAIRefineControl = shouldShowAIRefineControl(isActive, draftText);
+  const showTargetActionButtons =
+    isActive && (canInsertTags || canAITranslate || hasRefinableTarget);
   const targetTextLayerClass = showTargetActionButtons
     ? 'editor-target-text-layer pr-12'
     : 'editor-target-text-layer';
@@ -381,8 +451,69 @@ export const EditorRow: React.FC<EditorRowProps> = ({
           )}
         </div>
 
+        {showAIRefineInput && showAIRefineControl && (
+          <div className="absolute top-1.5 right-9 z-30">
+            <input
+              ref={aiRefineInputRef}
+              value={aiRefineDraft}
+              onClick={(event) => event.stopPropagation()}
+              onChange={(event) => setAiRefineDraft(event.target.value)}
+              onKeyDown={handleAIRefineInputKeyDown}
+              disabled={isAIRefining}
+              placeholder="Refine prompt(Enter to send)"
+              className="field-input !w-56 !px-2.5 !py-1 text-[11px] leading-tight !bg-surface/50 border-border/70 backdrop-blur-sm shadow-sm disabled:opacity-60 disabled:cursor-wait"
+              aria-label="AI refine instruction"
+            />
+          </div>
+        )}
+
         {showTargetActionButtons && (
           <div className="absolute top-1.5 right-1.5 z-20 flex flex-col items-end gap-1">
+            {showAIRefineControl && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (isAIRefining) return;
+                  toggleAIRefineInput();
+                }}
+                disabled={isAIRefining}
+                className="relative z-20 p-1 rounded bg-surface/80 border border-border/70 hover:bg-brand-soft/75 hover:border-brand/40 text-text-muted hover:text-brand transition-all shadow-sm disabled:opacity-60 disabled:cursor-wait"
+                title="AI refine this translation"
+                aria-label="AI refine this translation"
+              >
+                {isAIRefining ? (
+                  <svg
+                    className="w-3.5 h-3.5 animate-spin"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v4m0 8v4m8-8h-4M8 12H4m12.364 5.364l-2.828-2.828M9.464 9.464L6.636 6.636m9.728 0l-2.828 2.828m-4.072 4.072l-2.828 2.828"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 18h18M7 18c0-6 3-10 5-10s5 4 5 10"
+                      />
+                  </svg>
+                )}
+              </button>
+            )}
+
             {canAITranslate && (
               <button
                 type="button"

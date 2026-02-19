@@ -577,6 +577,53 @@ export function useEditor({ activeFileId }: UseEditorProps) {
     [aiTranslatingSegmentIds, clearSegmentSaveError, segments, setSegmentSaveError],
   );
 
+  const refineSegmentWithAI = useCallback(
+    async (segmentId: string, instruction: string) => {
+      if (aiTranslatingSegmentIds[segmentId]) {
+        return;
+      }
+
+      const segment = segments.find((item) => item.segmentId === segmentId);
+      if (!segment) return;
+
+      const sourceText = serializeTokensToDisplayText(segment.sourceTokens).trim();
+      if (!sourceText) {
+        setSegmentSaveError(segmentId, 'AI 微调失败：源文为空');
+        return;
+      }
+
+      const refinementInstruction = instruction.trim();
+      if (!refinementInstruction) {
+        setSegmentSaveError(segmentId, 'AI 微调失败：微调指示不能为空');
+        return;
+      }
+
+      setAiTranslatingSegmentIds((prev) => {
+        if (prev[segmentId]) return prev;
+        return {
+          ...prev,
+          [segmentId]: true,
+        };
+      });
+      clearSegmentSaveError(segmentId);
+
+      try {
+        await apiClient.aiRefineSegment(segmentId, refinementInstruction);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setSegmentSaveError(segmentId, `AI 微调失败：${message}`);
+      } finally {
+        setAiTranslatingSegmentIds((prev) => {
+          if (!prev[segmentId]) return prev;
+          const next = { ...prev };
+          delete next[segmentId];
+          return next;
+        });
+      }
+    },
+    [aiTranslatingSegmentIds, clearSegmentSaveError, segments, setSegmentSaveError],
+  );
+
   return {
     segments,
     projectId,
@@ -589,6 +636,7 @@ export function useEditor({ activeFileId }: UseEditorProps) {
     aiTranslatingSegmentIds,
     handleTranslationChange,
     translateSegmentWithAI,
+    refineSegmentWithAI,
     confirmSegment,
     handleApplyMatch,
     handleApplyTerm,

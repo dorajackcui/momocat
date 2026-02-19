@@ -1001,6 +1001,234 @@ describe('AIModule.aiTranslateSegment', () => {
   });
 });
 
+describe('AIModule.aiRefineSegment', () => {
+  it('refines one segment with refinement prompt fields and translation references', async () => {
+    const segment = createSegment({
+      segmentId: 'refine-1',
+      sourceText: 'Hello world',
+      targetText: '你好世界',
+      context: 'UI button label',
+      status: 'draft',
+    });
+
+    const projectRepo = {
+      getFile: vi.fn().mockReturnValue({ id: 1, projectId: 11, name: 'demo.xlsx' }),
+      getProject: vi.fn().mockReturnValue({
+        id: 11,
+        srcLang: 'en',
+        tgtLang: 'zh',
+        aiPrompt: '',
+        aiTemperature: 0.2,
+      }),
+    } as unknown as ProjectRepository;
+
+    const segmentRepo = {
+      getSegment: vi.fn().mockReturnValue(segment),
+    } as unknown as SegmentRepository;
+
+    const settingsRepo = {
+      getSetting: vi.fn().mockReturnValue('test-api-key'),
+    } as unknown as SettingsRepository;
+
+    const segmentService = {
+      updateSegment: vi.fn().mockResolvedValue(undefined),
+    } as unknown as SegmentService;
+
+    const transport = {
+      testConnection: vi.fn().mockResolvedValue({ ok: true }),
+      chatCompletions: vi.fn().mockResolvedValue({
+        content: '你好，世界',
+        status: 200,
+        endpoint: '/v1/chat/completions',
+      }),
+    } as unknown as AITransport;
+
+    const tmService = {
+      findMatches: vi.fn().mockResolvedValue([
+        {
+          similarity: 99,
+          tmName: 'Main TM',
+          sourceTokens: [{ type: 'text', content: 'Hello world' }],
+          targetTokens: [{ type: 'text', content: '你好世界' }],
+        },
+      ]),
+    } as unknown as Pick<TMService, 'findMatches'>;
+
+    const tbService = {
+      findMatches: vi.fn().mockResolvedValue([{ srcTerm: 'world', tgtTerm: '世界', note: null }]),
+    } as unknown as Pick<TBService, 'findMatches'>;
+
+    const module = new AIModule(
+      projectRepo,
+      segmentRepo,
+      settingsRepo,
+      segmentService,
+      transport,
+      undefined,
+      { tmService, tbService },
+    );
+
+    const result = await module.aiRefineSegment('refine-1', 'Make the tone concise');
+
+    expect(result).toEqual({ segmentId: 'refine-1', status: 'translated' });
+    expect(segmentService.updateSegment).toHaveBeenCalledWith(
+      'refine-1',
+      expect.any(Array),
+      'translated',
+    );
+    const request = (transport.chatCompletions as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(request.userPrompt).toContain('Context: UI button label');
+    expect(request.userPrompt).toContain('Current Translation:');
+    expect(request.userPrompt).toContain('你好世界');
+    expect(request.userPrompt).toContain('Refinement Instruction:');
+    expect(request.userPrompt).toContain('Make the tone concise');
+    expect(request.userPrompt).toContain('TM Reference (best match):');
+    expect(request.userPrompt).toContain('Terminology References (hit terms):');
+  });
+
+  it('returns reviewed status for review project', async () => {
+    const segment = createSegment({
+      segmentId: 'refine-review-1',
+      sourceText: 'Review this text',
+      targetText: '初稿',
+      status: 'draft',
+    });
+
+    const projectRepo = {
+      getFile: vi.fn().mockReturnValue({ id: 1, projectId: 11, name: 'demo.xlsx' }),
+      getProject: vi.fn().mockReturnValue({
+        id: 11,
+        srcLang: 'en',
+        tgtLang: 'zh',
+        projectType: 'review',
+        aiPrompt: '',
+        aiTemperature: 0.2,
+      }),
+    } as unknown as ProjectRepository;
+
+    const segmentRepo = {
+      getSegment: vi.fn().mockReturnValue(segment),
+    } as unknown as SegmentRepository;
+
+    const settingsRepo = {
+      getSetting: vi.fn().mockReturnValue('test-api-key'),
+    } as unknown as SettingsRepository;
+
+    const segmentService = {
+      updateSegment: vi.fn().mockResolvedValue(undefined),
+    } as unknown as SegmentService;
+
+    const transport = {
+      testConnection: vi.fn().mockResolvedValue({ ok: true }),
+      chatCompletions: vi.fn().mockResolvedValue({
+        content: '修改后译文',
+        status: 200,
+        endpoint: '/v1/chat/completions',
+      }),
+    } as unknown as AITransport;
+
+    const module = new AIModule(projectRepo, segmentRepo, settingsRepo, segmentService, transport);
+    const result = await module.aiRefineSegment('refine-review-1', 'Fix terminology only');
+
+    expect(result).toEqual({ segmentId: 'refine-review-1', status: 'reviewed' });
+    expect(segmentService.updateSegment).toHaveBeenCalledWith(
+      'refine-review-1',
+      expect.any(Array),
+      'reviewed',
+    );
+  });
+
+  it('throws when refinement instruction is empty', async () => {
+    const segment = createSegment({
+      segmentId: 'refine-empty-inst-1',
+      sourceText: 'Hello',
+      targetText: '你好',
+      status: 'draft',
+    });
+
+    const projectRepo = {
+      getFile: vi.fn().mockReturnValue({ id: 1, projectId: 11, name: 'demo.xlsx' }),
+      getProject: vi.fn().mockReturnValue({
+        id: 11,
+        srcLang: 'en',
+        tgtLang: 'zh',
+        aiPrompt: '',
+        aiTemperature: 0.2,
+      }),
+    } as unknown as ProjectRepository;
+
+    const segmentRepo = {
+      getSegment: vi.fn().mockReturnValue(segment),
+    } as unknown as SegmentRepository;
+
+    const settingsRepo = {
+      getSetting: vi.fn().mockReturnValue('test-api-key'),
+    } as unknown as SettingsRepository;
+
+    const segmentService = {
+      updateSegment: vi.fn().mockResolvedValue(undefined),
+    } as unknown as SegmentService;
+
+    const transport = {
+      testConnection: vi.fn().mockResolvedValue({ ok: true }),
+      chatCompletions: vi.fn(),
+    } as unknown as AITransport;
+
+    const module = new AIModule(projectRepo, segmentRepo, settingsRepo, segmentService, transport);
+
+    await expect(module.aiRefineSegment('refine-empty-inst-1', '   ')).rejects.toThrow(
+      'Refinement instruction is empty',
+    );
+    expect(transport.chatCompletions).not.toHaveBeenCalled();
+    expect(segmentService.updateSegment).not.toHaveBeenCalled();
+  });
+
+  it('throws when current target is empty', async () => {
+    const segment = createSegment({
+      segmentId: 'refine-empty-target-1',
+      sourceText: 'Hello',
+      targetText: '',
+      status: 'new',
+    });
+
+    const projectRepo = {
+      getFile: vi.fn().mockReturnValue({ id: 1, projectId: 11, name: 'demo.xlsx' }),
+      getProject: vi.fn().mockReturnValue({
+        id: 11,
+        srcLang: 'en',
+        tgtLang: 'zh',
+        aiPrompt: '',
+        aiTemperature: 0.2,
+      }),
+    } as unknown as ProjectRepository;
+
+    const segmentRepo = {
+      getSegment: vi.fn().mockReturnValue(segment),
+    } as unknown as SegmentRepository;
+
+    const settingsRepo = {
+      getSetting: vi.fn().mockReturnValue('test-api-key'),
+    } as unknown as SettingsRepository;
+
+    const segmentService = {
+      updateSegment: vi.fn().mockResolvedValue(undefined),
+    } as unknown as SegmentService;
+
+    const transport = {
+      testConnection: vi.fn().mockResolvedValue({ ok: true }),
+      chatCompletions: vi.fn(),
+    } as unknown as AITransport;
+
+    const module = new AIModule(projectRepo, segmentRepo, settingsRepo, segmentService, transport);
+
+    await expect(
+      module.aiRefineSegment('refine-empty-target-1', 'Make it shorter'),
+    ).rejects.toThrow('Target segment is empty');
+    expect(transport.chatCompletions).not.toHaveBeenCalled();
+    expect(segmentService.updateSegment).not.toHaveBeenCalled();
+  });
+});
+
 describe('AIModule.proxySettings', () => {
   it('returns system mode by default when no proxy settings are stored', () => {
     const settingsRepo = {
