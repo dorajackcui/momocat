@@ -1,4 +1,4 @@
-# 项目结构说明（更新于 2026-02-14）
+# 项目结构说明（更新于 2026-02-21）
 
 本项目为 npm workspaces Monorepo，核心分为 `apps/`（应用）和 `packages/`（共享库）。
 
@@ -34,6 +34,7 @@ simple-cat-tool/
   - `TBService.ts`: TB 匹配逻辑
   - `ports.ts`: 服务层抽象端口定义
   - `modules/`: 按业务拆分模块（`ProjectFileModule`/`TMModule`/`TBModule`/`AIModule`）
+    - `modules/ai/`: AIModule 内部子模块（`dialogueTranslation.ts` / `promptReferences.ts` / `types.ts`）
   - `adapters/`: SQLite 端口适配器
   - `providers/`: 外部能力提供者（当前为 `OpenAITransport`）
 
@@ -66,7 +67,7 @@ simple-cat-tool/
 ## `packages/db`（数据库层）
 
 - `index.ts`: `CATDatabase` 聚合入口
-- `migration/runMigrations.ts`: schema 迁移（当前至 v11）
+- `migration/runMigrations.ts`: schema 迁移（当前至 v12）
 - `repos/*`: Project/Segment/TM/TB/Settings 仓储实现
 
 ## 运行数据与构建

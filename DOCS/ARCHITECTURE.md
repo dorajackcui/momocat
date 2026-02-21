@@ -16,6 +16,7 @@
 - `main`
   - `ProjectService` 作为应用层门面。
   - 业务能力按模块拆分：`ProjectFileModule`、`TMModule`、`TBModule`、`AIModule`。
+  - `AIModule` 内部进一步拆分为 `services/modules/ai/*`（dialogue 翻译、prompt 引用解析、内部类型）。
   - 领域服务：`SegmentService`、`TMService`、`TBService`。
   - IPC 按领域拆分注册：`ipc/projectHandlers.ts`、`tmHandlers.ts`、`tbHandlers.ts`、`aiHandlers.ts`、`dialogHandlers.ts`。
 - `packages`
@@ -33,6 +34,7 @@
   - 渲染层 `TMPanel` 对 TM 卡片做防御性截断，最多显示 `5` 条（TB 不受该上限约束）。
 - AI 单段链路（As-Is）：
   - `AIModule.aiTranslateSegment` 与 `AIModule.aiRefineSegment` 共享 `translateSegment` + Tag 校验重试机制。
+  - 主进程已增加同段互斥锁（segment-level operation lock），防止并发请求导致结果覆盖。
   - 微调场景通过 `ai-refine-segment` IPC 进入主进程，在 translation prompt 中追加“当前译文 + 微调指示”区块（`Current Translation` / `Refinement Instruction`）。
   - 微调沿用 TM/TB 引用注入与状态回写策略（`review` -> `reviewed`，其余 -> `translated`）。
 - AI 批量链路（As-Is）：
@@ -41,6 +43,8 @@
   - `dialogue` 模式下以 `segment.meta.context` 作为 `speaker`，按同 speaker 连续段分组翻译。
   - 每组请求会附带上一组（speaker + 原文 + 译文）作为上下文；返回采用结构化 JSON 解析并执行 Tag 校验。
   - 组翻译失败时自动降级为逐段翻译，优先保证可完成性。
+  - dialogue 进度语义已修正为“按实际处理完成递增”，避免预先计数造成进度虚高。
+  - renderer 侧已对未知 `jobId` 进度事件做 upsert，规避 job 事件先到导致的 UI 状态丢失。
 - 架构守卫（Gate-05）限制：
   - `ProjectService` 只做编排。
   - `CATDatabase` 不新增跨 repo 编排。

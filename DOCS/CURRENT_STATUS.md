@@ -11,11 +11,11 @@
 
 ## 2. 门禁状态（本地核验）
 
-核验日期：2026-02-14
+核验日期：2026-02-21
 
 1. `npm run typecheck --workspace=apps/desktop`：通过。
-2. `npm run lint --workspace=apps/desktop`：通过（`0 error / 0 warnings`）。
-3. `npm run gate:check`：通过。
+2. `npm run lint --workspace=apps/desktop`：通过（`0 error / 7 warnings`，均为历史存量 warning）。
+3. `npm run gate:check`：未通过（`gate:style` 阻断，当前命中 `apps/desktop/src/renderer/src/components/EditorRow.tsx` 的硬编码颜色类）。
 
 最新同步：
 
@@ -38,6 +38,12 @@
   - 分组策略：批量模式下将 `meta.context` 视为 `speaker`，同 `speaker` 连续空 target 段落按组发送；遇到不可翻译段会断组。
   - 上下文策略：翻译当前组时附带上一组（speaker + 原文 + 译文）以增强一致性。
   - 容错策略：组翻译采用结构化 JSON 返回校验 + Tag 校验；组失败自动降级为逐段翻译，确保任务可完成。
+- 已完成 AI 翻译链路稳态修复（2026-02-21）：
+  - 主进程已为 `aiTranslateSegment` / `aiRefineSegment` 增加同段互斥锁；同一 `segmentId` 并发请求会快速失败，避免后返回覆盖先返回。
+  - `useProjectAI` 已修复 job 事件竞态：未知 `jobId` 也会先 upsert，再由 `startAITranslateFile` 回填 `fileId`，避免 UI 卡在 `Queued/Running`。
+  - dialogue 批量翻译进度语义已修复：进度只在段落实际处理完成后递增，不再在组开始前“提前计数”。
+  - `AIModule` 已做文件级最小拆分：`services/modules/ai/dialogueTranslation.ts`、`services/modules/ai/promptReferences.ts`、`services/modules/ai/types.ts`。
+  - 相关回归测试通过：main 侧（44 tests）+ renderer 侧（14 tests）。
 - 当前 warning 分布（root lint）：
   - `packages/core`: `24`
   - `packages/db`: `19`
@@ -54,9 +60,10 @@
 
 ## 4. 当前优先级（建议）
 
-1. Warning 治理策略：下一步按模块压降 `packages/core` 与 `packages/db` 的剩余 `43` 条 warning。
-2. 功能开发新增要求：触达 `ProjectService`/`CATDatabase`/IPC 时，必须补对应测试。
-3. 继续保持门禁与代码一致：新增公共 API 时同步更新架构守卫清单。
+1. 先恢复 Gate：修复 `EditorRow.tsx` 的 `gate:style` 阻断项，确保 `npm run gate:check` 重新通过。
+2. Warning 治理策略：继续按模块压降 `packages/core` 与 `packages/db` 的剩余 warning。
+3. 功能开发新增要求：触达 `ProjectService`/`CATDatabase`/IPC 时，必须补对应测试。
+4. 继续保持门禁与代码一致：新增公共 API 时同步更新架构守卫清单。
 
 ## 5. 使用方式（给 agent）
 

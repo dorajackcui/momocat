@@ -9,6 +9,8 @@ import {
   normalizeProjectAIModel,
   normalizeTemperatureValue,
   parseTemperatureInput,
+  upsertTrackedJobFromProgress,
+  upsertTrackedJobOnStart,
 } from './useProjectAI';
 
 describe('useProjectAI behavior helpers', () => {
@@ -107,5 +109,41 @@ describe('useProjectAI behavior helpers', () => {
     expect(normalizeProjectAIModel('gpt-5-mini')).toBe('gpt-5-mini');
     expect(normalizeProjectAIModel('gpt-unknown')).toBe('gpt-4o');
     expect(normalizeProjectAIModel(null)).toBe('gpt-4o');
+  });
+
+  it('upserts unknown job progress with fallback file id', () => {
+    const merged = upsertTrackedJobFromProgress({
+      jobId: 'job-new',
+      progress: 100,
+      status: 'completed',
+      message: 'Done',
+    });
+
+    expect(merged).toEqual({
+      jobId: 'job-new',
+      fileId: -1,
+      progress: 100,
+      status: 'completed',
+      message: 'Done',
+    });
+  });
+
+  it('keeps terminal status when start arrives after completion', () => {
+    const existing = {
+      jobId: 'job-race',
+      fileId: -1,
+      progress: 100,
+      status: 'completed' as const,
+      message: 'Already done',
+    };
+
+    const merged = upsertTrackedJobOnStart('job-race', 42, existing);
+    expect(merged).toEqual({
+      jobId: 'job-race',
+      fileId: 42,
+      progress: 100,
+      status: 'completed',
+      message: 'Already done',
+    });
   });
 });

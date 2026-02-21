@@ -51,6 +51,7 @@ Renderer (React 组件 + Hooks)
   - `TMModule`：TM 管理、匹配、导入、批量应用、commit
   - `TBModule`：TB 管理、匹配、导入
   - `AIModule`：AI 配置、测试翻译、单段 AI 翻译、单段 AI 微调、批量 AI 预翻译（含对话分组模式）
+  - `modules/ai/*`：AIModule 内部子模块（dialogue 分组翻译、TM/TB 引用解析、AI 相关内部类型）
 - `services/SegmentService.ts`：段落更新、确认后传播、事件广播。
 - `filters/SpreadsheetFilter.ts`：CSV/XLSX 导入导出（文件过滤器）。
 - `JobManager.ts`：长任务进度（AI 翻译 + TM/TB 导入）统一事件中心。
@@ -159,7 +160,7 @@ AI Translate Segment (EditorRow):
   -> apiClient.aiTranslateSegment
   -> ipc "ai-translate-segment"
   -> ProjectService.aiTranslateSegment
-  -> AIModule.aiTranslateSegment
+  -> AIModule.aiTranslateSegment (主进程同段互斥锁兜底)
   -> SegmentService.updateSegment(status=translated/reviewed)
 
 AI Refine Segment (EditorRow):
@@ -167,7 +168,7 @@ AI Refine Segment (EditorRow):
   -> apiClient.aiRefineSegment
   -> ipc "ai-refine-segment"
   -> ProjectService.aiRefineSegment
-  -> AIModule.aiRefineSegment
+  -> AIModule.aiRefineSegment (与单段翻译共享同段互斥锁)
   -> translation user prompt 追加:
      - Current Translation
      - Refinement Instruction
@@ -176,11 +177,12 @@ AI Refine Segment (EditorRow):
 AI Translate File:
   -> apiClient.aiTranslateFile(fileId, { mode })
   -> ipc "ai-translate-file" 立即返回 jobId
-  -> JobManager 推送 job-progress
+  -> JobManager 推送 job-progress (renderer 对未知 jobId 先 upsert，避免时序竞态丢状态)
   -> AIModule.aiTranslateFile
      - mode=default: 逐段翻译空白 target
      - mode=dialogue(仅 translation): 按 speaker 连续段分组翻译，
        并注入上一组(原文+译文+speaker)上下文
+     - dialogue 进度语义：仅在段落实际处理完成后递增
   -> SegmentService.updateSegment / updateSegmentsAtomically(status=translated)
 ```
 
@@ -188,6 +190,7 @@ AI Translate File:
 - 微调按钮仅在 active 行且目标列已有文本时出现。
 - 微调输入框为右侧半透明悬浮层，不挤占译文文本区域；提交快捷键为 Enter，取消为 Escape。
 - 单段 AI 翻译与单段 AI 微调共享同一段落级并发锁（同一段同时只允许一个 AI 请求）。
+- 同段并发锁已由主进程兜底：并发请求会快速失败，防止后返回覆盖先返回。
 - 文件级批量翻译新增 `AI Dialogue` 手动入口（仅 `translation` 项目显示）。
 - 对话模式当前将 `meta.context` 视为 `speaker`；组翻译失败会自动降级到逐段翻译。
 
@@ -237,6 +240,9 @@ TMImportWizard / TBImportWizard
 - `apps/desktop/src/renderer/src/hooks/useEditor.ts`
 - `apps/desktop/src/renderer/src/hooks/projectDetail/useProjectAI.ts`
 - `apps/desktop/src/main/services/modules/AIModule.ts`
+- `apps/desktop/src/main/services/modules/ai/dialogueTranslation.ts`
+- `apps/desktop/src/main/services/modules/ai/promptReferences.ts`
+- `apps/desktop/src/main/services/modules/ai/types.ts`
 - `apps/desktop/src/main/services/modules/ai-prompts/translationPromptTemplate.ts`
 - `apps/desktop/src/main/services/providers/OpenAITransport.ts`
 
