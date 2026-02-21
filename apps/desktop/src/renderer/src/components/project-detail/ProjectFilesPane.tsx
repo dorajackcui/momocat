@@ -113,25 +113,48 @@ export function ProjectFilesPane({
                       TM Match
                     </Button>
                   )}
-                  <Button
-                    onClick={() => void ai.startAITranslateFile(file.id, file.name)}
-                    disabled={jobRunning}
-                    variant="soft"
-                    size="sm"
-                    className="!bg-success-soft !text-success"
-                  >
-                    {jobRunning
-                      ? isReviewProject
-                        ? 'AI Reviewing...'
-                        : isCustomProject
-                          ? 'AI Processing...'
-                          : 'AI Translating...'
-                      : isReviewProject
-                        ? 'AI Review'
-                        : isCustomProject
-                          ? 'AI Process'
-                          : 'AI Translate'}
-                  </Button>
+                  {supportsTMWorkflow ? (
+                    <>
+                      <Button
+                        onClick={() => void ai.startAITranslateFile(file.id, file.name, 'default')}
+                        disabled={jobRunning}
+                        variant="soft"
+                        size="sm"
+                        className="!bg-success-soft !text-success"
+                      >
+                        {jobRunning ? 'AI Translating...' : 'AI Translate'}
+                      </Button>
+                      <Button
+                        onClick={() => void ai.startAITranslateFile(file.id, file.name, 'dialogue')}
+                        disabled={jobRunning}
+                        variant="soft"
+                        size="sm"
+                        className="!bg-info-soft !text-info"
+                      >
+                        {jobRunning ? 'AI Dialogue...' : 'AI Dialogue'}
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      onClick={() => void ai.startAITranslateFile(file.id, file.name)}
+                      disabled={jobRunning}
+                      variant="soft"
+                      size="sm"
+                      className="!bg-success-soft !text-success"
+                    >
+                      {jobRunning
+                        ? isReviewProject
+                          ? 'AI Reviewing...'
+                          : isCustomProject
+                            ? 'AI Processing...'
+                            : 'AI Translating...'
+                        : isReviewProject
+                          ? 'AI Review'
+                          : isCustomProject
+                            ? 'AI Process'
+                            : 'AI Translate'}
+                    </Button>
+                  )}
                   {supportsTMWorkflow && (
                     <Button
                       onClick={() => void onRunFileQA(file.id, file.name)}

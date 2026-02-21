@@ -1,4 +1,8 @@
-import { SystemPromptBuildParams, UserPromptBuildParams } from './types';
+import {
+  DialogueUserPromptBuildParams,
+  SystemPromptBuildParams,
+  UserPromptBuildParams,
+} from './types';
 
 function buildTranslationBasePromptRules(srcLang: string, tgtLang: string): string[] {
   return [
@@ -74,6 +78,63 @@ export function buildTranslationUserPrompt(params: UserPromptBuildParams): strin
       const noteSuffix = note ? ` (note: ${note})` : '';
       userParts.push(`- ${reference.srcTerm} => ${reference.tgtTerm}${noteSuffix}`);
     }
+  }
+
+  if (params.validationFeedback) {
+    userParts.push('', 'Validation feedback from previous attempt:', params.validationFeedback);
+  }
+
+  return userParts.join('\n');
+}
+
+export function buildDialogueTranslationUserPrompt(params: DialogueUserPromptBuildParams): string {
+  const userParts: string[] = [
+    `Translate the following dialogue segments from ${params.srcLang} to ${params.tgtLang}.`,
+    'Return strict JSON only with this schema:',
+    '{"translations":[{"id":"<segment-id>","text":"<translated-text>"}]}',
+    'Each output item must preserve its source id exactly.',
+    'Never omit or add IDs.',
+    '',
+    'Dialogue Segments:',
+  ];
+
+  params.segments.forEach((segment, index) => {
+    userParts.push(
+      `${index + 1}. id: ${segment.id}`,
+      `   speaker: ${segment.speaker}`,
+      '   source:',
+      segment.sourcePayload,
+    );
+
+    if (segment.tmReference) {
+      userParts.push(
+        '   TM Reference (best match):',
+        `   - Similarity: ${segment.tmReference.similarity}% | TM: ${segment.tmReference.tmName}`,
+        `   - Source: ${segment.tmReference.sourceText}`,
+        `   - Target: ${segment.tmReference.targetText}`,
+      );
+    }
+
+    if (segment.tbReferences && segment.tbReferences.length > 0) {
+      userParts.push('   Terminology References (hit terms):');
+      for (const reference of segment.tbReferences) {
+        const note = typeof reference.note === 'string' ? reference.note.trim() : '';
+        const noteSuffix = note ? ` (note: ${note})` : '';
+        userParts.push(`   - ${reference.srcTerm} => ${reference.tgtTerm}${noteSuffix}`);
+      }
+    }
+  });
+
+  if (params.previousGroup) {
+    userParts.push(
+      '',
+      'Previous Dialogue Group (for consistency):',
+      `speaker: ${params.previousGroup.speaker}`,
+      'source:',
+      params.previousGroup.sourceText,
+      'target:',
+      params.previousGroup.targetText,
+    );
   }
 
   if (params.validationFeedback) {

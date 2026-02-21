@@ -1,6 +1,6 @@
 # Simple CAT Tool 架构说明
 
-最后更新：2026-02-19
+最后更新：2026-02-21
 
 > 文档定位：描述“当前实现边界 + 演进目标”。  
 > 若与代码冲突，以代码为准；优先参考：`DOCS/PROJECT_STRUCTURE.md`、`DOCS/DATABASE_SCHEMA.md`、`DOCS/DEVELOPMENT_GUIDE.md`。
@@ -35,6 +35,12 @@
   - `AIModule.aiTranslateSegment` 与 `AIModule.aiRefineSegment` 共享 `translateSegment` + Tag 校验重试机制。
   - 微调场景通过 `ai-refine-segment` IPC 进入主进程，在 translation prompt 中追加“当前译文 + 微调指示”区块（`Current Translation` / `Refinement Instruction`）。
   - 微调沿用 TM/TB 引用注入与状态回写策略（`review` -> `reviewed`，其余 -> `translated`）。
+- AI 批量链路（As-Is）：
+  - `ai-translate-file` 支持 `mode` 参数：`default` / `dialogue`。
+  - `dialogue` 目前仅对 `translation` 项目生效，`review/custom` 不变。
+  - `dialogue` 模式下以 `segment.meta.context` 作为 `speaker`，按同 speaker 连续段分组翻译。
+  - 每组请求会附带上一组（speaker + 原文 + 译文）作为上下文；返回采用结构化 JSON 解析并执行 Tag 校验。
+  - 组翻译失败时自动降级为逐段翻译，优先保证可完成性。
 - 架构守卫（Gate-05）限制：
   - `ProjectService` 只做编排。
   - `CATDatabase` 不新增跨 repo 编排。

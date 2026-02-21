@@ -1,4 +1,4 @@
-# 当前开发状态（更新于 2026-02-19）
+# 当前开发状态（更新于 2026-02-21）
 
 > 这是“执行面板”文档：记录当前阶段、门禁状态、近期优先级。  
 > 需要实时准确，过时信息优先改这里。
@@ -31,6 +31,13 @@
   - `TMRepo.searchConcordance` 统一上限为 `10`，并保留 `bm25` + CJK `LIKE` 回退（同样作用于 Concordance 面板）。
   - `TMService.findMatches` 改为复合相似度（Levenshtein + bigram Dice + 轻量 bonus），最小阈值保持 `70`，最终返回 Top `10`。
   - `TMPanel` 对 TM 结果增加 UI 防御上限，最多展示 `5` 条（TB 行为不变）。
+- 已完成“对话式批量 AI 翻译”（2026-02-21）：
+  - 作用范围：仅 `translation` 项目生效；`review/custom` 链路保持不变。
+  - 触发方式：文件列表新增手动入口 `AI Dialogue`；原 `AI Translate` 保留。
+  - IPC/契约：`aiTranslateFile` 新增可选参数 `mode`（`default` | `dialogue`），Renderer/Preload/Main 全链路打通。
+  - 分组策略：批量模式下将 `meta.context` 视为 `speaker`，同 `speaker` 连续空 target 段落按组发送；遇到不可翻译段会断组。
+  - 上下文策略：翻译当前组时附带上一组（speaker + 原文 + 译文）以增强一致性。
+  - 容错策略：组翻译采用结构化 JSON 返回校验 + Tag 校验；组失败自动降级为逐段翻译，确保任务可完成。
 - 当前 warning 分布（root lint）：
   - `packages/core`: `24`
   - `packages/db`: `19`

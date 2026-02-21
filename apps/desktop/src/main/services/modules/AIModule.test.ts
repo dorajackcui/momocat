@@ -865,6 +865,122 @@ describe('AIModule.aiTranslateFile', () => {
     expect(request.userPrompt).toContain('Input text');
     expect(request.userPrompt).toContain('Context: Additional context');
   });
+
+  it('groups consecutive speaker segments and injects previous dialogue group context', async () => {
+    const segments: Segment[] = [
+      createSegment({ segmentId: 'dlg-a1', sourceText: 'Hello', context: 'Alice' }),
+      createSegment({ segmentId: 'dlg-a2', sourceText: 'How are you?', context: 'Alice' }),
+      createSegment({ segmentId: 'dlg-b1', sourceText: 'I am fine.', context: 'Bob' }),
+    ];
+
+    const projectRepo = {
+      getFile: vi.fn().mockReturnValue({ id: 1, projectId: 11, name: 'demo.xlsx' }),
+      getProject: vi.fn().mockReturnValue({
+        id: 11,
+        srcLang: 'en',
+        tgtLang: 'zh',
+        projectType: 'translation',
+        aiPrompt: '',
+        aiTemperature: 0.2,
+      }),
+    } as unknown as ProjectRepository;
+
+    const segmentRepo = {
+      getSegmentsPage: vi.fn().mockReturnValue(segments),
+    } as unknown as SegmentRepository;
+
+    const settingsRepo = {
+      getSetting: vi.fn().mockReturnValue('test-api-key'),
+    } as unknown as SettingsRepository;
+
+    const segmentService = {
+      updateSegment: vi.fn().mockResolvedValue(undefined),
+      updateSegmentsAtomically: vi.fn().mockResolvedValue([]),
+    } as unknown as SegmentService;
+
+    const transport = {
+      testConnection: vi.fn().mockResolvedValue({ ok: true }),
+      chatCompletions: vi
+        .fn()
+        .mockResolvedValueOnce({
+          content:
+            '{"translations":[{"id":"dlg-a1","text":"你好"},{"id":"dlg-a2","text":"你好吗？"}]}',
+          status: 200,
+          endpoint: '/v1/chat/completions',
+        })
+        .mockResolvedValueOnce({
+          content: '{"translations":[{"id":"dlg-b1","text":"我很好。"}]}',
+          status: 200,
+          endpoint: '/v1/chat/completions',
+        }),
+    } as unknown as AITransport;
+
+    const module = new AIModule(projectRepo, segmentRepo, settingsRepo, segmentService, transport);
+    const result = await module.aiTranslateFile(1, { mode: 'dialogue' });
+
+    expect(result.translated).toBe(3);
+    expect(result.failed).toBe(0);
+    expect(segmentService.updateSegmentsAtomically).toHaveBeenCalledTimes(2);
+    const firstUpdate = (segmentService.updateSegmentsAtomically as ReturnType<typeof vi.fn>).mock
+      .calls[0][0];
+    expect(firstUpdate).toHaveLength(2);
+    const secondPrompt = (transport.chatCompletions as ReturnType<typeof vi.fn>).mock.calls[1][0]
+      .userPrompt;
+    expect(secondPrompt).toContain('Previous Dialogue Group (for consistency):');
+    expect(secondPrompt).toContain('speaker: Alice');
+    expect(secondPrompt).toContain('你好');
+    expect(segmentService.updateSegment).not.toHaveBeenCalled();
+  });
+
+  it('falls back to per-segment translation when dialogue group translation fails', async () => {
+    const segments: Segment[] = [
+      createSegment({ segmentId: 'dlg-fallback-1', sourceText: 'First line', context: 'Alice' }),
+      createSegment({ segmentId: 'dlg-fallback-2', sourceText: 'Second line', context: 'Alice' }),
+    ];
+
+    const projectRepo = {
+      getFile: vi.fn().mockReturnValue({ id: 1, projectId: 11, name: 'demo.xlsx' }),
+      getProject: vi.fn().mockReturnValue({
+        id: 11,
+        srcLang: 'en',
+        tgtLang: 'zh',
+        projectType: 'translation',
+        aiPrompt: '',
+        aiTemperature: 0.2,
+      }),
+    } as unknown as ProjectRepository;
+
+    const segmentRepo = {
+      getSegmentsPage: vi.fn().mockReturnValue(segments),
+    } as unknown as SegmentRepository;
+
+    const settingsRepo = {
+      getSetting: vi.fn().mockReturnValue('test-api-key'),
+    } as unknown as SettingsRepository;
+
+    const segmentService = {
+      updateSegment: vi.fn().mockResolvedValue(undefined),
+      updateSegmentsAtomically: vi.fn().mockResolvedValue([]),
+    } as unknown as SegmentService;
+
+    const responses = ['not-json', 'still-not-json', 'again-not-json', '第一句', '第二句'];
+    const transport = {
+      testConnection: vi.fn().mockResolvedValue({ ok: true }),
+      chatCompletions: vi.fn().mockImplementation(async () => ({
+        content: responses.shift() ?? '默认译文',
+        status: 200,
+        endpoint: '/v1/chat/completions',
+      })),
+    } as unknown as AITransport;
+
+    const module = new AIModule(projectRepo, segmentRepo, settingsRepo, segmentService, transport);
+    const result = await module.aiTranslateFile(1, { mode: 'dialogue' });
+
+    expect(result.translated).toBe(2);
+    expect(result.failed).toBe(0);
+    expect(segmentService.updateSegmentsAtomically).not.toHaveBeenCalled();
+    expect(segmentService.updateSegment).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('AIModule.aiTranslateSegment', () => {

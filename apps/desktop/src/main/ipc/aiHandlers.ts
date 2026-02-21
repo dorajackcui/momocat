@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { IPC_CHANNELS } from '../../shared/ipcChannels';
+import type { AITranslateFileOptions } from '../../shared/ipc';
 import type { AIHandlerDeps } from './types';
 
 function registerHandle(
@@ -73,12 +74,13 @@ export function registerAIHandlers({ ipcMain, projectService, jobManager }: AIHa
     { ipcMain, projectService, jobManager },
     IPC_CHANNELS.ai.translateFile,
     (_event, ...args) => {
-      const [fileId] = args as [number];
+      const [fileId, options] = args as [number, AITranslateFileOptions | undefined];
       const jobId = randomUUID();
       jobManager.startJob(jobId, 'AI translation started');
 
       projectService
         .aiTranslateFile(fileId, {
+          mode: options?.mode,
           onProgress: (data) => {
             const progress = data.total === 0 ? 100 : Math.round((data.current / data.total) * 100);
             jobManager.updateProgress(jobId, {

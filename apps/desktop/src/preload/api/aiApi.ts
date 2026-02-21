@@ -42,8 +42,8 @@ export function createAIApi(ipcRenderer: IpcRendererLike): DesktopApiSlice<AIApi
       ipcRenderer.invoke(IPC_CHANNELS.ai.refineSegment, segmentId, instruction) as ReturnType<
         DesktopApi['aiRefineSegment']
       >,
-    aiTranslateFile: (fileId) =>
-      ipcRenderer.invoke(IPC_CHANNELS.ai.translateFile, fileId) as ReturnType<
+    aiTranslateFile: (fileId, options) =>
+      ipcRenderer.invoke(IPC_CHANNELS.ai.translateFile, fileId, options) as ReturnType<
         DesktopApi['aiTranslateFile']
       >,
     aiTestTranslate: (projectId, sourceText, contextText) =>

@@ -1,5 +1,6 @@
 import {
   DEFAULT_PROJECT_AI_MODEL,
+  Project,
   ProjectAIModel,
   ProjectType,
   Segment,
@@ -11,19 +12,24 @@ import {
   serializeTokensToDisplayText,
   serializeTokensToEditorText,
 } from '@cat/core';
-import type { ProxySettings, ProxySettingsInput } from '../../../shared/ipc';
+import type { AIBatchMode, ProxySettings, ProxySettingsInput } from '../../../shared/ipc';
 import { AITransport, ProjectRepository, SegmentRepository, SettingsRepository } from '../ports';
 import { ProxySettingsApplier, ProxySettingsManager } from '../proxy/ProxySettingsManager';
 import { SegmentService } from '../SegmentService';
 import type { TBService } from '../TBService';
 import type { TMService } from '../TMService';
 import {
+  buildAIDialogueUserPrompt,
   buildAISystemPrompt,
   buildAIUserPrompt,
   getAIProgressVerb,
   normalizeProjectType,
 } from './ai-prompts';
-import type { PromptTBReference, PromptTMReference } from './ai-prompts/types';
+import type {
+  DialoguePromptPreviousGroup,
+  PromptTBReference,
+  PromptTMReference,
+} from './ai-prompts/types';
 
 interface TranslateDebugMeta {
   requestId?: string;
@@ -44,11 +50,40 @@ interface TranslationPromptReferences {
   tbReferences?: PromptTBReference[];
 }
 
+interface DialogueSegmentDraft {
+  segment: Segment;
+  speaker: string;
+  speakerKey: string;
+  sourceText: string;
+  sourcePayload: string;
+}
+
+interface DialogueTranslationUnit {
+  speaker: string;
+  speakerKey: string;
+  charCount: number;
+  segments: DialogueSegmentDraft[];
+}
+
+interface SegmentUpdateDraft {
+  segmentId: string;
+  targetTokens: Token[];
+  status: SegmentStatus;
+}
+
+interface DialogueTranslationResult {
+  updates: SegmentUpdateDraft[];
+  previousGroup: DialoguePromptPreviousGroup;
+}
+
 export class AIModule {
   private static readonly SEGMENT_PAGE_SIZE = 1000;
   private static readonly AI_API_KEY = 'openai_api_key';
   private static readonly PROXY_MODE_KEY = 'app_proxy_mode';
   private static readonly PROXY_URL_KEY = 'app_proxy_url';
+  private static readonly DIALOGUE_MAX_SEGMENTS_PER_UNIT = 6;
+  private static readonly DIALOGUE_MAX_CHARS_PER_UNIT = 1200;
+  private static readonly TRANSLATION_INTERVAL_MS = 40;
   private readonly tagValidator = new TagValidator();
 
   constructor(
@@ -123,6 +158,7 @@ export class AIModule {
     fileId: number,
     options?: {
       model?: string;
+      mode?: AIBatchMode;
       onProgress?: (data: { current: number; total: number; message?: string }) => void;
     },
   ) {
@@ -140,12 +176,24 @@ export class AIModule {
     const model = this.resolveModel(options?.model, project.aiModel);
     const projectType = project.projectType || 'translation';
     const temperature = this.resolveTemperature(project.aiTemperature);
+    if (projectType === 'translation' && options?.mode === 'dialogue') {
+      return this.aiTranslateFileByDialogueUnits({
+        fileId,
+        project,
+        apiKey,
+        model,
+        temperature,
+        onProgress: options?.onProgress,
+      });
+    }
+
     const totalSegments = this.countFileSegments(fileId);
     const total = this.countTranslatableSegments(fileId);
     let current = 0;
     let translated = 0;
     const skipped = totalSegments - total;
     let failed = 0;
+    const aiStatus: SegmentStatus = projectType === 'review' ? 'reviewed' : 'translated';
 
     for (const seg of this.iterateFileSegments(fileId)) {
       if (!this.isTranslatableSegment(seg)) continue;
@@ -157,20 +205,10 @@ export class AIModule {
         message: `${getAIProgressVerb(projectType)} segment ${current} of ${total}`,
       });
 
-      const sourceText = serializeTokensToDisplayText(seg.sourceTokens);
-      const sourceTagPreservedText = serializeTokensToEditorText(
-        seg.sourceTokens,
-        seg.sourceTokens,
-      );
-      const context = seg.meta?.context ? String(seg.meta.context).trim() : '';
-      const aiStatus: SegmentStatus = projectType === 'review' ? 'reviewed' : 'translated';
-      const promptReferences =
-        projectType === 'translation'
-          ? await this.resolveTranslationPromptReferences(file.projectId, seg)
-          : {};
-
       try {
-        const targetTokens = await this.translateSegment({
+        const targetTokens = await this.translateBatchSegment({
+          projectId: file.projectId,
+          segment: seg,
           apiKey,
           model,
           projectPrompt: project.aiPrompt || '',
@@ -178,12 +216,6 @@ export class AIModule {
           temperature,
           srcLang: project.srcLang,
           tgtLang: project.tgtLang,
-          sourceTokens: seg.sourceTokens,
-          sourceText,
-          sourceTagPreservedText,
-          context,
-          tmReference: promptReferences.tmReference,
-          tbReferences: promptReferences.tbReferences,
         });
 
         await this.segmentService.updateSegment(seg.segmentId, targetTokens, aiStatus);
@@ -192,7 +224,7 @@ export class AIModule {
         failed += 1;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 40));
+      await this.sleep(AIModule.TRANSLATION_INTERVAL_MS);
     }
 
     return { translated, skipped, failed, total: totalSegments };
@@ -412,6 +444,413 @@ export class AIModule {
     }
   }
 
+  private async aiTranslateFileByDialogueUnits(params: {
+    fileId: number;
+    project: Project;
+    apiKey: string;
+    model: string;
+    temperature: number;
+    onProgress?: (data: { current: number; total: number; message?: string }) => void;
+  }) {
+    const units = this.buildDialogueUnits(params.fileId);
+    const totalSegments = this.countFileSegments(params.fileId);
+    const total = units.reduce((sum, unit) => sum + unit.segments.length, 0);
+    const skipped = totalSegments - total;
+    let current = 0;
+    let translated = 0;
+    let failed = 0;
+    let previousGroup: DialoguePromptPreviousGroup | undefined;
+
+    for (const unit of units) {
+      for (let index = 0; index < unit.segments.length; index++) {
+        current += 1;
+        params.onProgress?.({
+          current,
+          total,
+          message: `${getAIProgressVerb('translation')} segment ${current} of ${total}`,
+        });
+      }
+
+      try {
+        const result = await this.translateDialogueUnit({
+          projectId: params.project.id,
+          project: params.project,
+          apiKey: params.apiKey,
+          model: params.model,
+          temperature: params.temperature,
+          unit,
+          previousGroup,
+        });
+
+        await this.segmentService.updateSegmentsAtomically(result.updates);
+        translated += unit.segments.length;
+        previousGroup = result.previousGroup;
+      } catch {
+        for (const draft of unit.segments) {
+          try {
+            const targetTokens = await this.translateBatchSegment({
+              projectId: params.project.id,
+              segment: draft.segment,
+              apiKey: params.apiKey,
+              model: params.model,
+              projectPrompt: params.project.aiPrompt || '',
+              projectType: 'translation',
+              temperature: params.temperature,
+              srcLang: params.project.srcLang,
+              tgtLang: params.project.tgtLang,
+            });
+
+            await this.segmentService.updateSegment(
+              draft.segment.segmentId,
+              targetTokens,
+              'translated',
+            );
+            translated += 1;
+            previousGroup = {
+              speaker: draft.speaker || 'Unknown',
+              sourceText: draft.sourcePayload,
+              targetText: serializeTokensToEditorText(targetTokens, draft.segment.sourceTokens),
+            };
+          } catch {
+            failed += 1;
+          }
+
+          await this.sleep(AIModule.TRANSLATION_INTERVAL_MS);
+        }
+
+        continue;
+      }
+
+      await this.sleep(AIModule.TRANSLATION_INTERVAL_MS);
+    }
+
+    return { translated, skipped, failed, total: totalSegments };
+  }
+
+  private buildDialogueUnits(fileId: number): DialogueTranslationUnit[] {
+    const units: DialogueTranslationUnit[] = [];
+    let currentUnit: DialogueTranslationUnit | undefined;
+
+    const flushUnit = () => {
+      if (currentUnit && currentUnit.segments.length > 0) {
+        units.push(currentUnit);
+      }
+      currentUnit = undefined;
+    };
+
+    for (const segment of this.iterateFileSegments(fileId)) {
+      if (!this.isTranslatableSegment(segment)) {
+        flushUnit();
+        continue;
+      }
+
+      const sourceText = serializeTokensToDisplayText(segment.sourceTokens);
+      const sourcePayload = serializeTokensToEditorText(segment.sourceTokens, segment.sourceTokens);
+      const speaker = this.readDialogueSpeaker(segment);
+      const speakerKey = speaker.toLocaleLowerCase();
+      const draft: DialogueSegmentDraft = {
+        segment,
+        speaker,
+        speakerKey,
+        sourceText,
+        sourcePayload,
+      };
+
+      if (!speaker) {
+        flushUnit();
+        units.push({
+          speaker,
+          speakerKey,
+          charCount: sourcePayload.length,
+          segments: [draft],
+        });
+        continue;
+      }
+
+      if (
+        currentUnit &&
+        currentUnit.speakerKey === speakerKey &&
+        currentUnit.segments.length < AIModule.DIALOGUE_MAX_SEGMENTS_PER_UNIT &&
+        currentUnit.charCount + sourcePayload.length <= AIModule.DIALOGUE_MAX_CHARS_PER_UNIT
+      ) {
+        currentUnit.segments.push(draft);
+        currentUnit.charCount += sourcePayload.length;
+        continue;
+      }
+
+      flushUnit();
+      currentUnit = {
+        speaker,
+        speakerKey,
+        charCount: sourcePayload.length,
+        segments: [draft],
+      };
+    }
+
+    flushUnit();
+
+    return units;
+  }
+
+  private async translateDialogueUnit(params: {
+    projectId: number;
+    project: Project;
+    apiKey: string;
+    model: string;
+    temperature: number;
+    unit: DialogueTranslationUnit;
+    previousGroup?: DialoguePromptPreviousGroup;
+  }): Promise<DialogueTranslationResult> {
+    const promptSegments = [];
+    for (const draft of params.unit.segments) {
+      const references = await this.resolveTranslationPromptReferences(
+        params.projectId,
+        draft.segment,
+      );
+      promptSegments.push({
+        id: draft.segment.segmentId,
+        speaker: draft.speaker || 'Unknown',
+        sourcePayload: draft.sourcePayload,
+        tmReference: references.tmReference,
+        tbReferences: references.tbReferences,
+      });
+    }
+
+    const systemPrompt = buildAISystemPrompt('translation', {
+      srcLang: params.project.srcLang,
+      tgtLang: params.project.tgtLang,
+      projectPrompt: params.project.aiPrompt || '',
+    });
+
+    const expectedIds = params.unit.segments.map((segment) => segment.segment.segmentId);
+    const maxAttempts = 3;
+    let validationFeedback: string | undefined;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const userPrompt = buildAIDialogueUserPrompt({
+        srcLang: params.project.srcLang,
+        tgtLang: params.project.tgtLang,
+        segments: promptSegments,
+        previousGroup: params.previousGroup,
+        validationFeedback,
+      });
+
+      const response = await this.transport.chatCompletions({
+        apiKey: params.apiKey,
+        model: params.model,
+        temperature: this.resolveTemperature(params.temperature),
+        systemPrompt,
+        userPrompt,
+      });
+      const content = response.content.trim();
+      if (!content) {
+        throw new Error('OpenAI response was empty');
+      }
+
+      try {
+        const translations = this.parseDialogueTranslations(content, expectedIds);
+        const updates: SegmentUpdateDraft[] = [];
+        const issues: string[] = [];
+
+        for (const draft of params.unit.segments) {
+          const translatedText = translations.get(draft.segment.segmentId) ?? '';
+          if (
+            this.isUnchangedOutput(
+              translatedText,
+              draft.sourceText,
+              draft.sourcePayload,
+              params.project.srcLang,
+              params.project.tgtLang,
+            )
+          ) {
+            issues.push(`Segment ${draft.segment.segmentId}: model returned source unchanged.`);
+            continue;
+          }
+
+          let targetTokens: Token[];
+          try {
+            targetTokens = parseEditorTextToTokens(translatedText, draft.segment.sourceTokens);
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            issues.push(`Segment ${draft.segment.segmentId}: token parsing failed (${message}).`);
+            continue;
+          }
+
+          const validationResult = this.tagValidator.validate(
+            draft.segment.sourceTokens,
+            targetTokens,
+          );
+          const errors = validationResult.issues.filter((issue) => issue.severity === 'error');
+          if (errors.length > 0) {
+            issues.push(
+              `Segment ${draft.segment.segmentId}: ${errors.map((errorItem) => errorItem.message).join('; ')}`,
+            );
+            continue;
+          }
+
+          updates.push({
+            segmentId: draft.segment.segmentId,
+            targetTokens,
+            status: 'translated',
+          });
+        }
+
+        if (issues.length === 0 && updates.length === params.unit.segments.length) {
+          const targetText = params.unit.segments
+            .map((draft) => translations.get(draft.segment.segmentId)?.trim() ?? '')
+            .join('\n');
+          return {
+            updates,
+            previousGroup: {
+              speaker: params.unit.speaker || 'Unknown',
+              sourceText: params.unit.segments.map((draft) => draft.sourcePayload).join('\n'),
+              targetText,
+            },
+          };
+        }
+
+        if (attempt === maxAttempts) {
+          throw new Error(
+            `Dialogue translation failed after ${maxAttempts} attempts: ${issues.join(' ')}`,
+          );
+        }
+
+        validationFeedback = [
+          'Previous response was invalid.',
+          ...issues.map((issue) => `- ${issue}`),
+          'Retry with strict JSON format and keep protected markers unchanged.',
+        ].join('\n');
+      } catch (error) {
+        if (attempt === maxAttempts) {
+          throw error;
+        }
+        const message = error instanceof Error ? error.message : String(error);
+        validationFeedback = [
+          'Previous response was invalid.',
+          `- ${message}`,
+          'Retry with strict JSON format and keep protected markers unchanged.',
+        ].join('\n');
+      }
+    }
+
+    throw new Error('Unexpected dialogue translation retry failure');
+  }
+
+  private parseDialogueTranslations(raw: string, expectedIds: string[]): Map<string, string> {
+    const payload = this.extractJsonPayload(raw);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(payload);
+    } catch {
+      throw new Error('Response is not valid JSON.');
+    }
+
+    if (!parsed || typeof parsed !== 'object') {
+      throw new Error('Response must be a JSON object.');
+    }
+    const translations = (parsed as { translations?: unknown }).translations;
+    if (!Array.isArray(translations)) {
+      throw new Error('Response must include a translations array.');
+    }
+
+    const expectedIdSet = new Set(expectedIds);
+    const result = new Map<string, string>();
+
+    for (const item of translations) {
+      if (!item || typeof item !== 'object') {
+        throw new Error('Each translations item must be an object.');
+      }
+      const id = String((item as { id?: unknown }).id ?? '').trim();
+      const text = String((item as { text?: unknown }).text ?? '').trim();
+      if (!id) {
+        throw new Error('Each translations item requires a non-empty id.');
+      }
+      if (!text) {
+        throw new Error(`Translation text is empty for segment ${id}.`);
+      }
+      if (!expectedIdSet.has(id)) {
+        throw new Error(`Unexpected segment id returned: ${id}.`);
+      }
+      if (result.has(id)) {
+        throw new Error(`Duplicate segment id returned: ${id}.`);
+      }
+      result.set(id, text);
+    }
+
+    for (const expectedId of expectedIds) {
+      if (!result.has(expectedId)) {
+        throw new Error(`Missing translation for segment ${expectedId}.`);
+      }
+    }
+
+    return result;
+  }
+
+  private extractJsonPayload(raw: string): string {
+    const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fenced && fenced[1]) {
+      return fenced[1].trim();
+    }
+    return raw.trim();
+  }
+
+  private readDialogueSpeaker(segment: Segment): string {
+    return segment.meta?.context ? String(segment.meta.context).trim() : '';
+  }
+
+  private isUnchangedOutput(
+    translatedText: string,
+    sourceText: string,
+    sourcePayload: string,
+    srcLang: string,
+    tgtLang: string,
+  ): boolean {
+    if (srcLang === tgtLang) {
+      return false;
+    }
+    const trimmed = translatedText.trim();
+    return trimmed === sourceText.trim() || trimmed === sourcePayload.trim();
+  }
+
+  private async translateBatchSegment(params: {
+    projectId: number;
+    segment: Segment;
+    apiKey: string;
+    model: string;
+    projectPrompt: string;
+    projectType: ProjectType;
+    temperature: number;
+    srcLang: string;
+    tgtLang: string;
+  }): Promise<Token[]> {
+    const sourceText = serializeTokensToDisplayText(params.segment.sourceTokens);
+    const sourceTagPreservedText = serializeTokensToEditorText(
+      params.segment.sourceTokens,
+      params.segment.sourceTokens,
+    );
+    const context = params.segment.meta?.context ? String(params.segment.meta.context).trim() : '';
+    const promptReferences =
+      params.projectType === 'translation'
+        ? await this.resolveTranslationPromptReferences(params.projectId, params.segment)
+        : {};
+
+    return this.translateSegment({
+      apiKey: params.apiKey,
+      model: params.model,
+      projectPrompt: params.projectPrompt,
+      projectType: params.projectType,
+      temperature: params.temperature,
+      srcLang: params.srcLang,
+      tgtLang: params.tgtLang,
+      sourceTokens: params.segment.sourceTokens,
+      sourceText,
+      sourceTagPreservedText,
+      context,
+      tmReference: promptReferences.tmReference,
+      tbReferences: promptReferences.tbReferences,
+    });
+  }
+
   private async translateSegment(params: {
     apiKey: string;
     model: string;
@@ -560,6 +999,10 @@ export class AIModule {
     }
 
     return trimmed;
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   private resolveTemperature(value: number | null | undefined): number {

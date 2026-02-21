@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildAISystemPrompt, buildAIUserPrompt } from './index';
+import { buildAIDialogueUserPrompt, buildAISystemPrompt, buildAIUserPrompt } from './index';
 
 describe('ai-prompt templates', () => {
   it('builds translation system prompt with project prompt prefix', () => {
@@ -161,5 +161,38 @@ describe('ai-prompt templates', () => {
 
     expect(prompt).toContain('Input:');
     expect(prompt).not.toContain('Context:');
+  });
+
+  it('builds dialogue translation user prompt with previous group and json contract', () => {
+    const prompt = buildAIDialogueUserPrompt({
+      srcLang: 'en',
+      tgtLang: 'zh',
+      segments: [
+        {
+          id: 'seg-1',
+          speaker: 'Alice',
+          sourcePayload: 'Hello there',
+        },
+        {
+          id: 'seg-2',
+          speaker: 'Alice',
+          sourcePayload: 'How are you?',
+        },
+      ],
+      previousGroup: {
+        speaker: 'Bob',
+        sourceText: 'Good morning',
+        targetText: '早上好',
+      },
+    });
+
+    expect(prompt).toContain('Return strict JSON only');
+    expect(prompt).toContain('{"translations":[{"id":"<segment-id>","text":"<translated-text>"}]}');
+    expect(prompt).toContain('id: seg-1');
+    expect(prompt).toContain('speaker: Alice');
+    expect(prompt).toContain('Previous Dialogue Group (for consistency):');
+    expect(prompt).toContain('speaker: Bob');
+    expect(prompt).toContain('target:');
+    expect(prompt).toContain('早上好');
   });
 });

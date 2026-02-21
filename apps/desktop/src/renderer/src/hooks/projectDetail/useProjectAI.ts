@@ -5,7 +5,7 @@ import {
   ProjectAIModel,
   normalizeProjectAIModel as normalizeProjectAIModelCore,
 } from '@cat/core';
-import type { JobProgressEvent } from '../../../../shared/ipc';
+import type { AIBatchMode, JobProgressEvent } from '../../../../shared/ipc';
 import { apiClient } from '../../services/apiClient';
 import { feedbackService } from '../../services/feedbackService';
 
@@ -124,7 +124,7 @@ export interface ProjectAIController {
   hasTestDetails: boolean;
   savePrompt: () => Promise<void>;
   testPrompt: () => Promise<void>;
-  startAITranslateFile: (fileId: number, fileName: string) => Promise<void>;
+  startAITranslateFile: (fileId: number, fileName: string, mode?: AIBatchMode) => Promise<void>;
   getFileJob: (fileId: number) => TrackedAIJob | null;
 }
 
@@ -318,21 +318,24 @@ export function useProjectAI({
   }, [project, testContext, testSource]);
 
   const startAITranslateFile = useCallback(
-    async (fileId: number, fileName: string) => {
+    async (fileId: number, fileName: string, mode: AIBatchMode = 'default') => {
       const projectType = project?.projectType || 'translation';
+      const effectiveMode: AIBatchMode = projectType === 'translation' ? mode : 'default';
       const actionLabel =
         projectType === 'review'
           ? 'review'
           : projectType === 'custom'
             ? 'processing'
-            : 'translation';
+            : effectiveMode === 'dialogue'
+              ? 'dialogue translation'
+              : 'translation';
       const targetLabel = projectType === 'custom' ? 'output' : 'target';
       const confirmed = await feedbackService.confirm(
         `Run AI ${actionLabel} for "${fileName}"? This will fill empty ${targetLabel} segments only.`,
       );
       if (!confirmed) return;
       try {
-        const jobId = await apiClient.aiTranslateFile(fileId);
+        const jobId = await apiClient.aiTranslateFile(fileId, { mode: effectiveMode });
         setAiJobs((prev) => ({
           ...prev,
           [jobId]: { jobId, fileId, progress: 0, status: 'running', message: 'Queued' },

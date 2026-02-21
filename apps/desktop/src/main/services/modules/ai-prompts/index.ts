@@ -2,10 +2,15 @@ import { ProjectType } from '@cat/core';
 import { buildCustomSystemPrompt, buildCustomUserPrompt } from './customPromptTemplate';
 import { buildReviewSystemPrompt, buildReviewUserPrompt } from './reviewPromptTemplate';
 import {
+  buildDialogueTranslationUserPrompt,
   buildTranslationSystemPrompt,
   buildTranslationUserPrompt,
 } from './translationPromptTemplate';
-import { SystemPromptBuildParams, UserPromptBuildParams } from './types';
+import {
+  DialogueUserPromptBuildParams,
+  SystemPromptBuildParams,
+  UserPromptBuildParams,
+} from './types';
 
 export function normalizeProjectType(projectType?: ProjectType): ProjectType {
   if (projectType === 'review') {
@@ -54,4 +59,8 @@ export function buildAIUserPrompt(projectType: ProjectType, params: UserPromptBu
     return buildCustomUserPrompt(params);
   }
   return buildTranslationUserPrompt(params);
+}
+
+export function buildAIDialogueUserPrompt(params: DialogueUserPromptBuildParams): string {
+  return buildDialogueTranslationUserPrompt(params);
 }

@@ -28,3 +28,25 @@ export interface UserPromptBuildParams {
   tmReference?: PromptTMReference;
   tbReferences?: PromptTBReference[];
 }
+
+export interface DialoguePromptSegment {
+  id: string;
+  speaker: string;
+  sourcePayload: string;
+  tmReference?: PromptTMReference;
+  tbReferences?: PromptTBReference[];
+}
+
+export interface DialoguePromptPreviousGroup {
+  speaker: string;
+  sourceText: string;
+  targetText: string;
+}
+
+export interface DialogueUserPromptBuildParams {
+  srcLang: string;
+  tgtLang: string;
+  segments: DialoguePromptSegment[];
+  previousGroup?: DialoguePromptPreviousGroup;
+  validationFeedback?: string;
+}

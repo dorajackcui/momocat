@@ -150,6 +150,12 @@ export interface AISegmentTranslateResult {
   status: SegmentStatus;
 }
 
+export type AIBatchMode = 'default' | 'dialogue';
+
+export interface AITranslateFileOptions {
+  mode?: AIBatchMode;
+}
+
 export interface SegmentsUpdatedEvent {
   segmentId: string;
   targetTokens: Token[];
@@ -258,7 +264,7 @@ export interface DesktopApi {
   testAIConnection: (apiKey?: string) => Promise<{ ok: true }>;
   aiTranslateSegment: (segmentId: string) => Promise<AISegmentTranslateResult>;
   aiRefineSegment: (segmentId: string, instruction: string) => Promise<AISegmentTranslateResult>;
-  aiTranslateFile: (fileId: number) => Promise<string>;
+  aiTranslateFile: (fileId: number, options?: AITranslateFileOptions) => Promise<string>;
   aiTestTranslate: (
     projectId: number,
     sourceText: string,
