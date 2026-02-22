@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { ProjectFile, ProjectType } from '@cat/core';
 import { ProjectAIController } from '../../hooks/projectDetail/useProjectAI';
 import { Button, Card, IconButton } from '../ui';
 import { ProjectAIPane } from './ProjectAIPane';
+import { ProjectAITranslateModal } from './ProjectAITranslateModal';
 import { deriveFileProgressBuckets, toPercent } from './fileProgressStats';
 
 interface ProjectFilesPaneProps {
@@ -27,12 +29,28 @@ export function ProjectFilesPane({
   ai,
   projectType = 'translation',
 }: ProjectFilesPaneProps) {
+  const [aiTranslateFile, setAiTranslateFile] = useState<{ id: number; name: string } | null>(null);
   const isReviewProject = projectType === 'review';
   const isCustomProject = projectType === 'custom';
   const supportsTMWorkflow = projectType === 'translation';
   return (
     <div className="max-w-4xl mx-auto">
       <ProjectAIPane ai={ai} projectType={projectType} />
+      {aiTranslateFile && (
+        <ProjectAITranslateModal
+          open={true}
+          fileName={aiTranslateFile.name}
+          onClose={() => setAiTranslateFile(null)}
+          onConfirm={(options) => {
+            void ai.startAITranslateFile(aiTranslateFile.id, aiTranslateFile.name, {
+              mode: options.mode,
+              targetScope: options.targetScope,
+              confirm: false,
+            });
+            setAiTranslateFile(null);
+          }}
+        />
+      )}
 
       <h3 className="text-sm font-bold text-text-faint uppercase tracking-wider mb-6">Files</h3>
 
@@ -116,22 +134,13 @@ export function ProjectFilesPane({
                   {supportsTMWorkflow ? (
                     <>
                       <Button
-                        onClick={() => void ai.startAITranslateFile(file.id, file.name, 'default')}
+                        onClick={() => setAiTranslateFile({ id: file.id, name: file.name })}
                         disabled={jobRunning}
                         variant="soft"
                         size="sm"
                         className="!bg-success-soft !text-success"
                       >
                         {jobRunning ? 'AI Translating...' : 'AI Translate'}
-                      </Button>
-                      <Button
-                        onClick={() => void ai.startAITranslateFile(file.id, file.name, 'dialogue')}
-                        disabled={jobRunning}
-                        variant="soft"
-                        size="sm"
-                        className="!bg-info-soft !text-info"
-                      >
-                        {jobRunning ? 'AI Dialogue...' : 'AI Dialogue'}
                       </Button>
                     </>
                   ) : (

@@ -5,7 +5,7 @@ import {
   ProjectAIModel,
   normalizeProjectAIModel as normalizeProjectAIModelCore,
 } from '@cat/core';
-import type { AIBatchMode, JobProgressEvent } from '../../../../shared/ipc';
+import type { AIBatchMode, AIBatchTargetScope, JobProgressEvent } from '../../../../shared/ipc';
 import { apiClient } from '../../services/apiClient';
 import { feedbackService } from '../../services/feedbackService';
 
@@ -98,6 +98,12 @@ export interface TrackedAIJob extends JobProgressEvent {
   fileId: number;
 }
 
+export interface StartAITranslateFileOptions {
+  mode?: AIBatchMode;
+  targetScope?: AIBatchTargetScope;
+  confirm?: boolean;
+}
+
 const TERMINAL_JOB_STATUSES: TrackedAIJob['status'][] = ['completed', 'failed', 'cancelled'];
 
 function isTerminalJobStatus(status: TrackedAIJob['status']): boolean {
@@ -171,7 +177,11 @@ export interface ProjectAIController {
   hasTestDetails: boolean;
   savePrompt: () => Promise<void>;
   testPrompt: () => Promise<void>;
-  startAITranslateFile: (fileId: number, fileName: string, mode?: AIBatchMode) => Promise<void>;
+  startAITranslateFile: (
+    fileId: number,
+    fileName: string,
+    options?: AIBatchMode | StartAITranslateFileOptions,
+  ) => Promise<void>;
   getFileJob: (fileId: number) => TrackedAIJob | null;
 }
 
@@ -363,9 +373,20 @@ export function useProjectAI({
   }, [project, testContext, testSource]);
 
   const startAITranslateFile = useCallback(
-    async (fileId: number, fileName: string, mode: AIBatchMode = 'default') => {
+    async (
+      fileId: number,
+      fileName: string,
+      options: AIBatchMode | StartAITranslateFileOptions = 'default',
+    ) => {
+      const normalizedOptions: StartAITranslateFileOptions =
+        typeof options === 'string' ? { mode: options } : options;
       const projectType = project?.projectType || 'translation';
-      const effectiveMode: AIBatchMode = projectType === 'translation' ? mode : 'default';
+      const effectiveMode: AIBatchMode =
+        projectType === 'translation' ? normalizedOptions.mode || 'default' : 'default';
+      const effectiveTargetScope: AIBatchTargetScope =
+        projectType === 'translation'
+          ? normalizedOptions.targetScope || 'blank-only'
+          : 'blank-only';
       const actionLabel =
         projectType === 'review'
           ? 'review'
@@ -375,12 +396,22 @@ export function useProjectAI({
               ? 'dialogue translation'
               : 'translation';
       const targetLabel = projectType === 'custom' ? 'output' : 'target';
-      const confirmed = await feedbackService.confirm(
-        `Run AI ${actionLabel} for "${fileName}"? This will fill empty ${targetLabel} segments only.`,
-      );
-      if (!confirmed) return;
+      const shouldConfirm = normalizedOptions.confirm !== false;
+      if (shouldConfirm) {
+        const scopeLabel =
+          effectiveTargetScope === 'overwrite-non-confirmed'
+            ? `overwrite existing non-confirmed ${targetLabel} segments`
+            : `fill empty ${targetLabel} segments only`;
+        const confirmed = await feedbackService.confirm(
+          `Run AI ${actionLabel} for "${fileName}"? This will ${scopeLabel}.`,
+        );
+        if (!confirmed) return;
+      }
       try {
-        const jobId = await apiClient.aiTranslateFile(fileId, { mode: effectiveMode });
+        const jobId = await apiClient.aiTranslateFile(fileId, {
+          mode: effectiveMode,
+          targetScope: effectiveTargetScope,
+        });
         setAiJobs((prev) => {
           const existing = prev[jobId];
           return {

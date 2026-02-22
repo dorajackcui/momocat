@@ -19,6 +19,10 @@
 
 最新同步：
 
+- 已完成 AI Translate 入口合并与批量选项扩展（2026-02-21）：
+  - 文件操作栏移除独立 `AI Dialogue` 按钮，`translation` 项目统一改为点击 `AI Translate` 后在弹窗中选择参数。
+  - 新增两项可选参数：`targetScope`（`blank-only` / `overwrite-non-confirmed`）与 `mode`（`default` / `dialogue`）。
+  - 覆盖策略已统一到主进程筛选逻辑：`overwrite-non-confirmed` 仅覆盖未确认段；`confirmed` 段始终跳过；默认行为保持“仅填空白段”。
 - 已修复 `gate:arch` 漂移：`DOCS/architecture/GATE05_GUARDRAILS.json` 已补齐 `getProjectTypeByFileId`。
 - 已完成首轮 warning 压降：`apps/desktop` 从 `555` 降到 `0`。
 - 编辑器已支持“单段 AI 翻译”（与批量翻译使用同一套 Prompt/TM/TB/Tag 校验规则），并在 `EditorRow` 增加半透明按钮；当同时存在 Insert Tag 与 AI 按钮时采用纵向排列避免遮挡。

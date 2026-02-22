@@ -43,13 +43,17 @@ describe('ai handlers', () => {
     const handler = handlers.get(IPC_CHANNELS.ai.translateFile);
     expect(handler).toBeDefined();
 
-    const jobId = handler?.({}, 1, { mode: 'dialogue' }) as string;
+    const jobId = handler?.({}, 1, {
+      mode: 'dialogue',
+      targetScope: 'overwrite-non-confirmed',
+    }) as string;
     expect(typeof jobId).toBe('string');
     expect(startJob).toHaveBeenCalledWith(jobId, 'AI translation started');
     expect(projectService.aiTranslateFile).toHaveBeenCalledWith(
       1,
       expect.objectContaining({
         mode: 'dialogue',
+        targetScope: 'overwrite-non-confirmed',
         onProgress: expect.any(Function),
       }),
     );

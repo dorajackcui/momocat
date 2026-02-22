@@ -12,7 +12,12 @@ import {
   serializeTokensToDisplayText,
   serializeTokensToEditorText,
 } from '@cat/core';
-import type { AIBatchMode, ProxySettings, ProxySettingsInput } from '../../../shared/ipc';
+import type {
+  AIBatchMode,
+  AIBatchTargetScope,
+  ProxySettings,
+  ProxySettingsInput,
+} from '../../../shared/ipc';
 import { AITransport, ProjectRepository, SegmentRepository, SettingsRepository } from '../ports';
 import { ProxySettingsApplier, ProxySettingsManager } from '../proxy/ProxySettingsManager';
 import { SegmentService } from '../SegmentService';
@@ -120,6 +125,7 @@ export class AIModule {
     options?: {
       model?: string;
       mode?: AIBatchMode;
+      targetScope?: AIBatchTargetScope;
       onProgress?: (data: { current: number; total: number; message?: string }) => void;
     },
   ) {
@@ -137,6 +143,7 @@ export class AIModule {
     const model = this.resolveModel(options?.model, project.aiModel);
     const projectType = project.projectType || 'translation';
     const temperature = this.resolveTemperature(project.aiTemperature);
+    const targetScope = this.resolveBatchTargetScope(options?.targetScope);
     if (projectType === 'translation' && options?.mode === 'dialogue') {
       return this.aiTranslateFileByDialogueUnits({
         fileId,
@@ -144,12 +151,13 @@ export class AIModule {
         apiKey,
         model,
         temperature,
+        targetScope,
         onProgress: options?.onProgress,
       });
     }
 
     const totalSegments = this.countFileSegments(fileId);
-    const total = this.countTranslatableSegments(fileId);
+    const total = this.countTranslatableSegments(fileId, targetScope);
     let current = 0;
     let translated = 0;
     const skipped = totalSegments - total;
@@ -157,7 +165,7 @@ export class AIModule {
     const aiStatus: SegmentStatus = projectType === 'review' ? 'reviewed' : 'translated';
 
     for (const seg of this.iterateFileSegments(fileId)) {
-      if (!this.isTranslatableSegment(seg)) continue;
+      if (!this.isTranslatableSegment(seg, targetScope)) continue;
 
       current += 1;
       options?.onProgress?.({
@@ -415,11 +423,12 @@ export class AIModule {
     apiKey: string;
     model: string;
     temperature: number;
+    targetScope: AIBatchTargetScope;
     onProgress?: (data: { current: number; total: number; message?: string }) => void;
   }) {
     const units = buildDialogueUnits({
       segments: this.iterateFileSegments(params.fileId),
-      isTranslatableSegment: (segment) => this.isTranslatableSegment(segment),
+      isTranslatableSegment: (segment) => this.isTranslatableSegment(segment, params.targetScope),
       maxSegmentsPerUnit: AIModule.DIALOGUE_MAX_SEGMENTS_PER_UNIT,
       maxCharsPerUnit: AIModule.DIALOGUE_MAX_CHARS_PER_UNIT,
     });
@@ -760,10 +769,15 @@ export class AIModule {
     }
   }
 
-  private isTranslatableSegment(segment: Segment): boolean {
+  private resolveBatchTargetScope(scope?: AIBatchTargetScope): AIBatchTargetScope {
+    return scope === 'overwrite-non-confirmed' ? scope : 'blank-only';
+  }
+
+  private isTranslatableSegment(segment: Segment, targetScope: AIBatchTargetScope): boolean {
     const sourceText = serializeTokensToDisplayText(segment.sourceTokens).trim();
     if (!sourceText) return false;
     if (segment.status === 'confirmed') return false;
+    if (targetScope === 'overwrite-non-confirmed') return true;
     const existingTarget = serializeTokensToDisplayText(segment.targetTokens).trim();
     return existingTarget.length === 0;
   }
@@ -786,10 +800,10 @@ export class AIModule {
     return count;
   }
 
-  private countTranslatableSegments(fileId: number): number {
+  private countTranslatableSegments(fileId: number, targetScope: AIBatchTargetScope): number {
     let count = 0;
     for (const segment of this.iterateFileSegments(fileId)) {
-      if (this.isTranslatableSegment(segment)) {
+      if (this.isTranslatableSegment(segment, targetScope)) {
         count += 1;
       }
     }

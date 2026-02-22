@@ -151,9 +151,11 @@ export interface AISegmentTranslateResult {
 }
 
 export type AIBatchMode = 'default' | 'dialogue';
+export type AIBatchTargetScope = 'blank-only' | 'overwrite-non-confirmed';
 
 export interface AITranslateFileOptions {
   mode?: AIBatchMode;
+  targetScope?: AIBatchTargetScope;
 }
 
 export interface SegmentsUpdatedEvent {

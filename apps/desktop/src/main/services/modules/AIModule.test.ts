@@ -107,6 +107,214 @@ describe('AIModule.aiTranslateFile', () => {
     expect(serializeTokensToDisplayText(translatedTokens)).toBe('你好世界');
   });
 
+  it('keeps blank-only as default target scope', async () => {
+    const segments: Segment[] = [
+      createSegment({ segmentId: 'blank-only-empty', sourceText: 'Hello world' }),
+      createSegment({
+        segmentId: 'blank-only-prefilled',
+        sourceText: 'Good morning',
+        targetText: '早上好',
+      }),
+      createSegment({
+        segmentId: 'blank-only-confirmed',
+        sourceText: 'Confirmed text',
+        targetText: '已确认',
+        status: 'confirmed',
+      }),
+    ];
+
+    const projectRepo = {
+      getFile: vi.fn().mockReturnValue({ id: 1, projectId: 11, name: 'demo.xlsx' }),
+      getProject: vi.fn().mockReturnValue({
+        id: 11,
+        srcLang: 'en',
+        tgtLang: 'zh',
+        aiPrompt: '',
+        aiTemperature: 0.2,
+        projectType: 'translation',
+      }),
+    } as unknown as ProjectRepository;
+
+    const segmentRepo = {
+      getSegmentsPage: vi.fn().mockReturnValue(segments),
+    } as unknown as SegmentRepository;
+
+    const settingsRepo = {
+      getSetting: vi.fn().mockReturnValue('test-api-key'),
+    } as unknown as SettingsRepository;
+
+    const segmentService = {
+      updateSegment: vi.fn().mockResolvedValue(undefined),
+    } as unknown as SegmentService;
+
+    const transport = {
+      testConnection: vi.fn().mockResolvedValue({ ok: true }),
+      chatCompletions: vi.fn().mockResolvedValue({
+        content: '你好世界',
+        status: 200,
+        endpoint: '/v1/chat/completions',
+      }),
+    } as unknown as AITransport;
+
+    const module = new AIModule(projectRepo, segmentRepo, settingsRepo, segmentService, transport);
+    const result = await module.aiTranslateFile(1);
+
+    expect(result).toEqual({ translated: 1, skipped: 2, failed: 0, total: 3 });
+    expect(segmentService.updateSegment).toHaveBeenCalledTimes(1);
+    expect(segmentService.updateSegment).toHaveBeenCalledWith(
+      'blank-only-empty',
+      expect.any(Array),
+      'translated',
+    );
+  });
+
+  it('overwrites non-confirmed targets when targetScope is overwrite-non-confirmed', async () => {
+    const segments: Segment[] = [
+      createSegment({ segmentId: 'overwrite-empty', sourceText: 'Hello world' }),
+      createSegment({
+        segmentId: 'overwrite-prefilled',
+        sourceText: 'Good morning',
+        targetText: '旧译文',
+      }),
+      createSegment({
+        segmentId: 'overwrite-confirmed',
+        sourceText: 'Confirmed text',
+        targetText: '已确认',
+        status: 'confirmed',
+      }),
+    ];
+
+    const projectRepo = {
+      getFile: vi.fn().mockReturnValue({ id: 1, projectId: 11, name: 'demo.xlsx' }),
+      getProject: vi.fn().mockReturnValue({
+        id: 11,
+        srcLang: 'en',
+        tgtLang: 'zh',
+        aiPrompt: '',
+        aiTemperature: 0.2,
+        projectType: 'translation',
+      }),
+    } as unknown as ProjectRepository;
+
+    const segmentRepo = {
+      getSegmentsPage: vi.fn().mockReturnValue(segments),
+    } as unknown as SegmentRepository;
+
+    const settingsRepo = {
+      getSetting: vi.fn().mockReturnValue('test-api-key'),
+    } as unknown as SettingsRepository;
+
+    const segmentService = {
+      updateSegment: vi.fn().mockResolvedValue(undefined),
+    } as unknown as SegmentService;
+
+    const transport = {
+      testConnection: vi.fn().mockResolvedValue({ ok: true }),
+      chatCompletions: vi.fn().mockResolvedValue({
+        content: '新译文',
+        status: 200,
+        endpoint: '/v1/chat/completions',
+      }),
+    } as unknown as AITransport;
+
+    const module = new AIModule(projectRepo, segmentRepo, settingsRepo, segmentService, transport);
+    const result = await module.aiTranslateFile(1, {
+      targetScope: 'overwrite-non-confirmed',
+    });
+
+    expect(result).toEqual({ translated: 2, skipped: 1, failed: 0, total: 3 });
+    expect(segmentService.updateSegment).toHaveBeenCalledTimes(2);
+    expect(segmentService.updateSegment).toHaveBeenNthCalledWith(
+      1,
+      'overwrite-empty',
+      expect.any(Array),
+      'translated',
+    );
+    expect(segmentService.updateSegment).toHaveBeenNthCalledWith(
+      2,
+      'overwrite-prefilled',
+      expect.any(Array),
+      'translated',
+    );
+    expect(segmentService.updateSegment).not.toHaveBeenCalledWith(
+      'overwrite-confirmed',
+      expect.any(Array),
+      'translated',
+    );
+  });
+
+  it('includes prefilled non-confirmed segments in dialogue mode overwrite scope', async () => {
+    const segments: Segment[] = [
+      createSegment({ segmentId: 'dialogue-overwrite-1', sourceText: 'Hello', context: 'Alice' }),
+      createSegment({
+        segmentId: 'dialogue-overwrite-2',
+        sourceText: 'How are you?',
+        targetText: '旧译文',
+        context: 'Alice',
+      }),
+      createSegment({
+        segmentId: 'dialogue-overwrite-confirmed',
+        sourceText: 'Confirmed',
+        targetText: '已确认',
+        context: 'Alice',
+        status: 'confirmed',
+      }),
+    ];
+
+    const projectRepo = {
+      getFile: vi.fn().mockReturnValue({ id: 1, projectId: 11, name: 'demo.xlsx' }),
+      getProject: vi.fn().mockReturnValue({
+        id: 11,
+        srcLang: 'en',
+        tgtLang: 'zh',
+        aiPrompt: '',
+        aiTemperature: 0.2,
+        projectType: 'translation',
+      }),
+    } as unknown as ProjectRepository;
+
+    const segmentRepo = {
+      getSegmentsPage: vi.fn().mockReturnValue(segments),
+    } as unknown as SegmentRepository;
+
+    const settingsRepo = {
+      getSetting: vi.fn().mockReturnValue('test-api-key'),
+    } as unknown as SettingsRepository;
+
+    const segmentService = {
+      updateSegment: vi.fn().mockResolvedValue(undefined),
+      updateSegmentsAtomically: vi.fn().mockResolvedValue([]),
+    } as unknown as SegmentService;
+
+    const transport = {
+      testConnection: vi.fn().mockResolvedValue({ ok: true }),
+      chatCompletions: vi.fn().mockResolvedValue({
+        content: JSON.stringify({
+          translations: [
+            { id: 'dialogue-overwrite-1', text: '你好' },
+            { id: 'dialogue-overwrite-2', text: '你好吗？' },
+          ],
+        }),
+        status: 200,
+        endpoint: '/v1/chat/completions',
+      }),
+    } as unknown as AITransport;
+
+    const module = new AIModule(projectRepo, segmentRepo, settingsRepo, segmentService, transport);
+    const result = await module.aiTranslateFile(1, {
+      mode: 'dialogue',
+      targetScope: 'overwrite-non-confirmed',
+    });
+
+    expect(result).toEqual({ translated: 2, skipped: 1, failed: 0, total: 3 });
+    expect(segmentService.updateSegmentsAtomically).toHaveBeenCalledTimes(1);
+    const updates = (segmentService.updateSegmentsAtomically as ReturnType<typeof vi.fn>).mock
+      .calls[0][0];
+    expect(updates).toHaveLength(2);
+    expect(updates[0].segmentId).toBe('dialogue-overwrite-1');
+    expect(updates[1].segmentId).toBe('dialogue-overwrite-2');
+  });
+
   it('includes imported context in user prompt', async () => {
     const segments: Segment[] = [
       createSegment({ segmentId: 'ctx-1', sourceText: 'Hello world', context: 'UI button label' }),

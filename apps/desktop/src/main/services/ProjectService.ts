@@ -32,6 +32,7 @@ import { SqliteTransactionManager } from './adapters/SqliteTransactionManager';
 import { ProxySettingsManager } from './proxy/ProxySettingsManager';
 import type {
   AIBatchMode,
+  AIBatchTargetScope,
   ImportOptions,
   ProxySettings,
   ProxySettingsInput,
@@ -376,6 +377,7 @@ export class ProjectService {
     options?: {
       model?: string;
       mode?: AIBatchMode;
+      targetScope?: AIBatchTargetScope;
       onProgress?: (data: { current: number; total: number; message?: string }) => void;
     },
   ) {
