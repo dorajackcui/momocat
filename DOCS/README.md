@@ -1,6 +1,6 @@
 # DOCS 文档导航
 
-最后更新：2026-02-17
+最后更新：2026-02-23
 
 本目录已按“规范 / 状态 / 导航 / 历史”分层。默认以代码为准，文档用于快速定位、统一约束、同步进度。
 
@@ -32,7 +32,7 @@
 - `DOCS/PROJECT_STRUCTURE.md`
   - Monorepo 结构与分层职责
 - `DOCS/DATABASE_SCHEMA.md`
-  - 当前数据库结构（以 `packages/db/src/migration/runMigrations.ts` 为准）
+  - 当前数据库结构（以 `packages/db/src/migration/runMigrations.ts` + `migration/migrations/*.ts` 为准）
 - `DOCS/ARCHITECTURE.md`
   - 当前实现边界 + 中长期演进方向
 - `DOCS/ROADMAP.md`

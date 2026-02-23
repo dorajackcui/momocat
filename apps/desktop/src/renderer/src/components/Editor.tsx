@@ -1,25 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Project, ProjectFile } from '@cat/core';
-import { EditorRow } from './EditorRow';
+import { ProjectAITranslateModal } from './project-detail/ProjectAITranslateModal';
 import { useEditor } from '../hooks/useEditor';
-import { TMPanel } from './TMPanel';
-import { ConcordancePanel } from './ConcordancePanel';
-import { EditorBatchActionBar } from './editor/EditorBatchActionBar';
 import {
-  ProjectAITranslateModal,
-  type ProjectAITranslateSubmit,
-} from './project-detail/ProjectAITranslateModal';
-import { buildFileQaFeedback } from './project-detail/fileQaFeedback';
-import { apiClient } from '../services/apiClient';
-import { feedbackService } from '../services/feedbackService';
-import {
-  FILTER_MATCH_MODE_OPTIONS,
-  FILTER_QUALITY_OPTIONS,
-  FILTER_QUICK_PRESET_OPTIONS,
-  FILTER_SORT_OPTIONS,
-  FILTER_STATUS_OPTIONS,
   useEditorFilters,
 } from '../hooks/useEditorFilters';
+import { apiClient } from '../services/apiClient';
+import { EditorHeader } from './editor/EditorHeader';
+import { EditorFilterBar } from './editor/EditorFilterBar';
+import { EditorListPane } from './editor/EditorListPane';
+import { EditorSidebar } from './editor/EditorSidebar';
+import { useEditorLayout } from '../hooks/editor/useEditorLayout';
+import { useConcordanceShortcut } from '../hooks/editor/useConcordanceShortcut';
+import { useEditorBatchActions } from '../hooks/editor/useEditorBatchActions';
 
 interface EditorProps {
   fileId: number;
@@ -27,27 +20,14 @@ interface EditorProps {
 }
 
 export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
-  const [activeTab, setActiveTab] = useState<'tm' | 'concordance'>('tm');
-  const [concordanceFocusSignal, setConcordanceFocusSignal] = useState(0);
-  const [concordanceSearchSignal, setConcordanceSearchSignal] = useState(0);
-  const [concordanceQuery, setConcordanceQuery] = useState('');
   const [file, setFile] = useState<ProjectFile | null>(null);
   const [project, setProject] = useState<Project | null>(null);
-  const [sidebarWidth, setSidebarWidth] = useState(320);
-  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [isSearchInputFocused, setIsSearchInputFocused] = useState(false);
   const [manualActivationSegmentId, setManualActivationSegmentId] = useState<string | null>(null);
   const [suppressAutoFocusSegmentId, setSuppressAutoFocusSegmentId] = useState<string | null>(null);
-  const [isBatchAIModalOpen, setIsBatchAIModalOpen] = useState(false);
-  const [trackedBatchAIJobId, setTrackedBatchAIJobId] = useState<string | null>(null);
-  const [isBatchAITranslating, setIsBatchAITranslating] = useState(false);
-  const [isBatchQARunning, setIsBatchQARunning] = useState(false);
   const [showNonPrintingSymbols, setShowNonPrintingSymbols] = useState(false);
-  const layoutRef = useRef<HTMLDivElement>(null);
   const sourceSearchInputRef = useRef<HTMLInputElement>(null);
   const targetSearchInputRef = useRef<HTMLInputElement>(null);
-
-  const SIDEBAR_MIN_WIDTH = 220;
 
   const {
     segments,
@@ -67,11 +47,6 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
     projectId,
     reloadEditorData,
   } = useEditor({ activeFileId: fileId });
-
-  const totalSegments = segments.length;
-  const confirmedSegments = segments.filter((s) => s.status === 'confirmed').length;
-  const saveErrorCount = Object.keys(segmentSaveErrors).length;
-  const supportsBatchActions = project?.projectType === 'translation';
 
   const {
     sourceQueryInput,
@@ -109,6 +84,27 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
     setActiveSegmentId,
   });
 
+  const { layoutRef, sidebarWidth, startSidebarResize } = useEditorLayout();
+  const {
+    activeTab,
+    setActiveTab,
+    concordanceFocusSignal,
+    concordanceSearchSignal,
+    concordanceQuery,
+  } = useConcordanceShortcut();
+
+  const supportsBatchActions = project?.projectType === 'translation';
+  const batchActions = useEditorBatchActions({
+    fileId,
+    fileName: file?.name || null,
+    supportsBatchActions,
+    reloadEditorData,
+  });
+
+  const totalSegments = segments.length;
+  const confirmedSegments = segments.filter((segment) => segment.status === 'confirmed').length;
+  const saveErrorCount = Object.keys(segmentSaveErrors).length;
+
   const syncSearchInputFocus = () => {
     const active = document.activeElement;
     setIsSearchInputFocused(
@@ -142,203 +138,19 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
   useEffect(() => {
     const loadInfo = async () => {
       try {
-        const f = await apiClient.getFile(fileId);
-        if (f) {
-          setFile(f);
-          const p = await apiClient.getProject(f.projectId);
-          setProject(p ?? null);
+        const loadedFile = await apiClient.getFile(fileId);
+        if (loadedFile) {
+          setFile(loadedFile);
+          const loadedProject = await apiClient.getProject(loadedFile.projectId);
+          setProject(loadedProject ?? null);
         }
-      } catch (e) {
-        console.error('Failed to load file info', e);
-      }
-    };
-    loadInfo();
-  }, [fileId]);
-
-  useEffect(() => {
-    setIsBatchAIModalOpen(false);
-    setTrackedBatchAIJobId(null);
-    setIsBatchAITranslating(false);
-    setIsBatchQARunning(false);
-  }, [fileId]);
-
-  useEffect(() => {
-    const getSelectedTextForConcordance = (): string => {
-      const activeElement = document.activeElement;
-      if (
-        activeElement instanceof HTMLTextAreaElement ||
-        activeElement instanceof HTMLInputElement
-      ) {
-        const start = activeElement.selectionStart ?? 0;
-        const end = activeElement.selectionEnd ?? 0;
-        if (end > start) {
-          return activeElement.value.slice(start, end).replace(/\s+/g, ' ').trim();
-        }
-      }
-
-      const fallbackSelection = window.getSelection()?.toString() ?? '';
-      return fallbackSelection.replace(/\s+/g, ' ').trim();
-    };
-
-    const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'k') return;
-      e.preventDefault();
-      const selectedText = getSelectedTextForConcordance();
-      setActiveTab('concordance');
-      setConcordanceFocusSignal((value) => value + 1);
-      if (selectedText) {
-        setConcordanceQuery(selectedText);
-        setConcordanceSearchSignal((value) => value + 1);
-      }
-    };
-
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, []);
-
-  useEffect(() => {
-    if (!isResizingSidebar) return;
-
-    const onMouseMove = (event: MouseEvent) => {
-      const layoutRect = layoutRef.current?.getBoundingClientRect();
-      if (!layoutRect) return;
-
-      const maxWidth = Math.max(SIDEBAR_MIN_WIDTH, Math.floor(layoutRect.width / 3));
-      const nextWidth = layoutRect.right - event.clientX;
-      const clampedWidth = Math.max(SIDEBAR_MIN_WIDTH, Math.min(nextWidth, maxWidth));
-      setSidebarWidth(clampedWidth);
-    };
-
-    const onMouseUp = () => {
-      setIsResizingSidebar(false);
-    };
-
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-  }, [isResizingSidebar]);
-
-  useEffect(() => {
-    const clampSidebarByViewport = () => {
-      const layoutWidth = layoutRef.current?.clientWidth;
-      if (!layoutWidth) return;
-      const maxWidth = Math.max(SIDEBAR_MIN_WIDTH, Math.floor(layoutWidth / 3));
-      setSidebarWidth((prev) => Math.max(SIDEBAR_MIN_WIDTH, Math.min(prev, maxWidth)));
-    };
-
-    clampSidebarByViewport();
-    window.addEventListener('resize', clampSidebarByViewport);
-    return () => window.removeEventListener('resize', clampSidebarByViewport);
-  }, []);
-
-  useEffect(() => {
-    if (!trackedBatchAIJobId) return;
-
-    const unsubscribe = apiClient.onJobProgress((progress) => {
-      if (progress.jobId !== trackedBatchAIJobId) return;
-      if (progress.status === 'running') return;
-
-      setIsBatchAITranslating(false);
-      setTrackedBatchAIJobId(null);
-
-      if (progress.status === 'failed') {
-        const errorMessage = progress.error?.message || progress.message || 'Unknown error';
-        feedbackService.error(`AI batch translation failed: ${errorMessage}`);
-        return;
-      }
-
-      if (progress.status === 'cancelled') {
-        feedbackService.info(progress.message || 'AI batch translation cancelled.');
-      }
-    });
-
-    return unsubscribe;
-  }, [trackedBatchAIJobId]);
-
-  const handleExport = async () => {
-    if (!file) return;
-
-    const defaultPath = file.name.replace(/(\.xlsx|\.csv)$/i, '_translated$1');
-    const outputPath = await apiClient.saveFileDialog(defaultPath, [
-      { name: 'Spreadsheets', extensions: ['xlsx', 'csv'] },
-    ]);
-
-    if (outputPath) {
-      try {
-        await apiClient.exportFile(fileId, outputPath);
-        feedbackService.success('Export successful');
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-
-        // Check if this is a QA error that can be forced
-        if (errorMessage.includes('Export blocked by QA errors')) {
-          const forceExport = await feedbackService.confirm(
-            `${errorMessage}\n\nDo you want to force export despite these errors?`,
-          );
-
-          if (forceExport) {
-            try {
-              await apiClient.exportFile(fileId, outputPath, undefined, true);
-              feedbackService.success('Export successful (forced despite QA errors)');
-            } catch (forceError) {
-              feedbackService.error(
-                `Export failed: ${forceError instanceof Error ? forceError.message : String(forceError)}`,
-              );
-            }
-          }
-        } else {
-          feedbackService.error(`Export failed: ${errorMessage}`);
-        }
+        console.error('Failed to load file info', error);
       }
-    }
-  };
+    };
 
-  const handleBatchAITranslate = async (options: ProjectAITranslateSubmit) => {
-    if (!supportsBatchActions) return;
-    setIsBatchAIModalOpen(false);
-    try {
-      const jobId = await apiClient.aiTranslateFile(fileId, {
-        mode: options.mode,
-        targetScope: options.targetScope,
-      });
-      setTrackedBatchAIJobId(jobId);
-      setIsBatchAITranslating(true);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      setTrackedBatchAIJobId(null);
-      setIsBatchAITranslating(false);
-      feedbackService.error(`Failed to start AI translation: ${message}`);
-    }
-  };
-
-  const handleBatchQA = async () => {
-    if (!file) return;
-    setIsBatchQARunning(true);
-    try {
-      const report = await apiClient.runFileQA(fileId);
-      await reloadEditorData();
-      const feedback = buildFileQaFeedback(file.name, report);
-      if (feedback.level === 'success') {
-        feedbackService.success(feedback.message);
-      } else {
-        feedbackService.info(feedback.message);
-      }
-    } catch (error) {
-      feedbackService.error(
-        `Run QA failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    } finally {
-      setIsBatchQARunning(false);
-    }
-  };
+    void loadInfo();
+  }, [fileId]);
 
   if (loading) {
     return (
@@ -355,453 +167,112 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-muted">
       {supportsBatchActions && (
         <ProjectAITranslateModal
-          open={isBatchAIModalOpen}
+          open={batchActions.isBatchAIModalOpen}
           fileName={file?.name || null}
-          onClose={() => setIsBatchAIModalOpen(false)}
+          onClose={batchActions.closeBatchAIModal}
           onConfirm={(options) => {
-            void handleBatchAITranslate(options);
+            void batchActions.handleBatchAITranslate(options);
           }}
         />
       )}
 
-      {/* Editor Header */}
-      <header className="px-6 py-3 border-b border-border flex justify-between items-center bg-surface shadow-sm z-10">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onBack}
-            className="p-1.5 text-text-faint hover:text-text-muted hover:bg-muted rounded-lg transition-all"
-            title="Back to Project"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10 19l-7-7m0 0l7-7m-7 7h18"
-              />
-            </svg>
-          </button>
-          <div>
-            <h2 className="text-sm font-bold text-text leading-tight">
-              {file?.name || 'Loading...'}
-            </h2>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-[10px] text-brand font-bold uppercase tracking-wider">
-                {project?.name}
-              </span>
-              <span className="text-[10px] text-text-faint">•</span>
-              <span className="text-[10px] text-text-muted font-medium uppercase tracking-wider">
-                {project?.srcLang} → {project?.tgtLang}
-              </span>
-            </div>
-          </div>
-        </div>
+      <EditorHeader
+        fileName={file?.name || null}
+        projectName={project?.name || null}
+        srcLang={project?.srcLang || null}
+        tgtLang={project?.tgtLang || null}
+        saveErrorCount={saveErrorCount}
+        confirmedSegments={confirmedSegments}
+        totalSegments={totalSegments}
+        onBack={onBack}
+        onExport={() => {
+          void batchActions.handleExport();
+        }}
+      />
 
-        <div className="flex items-center gap-6">
-          {saveErrorCount > 0 && (
-            <div className="px-2.5 py-1 bg-danger-soft border border-danger/40 rounded-md text-[11px] font-bold text-danger">
-              {saveErrorCount} 段保存失败
-            </div>
-          )}
-          <div className="flex items-center gap-3">
-            <span className="text-[10px] font-bold text-text-faint uppercase tracking-widest">
-              Progress
-            </span>
-            <div className="px-2.5 py-1 bg-muted rounded-md text-[11px] font-bold text-text-muted">
-              {confirmedSegments}/{totalSegments}
-            </div>
-          </div>
-          <div className="h-4 w-[1px] bg-border" />
-          <button
-            onClick={handleExport}
-            className="px-3 py-1.5 bg-brand hover:bg-brand-hover text-white text-[11px] font-bold rounded-lg shadow-sm transition-all active:scale-95"
-          >
-            Export
-          </button>
-        </div>
-      </header>
-
-      <div ref={layoutRef} className="flex-1 flex min-h-0">
-        {/* Main Editor Area */}
-        <div
-          className="flex-1 overflow-y-auto bg-surface custom-scrollbar"
-          style={{ scrollbarGutter: 'stable' }}
-        >
+      <div ref={layoutRef as React.RefObject<HTMLDivElement>} className="flex-1 flex min-h-0">
+        <div className="flex-1 overflow-y-auto bg-surface custom-scrollbar" style={{ scrollbarGutter: 'stable' }}>
           <div className="min-w-[800px]">
-            <div className="sticky top-0 z-20 bg-surface border-b border-border shadow-sm">
-              <EditorBatchActionBar
-                visible={supportsBatchActions}
-                canRunActions={Boolean(file)}
-                isBatchAITranslating={isBatchAITranslating}
-                isBatchQARunning={isBatchQARunning}
-                showNonPrintingSymbols={showNonPrintingSymbols}
-                onOpenBatchAIModal={() => setIsBatchAIModalOpen(true)}
-                onRunBatchQA={() => void handleBatchQA()}
-                onToggleNonPrintingSymbols={() => setShowNonPrintingSymbols((prev) => !prev)}
-              />
+            <EditorFilterBar
+              supportsBatchActions={supportsBatchActions}
+              canRunActions={Boolean(file)}
+              isBatchAITranslating={batchActions.isBatchAITranslating}
+              isBatchQARunning={batchActions.isBatchQARunning}
+              showNonPrintingSymbols={showNonPrintingSymbols}
+              onOpenBatchAIModal={batchActions.openBatchAIModal}
+              onRunBatchQA={() => {
+                void batchActions.handleBatchQA();
+              }}
+              onToggleNonPrintingSymbols={() => setShowNonPrintingSymbols((prev) => !prev)}
+              sortBy={sortBy}
+              sortDirection={sortDirection}
+              isSortMenuOpen={isSortMenuOpen}
+              toggleSortMenu={toggleSortMenu}
+              handleSortChange={handleSortChange}
+              sourceQueryInput={sourceQueryInput}
+              targetQueryInput={targetQueryInput}
+              setSourceQueryInput={setSourceQueryInput}
+              setTargetQueryInput={setTargetQueryInput}
+              sourceSearchInputRef={sourceSearchInputRef}
+              targetSearchInputRef={targetSearchInputRef}
+              onSearchInputFocus={handleSearchInputFocus}
+              onSearchInputBlur={handleSearchInputBlur}
+              isFilterMenuOpen={isFilterMenuOpen}
+              activeFilterCount={activeFilterCount}
+              toggleFilterMenu={toggleFilterMenu}
+              quickPreset={quickPreset}
+              applyQuickPreset={applyQuickPreset}
+              matchMode={matchMode}
+              handleMatchModeChange={handleMatchModeChange}
+              statusFilter={statusFilter}
+              handleStatusFilterChange={handleStatusFilterChange}
+              qualityFilters={qualityFilters}
+              toggleQualityFilter={toggleQualityFilter}
+              clearFilters={clearFilters}
+              hasActiveFilter={hasActiveFilter}
+              filterMenuRef={filterMenuRef}
+              sortMenuRef={sortMenuRef}
+            />
 
-              <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/80 backdrop-blur-sm">
-                <div ref={sortMenuRef} className="relative shrink-0">
-                  <button
-                    type="button"
-                    onClick={toggleSortMenu}
-                    className={`h-8 w-8 rounded-md border transition-colors ${
-                      isSortMenuOpen || sortBy !== 'default'
-                        ? 'bg-brand-soft text-brand border-brand/30'
-                        : 'bg-surface text-text-muted border-border hover:bg-muted'
-                    }`}
-                    title="Sort options"
-                    aria-label="Sort options"
-                  >
-                    <svg
-                      className="w-4 h-4 mx-auto"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 7h8M6 12h12M10 17h4"
-                      />
-                    </svg>
-                  </button>
-
-                  {sortBy !== 'default' && (
-                    <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-brand" />
-                  )}
-
-                  {isSortMenuOpen && (
-                    <div className="absolute left-0 top-full mt-2 w-64 rounded-lg border border-border bg-surface shadow-lg p-2 z-30 space-y-1">
-                      <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-text-faint">
-                        Sort
-                      </div>
-                      {FILTER_SORT_OPTIONS.map((option) => {
-                        const active =
-                          sortBy === option.sortBy && sortDirection === option.sortDirection;
-                        return (
-                          <button
-                            key={`${option.sortBy}-${option.sortDirection}`}
-                            type="button"
-                            onClick={() => handleSortChange(option.sortBy, option.sortDirection)}
-                            className={`w-full text-left px-2 py-1.5 rounded-md text-[11px] font-bold border transition-colors ${
-                              active
-                                ? 'bg-brand-soft text-brand border-brand/30'
-                                : 'bg-surface text-text-muted border-transparent hover:text-text-muted hover:bg-muted'
-                            }`}
-                          >
-                            {option.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                <label className="relative flex-1 min-w-0">
-                  <input
-                    ref={sourceSearchInputRef}
-                    value={sourceQueryInput}
-                    onChange={(e) => setSourceQueryInput(e.target.value)}
-                    onFocus={handleSearchInputFocus}
-                    onBlur={handleSearchInputBlur}
-                    placeholder="Filter source text"
-                    className="w-full rounded-xl border border-border bg-surface pl-8 pr-3 py-1.5 text-sm text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/20"
-                  />
-                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-faint">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                      />
-                    </svg>
-                  </span>
-                </label>
-
-                <label className="relative flex-1 min-w-0">
-                  <input
-                    ref={targetSearchInputRef}
-                    value={targetQueryInput}
-                    onChange={(e) => setTargetQueryInput(e.target.value)}
-                    onFocus={handleSearchInputFocus}
-                    onBlur={handleSearchInputBlur}
-                    placeholder="Filter target text"
-                    className="w-full rounded-xl border border-border bg-surface pl-8 pr-3 py-1.5 text-sm text-text-muted focus:outline-none focus:ring-2 focus:ring-brand/20"
-                  />
-                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-faint">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                      />
-                    </svg>
-                  </span>
-                </label>
-
-                <div ref={filterMenuRef} className="relative shrink-0">
-                  <button
-                    type="button"
-                    onClick={toggleFilterMenu}
-                    className={`h-8 w-8 rounded-md border transition-colors ${
-                      isFilterMenuOpen || activeFilterCount > 0
-                        ? 'bg-brand-soft text-brand border-brand/30'
-                        : 'bg-surface text-text-muted border-border hover:bg-muted'
-                    }`}
-                    aria-label="Open filters"
-                    title="Open filters"
-                  >
-                    <svg
-                      className="w-4 h-4 mx-auto"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M3 4h18M6 12h12M10 20h4"
-                      />
-                    </svg>
-                  </button>
-                  {activeFilterCount > 0 && (
-                    <span className="absolute -top-1 -right-1 rounded-full bg-brand px-1.5 py-0.5 text-[9px] text-white leading-none">
-                      {activeFilterCount}
-                    </span>
-                  )}
-
-                  {isFilterMenuOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-80 rounded-lg border border-border bg-surface shadow-lg p-3 z-30 space-y-3">
-                      <div>
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-text-faint mb-2">
-                          Quick Presets
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {FILTER_QUICK_PRESET_OPTIONS.map((preset) => {
-                            const active = quickPreset === preset.value;
-                            return (
-                              <button
-                                key={preset.value}
-                                type="button"
-                                onClick={() => applyQuickPreset(preset.value)}
-                                className={`px-2.5 py-1 rounded-md text-[11px] font-bold border transition-colors ${
-                                  active
-                                    ? 'bg-brand-soft text-brand border-brand/30'
-                                    : 'bg-surface text-text-muted border-border hover:text-text-muted hover:bg-muted'
-                                }`}
-                              >
-                                {preset.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-text-faint mb-2">
-                          Match Mode
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {FILTER_MATCH_MODE_OPTIONS.map((mode) => {
-                            const active = matchMode === mode.value;
-                            return (
-                              <button
-                                key={mode.value}
-                                type="button"
-                                onClick={() => handleMatchModeChange(mode.value)}
-                                className={`px-2.5 py-1 rounded-md text-[11px] font-bold border transition-colors ${
-                                  active
-                                    ? 'bg-brand-soft text-brand border-brand/30'
-                                    : 'bg-surface text-text-muted border-border hover:text-text-muted hover:bg-muted'
-                                }`}
-                              >
-                                {mode.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-text-faint mb-2">
-                          Status
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {FILTER_STATUS_OPTIONS.map((option) => {
-                            const active = statusFilter === option.value;
-                            return (
-                              <button
-                                key={option.value}
-                                type="button"
-                                onClick={() => handleStatusFilterChange(option.value)}
-                                className={`px-2.5 py-1 rounded-md text-[11px] font-bold border transition-colors ${
-                                  active
-                                    ? 'bg-brand-soft text-brand border-brand/30'
-                                    : 'bg-surface text-text-muted border-border hover:text-text-muted hover:bg-muted'
-                                }`}
-                              >
-                                {option.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-text-faint mb-2">
-                          Quality
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {FILTER_QUALITY_OPTIONS.map((option) => {
-                            const active = qualityFilters.includes(option.value);
-                            return (
-                              <button
-                                key={option.value}
-                                type="button"
-                                onClick={() => toggleQualityFilter(option.value)}
-                                className={`px-2.5 py-1 rounded-md text-[11px] font-bold border transition-colors ${
-                                  active
-                                    ? 'bg-brand-soft text-brand border-brand/30'
-                                    : 'bg-surface text-text-muted border-border hover:text-text-muted hover:bg-muted'
-                                }`}
-                              >
-                                {option.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  disabled={!hasActiveFilter}
-                  className="h-8 w-8 shrink-0 rounded-md border border-border bg-surface text-text-muted hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  aria-label="Clear filter"
-                  title="Clear filter"
-                >
-                  <svg
-                    className="w-3.5 h-3.5 mx-auto"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            {filteredSegments.map((item) => (
-              <EditorRow
-                key={item.segment.segmentId}
-                segment={item.segment}
-                rowNumber={item.segment.meta?.rowRef || item.originalIndex + 1}
-                isActive={item.segment.segmentId === activeSegmentId}
-                disableAutoFocus={
-                  (isSearchInputFocused && manualActivationSegmentId !== item.segment.segmentId) ||
-                  suppressAutoFocusSegmentId === item.segment.segmentId
-                }
-                onActivate={handleRowActivate}
-                onAutoFocus={handleRowAutoFocus}
-                onChange={handleTranslationChange}
-                onAITranslate={translateSegmentWithAI}
-                onAIRefine={refineSegmentWithAI}
-                onConfirm={confirmSegment}
-                isAITranslating={Boolean(aiTranslatingSegmentIds[item.segment.segmentId])}
-                isAIRefining={Boolean(aiTranslatingSegmentIds[item.segment.segmentId])}
-                saveError={segmentSaveErrors[item.segment.segmentId]}
-                sourceHighlightQuery={debouncedSourceQuery}
-                targetHighlightQuery={debouncedTargetQuery}
-                highlightMode={matchMode}
-                showNonPrintingSymbols={showNonPrintingSymbols}
-              />
-            ))}
-
-            {filteredSegments.length === 0 && (
-              <div className="px-8 py-10 text-center text-sm text-text-faint">
-                No segments match current filters.
-              </div>
-            )}
-
-            <div className="h-4" />
+            <EditorListPane
+              filteredSegments={filteredSegments}
+              activeSegmentId={activeSegmentId}
+              manualActivationSegmentId={manualActivationSegmentId}
+              suppressAutoFocusSegmentId={suppressAutoFocusSegmentId}
+              isSearchInputFocused={isSearchInputFocused}
+              onRowActivate={handleRowActivate}
+              onRowAutoFocus={handleRowAutoFocus}
+              onTranslationChange={handleTranslationChange}
+              onAITranslate={translateSegmentWithAI}
+              onAIRefine={refineSegmentWithAI}
+              onConfirm={confirmSegment}
+              aiTranslatingSegmentIds={aiTranslatingSegmentIds}
+              segmentSaveErrors={segmentSaveErrors}
+              sourceHighlightQuery={debouncedSourceQuery}
+              targetHighlightQuery={debouncedTargetQuery}
+              highlightMode={matchMode}
+              showNonPrintingSymbols={showNonPrintingSymbols}
+            />
           </div>
         </div>
 
-        {/* Right Sidebar */}
-        <div
-          className="border-l border-border bg-muted/50 flex-col hidden lg:flex relative"
-          style={{ width: `${sidebarWidth}px` }}
-        >
-          <button
-            type="button"
-            aria-label="Resize sidebar"
-            onMouseDown={(event) => {
-              event.preventDefault();
-              setIsResizingSidebar(true);
-            }}
-            className="absolute -left-1 top-0 h-full w-2 cursor-col-resize group z-20"
-          >
-            <span className="absolute left-1/2 -translate-x-1/2 h-full w-[2px] bg-transparent group-hover:bg-brand/40 transition-colors" />
-          </button>
-
-          {/* Tabs */}
-          <div className="flex border-b border-border bg-surface">
-            <button
-              onClick={() => setActiveTab('tm')}
-              className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider transition-colors ${
-                activeTab === 'tm'
-                  ? 'text-brand border-b-2 border-brand'
-                  : 'text-text-faint hover:text-text-muted'
-              }`}
-            >
-              CAT
-            </button>
-            <button
-              onClick={() => setActiveTab('concordance')}
-              title="Concordance (Ctrl/Cmd+K)"
-              className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider transition-colors ${
-                activeTab === 'concordance'
-                  ? 'text-brand border-b-2 border-brand'
-                  : 'text-text-faint hover:text-text-muted'
-              }`}
-            >
-              Concordance
-            </button>
-          </div>
-
-          {/* Panel Content */}
-          <div className="flex-1 overflow-y-auto">
-            {activeTab === 'tm' ? (
-              <TMPanel
-                matches={activeMatches}
-                termMatches={activeTerms}
-                onApply={handleApplyMatch}
-                onApplyTerm={handleApplyTerm}
-              />
-            ) : (
-              <ConcordancePanel
-                projectId={projectId || 0}
-                focusSignal={concordanceFocusSignal}
-                externalQuery={concordanceQuery}
-                searchSignal={concordanceSearchSignal}
-              />
-            )}
-          </div>
-        </div>
+        <EditorSidebar
+          sidebarWidth={sidebarWidth}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          onStartResize={(event) => {
+            event.preventDefault();
+            startSidebarResize();
+          }}
+          activeMatches={activeMatches}
+          activeTerms={activeTerms}
+          onApplyMatch={handleApplyMatch}
+          onApplyTerm={handleApplyTerm}
+          projectId={projectId || 0}
+          concordanceFocusSignal={concordanceFocusSignal}
+          concordanceQuery={concordanceQuery}
+          concordanceSearchSignal={concordanceSearchSignal}
+        />
       </div>
     </div>
   );

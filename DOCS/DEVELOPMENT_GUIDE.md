@@ -1,4 +1,4 @@
-# 开发指南（更新于 2026-02-17）
+# 开发指南（更新于 2026-02-23）
 
 本指南是当前功能开发阶段的执行规范。以下规则来自重构期 gate 与整改文档，仍然必须遵守。
 
@@ -73,14 +73,16 @@ npm run gate:check
 1. `npm run typecheck --workspace=apps/desktop`
 2. `npm run gate:arch`
 3. `npm run gate:style`
-4. `npm run lint`
-5. `npm run gate:smoke:large-file`
+4. `npm run gate:file-size`
+5. `npm run lint`
+6. `npm run gate:smoke:large-file`
 
 ### 3.2 失败处理规则
 
 1. 任一 gate 失败，先修 gate，再继续功能开发。
 2. 禁止跳过 smoke/gate 直接合并；如需豁免，必须在 PR 明确风险与回补时间。
 3. lint 当前允许 warning 基线，但新增 warning 需在同 PR 解释并控制范围。
+4. `gate:file-size` 的默认阈值：`warn >= 450`，`block >= 600`（allowlist 仅允许历史存量文件）。
 
 ## 5. 渲染层视觉规范（语义化主题）
 

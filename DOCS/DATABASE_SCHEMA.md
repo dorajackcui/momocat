@@ -1,13 +1,13 @@
-# 数据库 Schema（当前版，更新于 2026-02-14）
+# 数据库 Schema（当前版，更新于 2026-02-23）
 
-> 单一真相来源：`packages/db/src/migration/runMigrations.ts`
+> 单一真相来源：`packages/db/src/migration/runMigrations.ts` + `packages/db/src/migration/migrations/*.ts`
 
-本文档只描述当前有效结构（截至 schema v12），不保留历史假设。
+本文档只描述当前有效结构（截至 schema v14），不保留历史假设。
 
 ## 1. 版本信息
 
 - 版本表：`schema_version`
-- 当前目标版本：`v12`
+- 当前目标版本：`v14`
 - 迁移入口：`runMigrations(db)`
 
 ## 2. 核心业务表
@@ -22,6 +22,7 @@
   - `aiPrompt` (nullable)
   - `aiTemperature` (nullable)
   - `aiModel` (`gpt-5.2` / `gpt-5-mini` / `gpt-4o` / `gpt-4.1-mini`，默认 `gpt-4o`)
+  - `qaSettingsJson` (nullable，默认写入项目 QA 配置)
   - `createdAt`, `updatedAt`
 
 - `files`
@@ -40,6 +41,7 @@
   - `sourceTokensJson`, `targetTokensJson`
   - `status`, `tagsSignature`, `matchKey`, `srcHash`
   - `metaJson`
+  - `qaIssuesJson` (nullable，段落 QA 问题缓存)
   - `updatedAt`
 
 ### 2.2 TM（翻译记忆）
@@ -119,5 +121,6 @@
 ## 5. 相关代码
 
 - 迁移：`packages/db/src/migration/runMigrations.ts`
+- 迁移步骤：`packages/db/src/migration/migrations/v003.ts ... v014.ts`
 - 聚合入口：`packages/db/src/index.ts`
 - 仓储实现：`packages/db/src/repos/*.ts`

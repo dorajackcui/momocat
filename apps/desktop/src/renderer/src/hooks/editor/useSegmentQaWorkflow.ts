@@ -1,0 +1,95 @@
+import { useCallback } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
+import type { Segment, SegmentQaRuleId, TBMatch } from '@cat/core';
+import { evaluateSegmentQa, TagValidator } from '@cat/core';
+import { apiClient } from '../../services/apiClient';
+
+interface UseSegmentQaWorkflowParams {
+  segments: Segment[];
+  projectId: number | null;
+  enabledQaRuleIds: SegmentQaRuleId[];
+  instantQaOnConfirm: boolean;
+  setSegments: Dispatch<SetStateAction<Segment[]>>;
+  setActiveSegmentId: Dispatch<SetStateAction<string | null>>;
+  tagValidator: TagValidator;
+}
+
+export function useSegmentQaWorkflow({
+  segments,
+  projectId,
+  enabledQaRuleIds,
+  instantQaOnConfirm,
+  setSegments,
+  setActiveSegmentId,
+  tagValidator,
+}: UseSegmentQaWorkflowParams): { confirmSegment: (segmentId: string) => Promise<void> } {
+  const confirmSegment = useCallback(
+    async (segmentId: string) => {
+      const segment = segments.find((item) => item.segmentId === segmentId);
+      if (!segment) return;
+
+      if (instantQaOnConfirm) {
+        let termMatches: TBMatch[] = [];
+        if (projectId !== null && enabledQaRuleIds.includes('terminology-consistency')) {
+          try {
+            termMatches = (await apiClient.getTermMatches(projectId, segment)) || [];
+          } catch (error) {
+            console.error('[useEditor] Failed to run TB QA check:', error);
+          }
+        }
+
+        const combinedIssues = evaluateSegmentQa(segment, {
+          enabledRuleIds: enabledQaRuleIds,
+          termMatches,
+        });
+        const hasBlockingErrors = combinedIssues.some((issue) => issue.severity === 'error');
+        const tagValidationResult = enabledQaRuleIds.includes('tag-integrity')
+          ? tagValidator.validate(segment.sourceTokens, segment.targetTokens)
+          : { issues: [], suggestions: [] };
+
+        setSegments((prev) =>
+          prev.map((item) => {
+            if (item.segmentId !== segmentId) return item;
+            return {
+              ...item,
+              qaIssues: combinedIssues,
+              autoFixSuggestions: tagValidationResult.suggestions,
+            };
+          }),
+        );
+
+        if (hasBlockingErrors) {
+          return;
+        }
+      } else {
+        setSegments((prev) =>
+          prev.map((item) =>
+            item.segmentId === segmentId
+              ? { ...item, qaIssues: undefined, autoFixSuggestions: undefined }
+              : item,
+          ),
+        );
+      }
+
+      await apiClient.updateSegment(segmentId, segment.targetTokens, 'confirmed');
+
+      const currentIndex = segments.findIndex((item) => item.segmentId === segmentId);
+      if (currentIndex < segments.length - 1) {
+        setActiveSegmentId(segments[currentIndex + 1].segmentId);
+      }
+    },
+    [
+      enabledQaRuleIds,
+      instantQaOnConfirm,
+      projectId,
+      segments,
+      setActiveSegmentId,
+      setSegments,
+      tagValidator,
+    ],
+  );
+
+  return {
+    confirmSegment,
+  };
+}

@@ -1,6 +1,6 @@
 # HANDOFF（完整版交接系统）
 
-最后更新：2026-02-17
+最后更新：2026-02-23
 
 > 这是完整交接文档。  
 > 日常新会话建议先读轻量版：`DOCS/HANDOFF_LITE.md`。
@@ -67,6 +67,10 @@
 3. 风格门禁：
    - `scripts/gate-style-classes.mjs`
    - `npm run gate:style`（已并入 `npm run gate:check`）
+
+4. 大文件门禁：
+   - `scripts/gate-file-size.mjs`
+   - `npm run gate:file-size`（已并入 `npm run gate:check`）
 
 ## 7. 你可直接复用的指令
 

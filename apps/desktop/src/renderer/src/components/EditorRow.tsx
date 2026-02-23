@@ -504,8 +504,8 @@ export const EditorRow: React.FC<EditorRowProps> = ({
       >
         <div
           aria-hidden="true"
-          className={`pointer-events-none absolute -top-px -bottom-px left-0 right-0 z-20 border-t-[3px] border-r-[3px] border-b-[3px] border-sky-400/90 transition-opacity duration-150 ${
-            isActive ? 'opacity-100 shadow-[0_0_6px_rgba(56,189,248,0.18)]' : 'opacity-0'
+          className={`pointer-events-none absolute -top-px -bottom-px left-0 right-0 z-20 border-t-[3px] border-r-[3px] border-b-[3px] border-brand/70 transition-opacity duration-150 ${
+            isActive ? 'opacity-100 shadow-sm' : 'opacity-0'
           }`}
         />
 

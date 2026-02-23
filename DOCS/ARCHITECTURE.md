@@ -16,17 +16,22 @@
 - `main`
   - `ProjectService` 作为应用层门面。
   - 业务能力按模块拆分：`ProjectFileModule`、`TMModule`、`TBModule`、`AIModule`。
-  - `AIModule` 内部进一步拆分为 `services/modules/ai/*`（dialogue 翻译、prompt 引用解析、内部类型）。
+  - `AIModule` 当前为 façade，内部委托到 `services/modules/ai/*`（`AISettingsService`、`AITranslationOrchestrator`、`AITextTranslator`、`SegmentPagingIterator` + dialogue/prompt helpers）。
+  - `TMModule` 当前为 façade，内部委托到 `services/modules/tm/*`（`TMQueryService`、`TMImportService`、`TMBatchOpsService`）。
   - 领域服务：`SegmentService`、`TMService`、`TBService`。
   - IPC 按领域拆分注册：`ipc/projectHandlers.ts`、`tmHandlers.ts`、`tbHandlers.ts`、`aiHandlers.ts`、`dialogHandlers.ts`。
+- `renderer`（编辑器域）
+  - `Editor.tsx` 作为容器编排，子结构拆为 `EditorHeader` / `EditorFilterBar` / `EditorListPane` / `EditorSidebar`。
+  - `useEditor.ts` 作为 controller 聚合，内部拆分为数据加载、持久化、QA 流程、活动段匹配等子 hook。
 - `packages`
-  - `@cat/core`：Token/Segment/Tag 模型与算法。
-  - `@cat/db`：SQLite 迁移与 Repo 层。
+  - `@cat/core`：Token/Segment/Tag 模型与算法；`TagManager` 为轻量事件封装，标签纯操作下沉至 `tag/operations.ts`。
+  - `@cat/db`：SQLite 迁移与 Repo 层；迁移已 pipeline 化（`migrations/v003.ts ... v014.ts`）。
 
 ### 1.2 数据与边界
 
 - 默认离线优先：SQLite（`@cat/db`）为主存储。
 - Segment/TM/TB 均以 Token 序列为核心数据结构。
+- DB schema 迁移由 `runMigrations.ts` 调度执行，当前目标版本 `v14`。
 - TM 查询链路（As-Is）：
   - `TMRepo.searchConcordance` 使用 `tm_fts` + `bm25` 作为候选召回主路径，并在 CJK 连续文本场景增加 `LIKE` 回退。
   - Concordance 与编辑器 TM fuzzy 匹配共享同一候选查询，当前统一候选上限为 `10`。
@@ -53,6 +58,9 @@
   - `ProjectService` 只做编排。
   - `CATDatabase` 不新增跨 repo 编排。
   - 校验脚本：`scripts/gate-architecture-check.mjs`。
+- 规模守卫（新增）：
+  - 校验脚本：`scripts/gate-file-size.mjs`。
+  - 阈值：`warn >= 450`，`block >= 600`（历史超大文件通过 allowlist 管控）。
 
 ## 2. 核心原则
 

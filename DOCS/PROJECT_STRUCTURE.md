@@ -1,4 +1,4 @@
-# 项目结构说明（更新于 2026-02-21）
+# 项目结构说明（更新于 2026-02-23）
 
 本项目为 npm workspaces Monorepo，核心分为 `apps/`（应用）和 `packages/`（共享库）。
 
@@ -34,7 +34,17 @@ simple-cat-tool/
   - `TBService.ts`: TB 匹配逻辑
   - `ports.ts`: 服务层抽象端口定义
   - `modules/`: 按业务拆分模块（`ProjectFileModule`/`TMModule`/`TBModule`/`AIModule`）
-    - `modules/ai/`: AIModule 内部子模块（`dialogueTranslation.ts` / `promptReferences.ts` / `types.ts`）
+    - `modules/ai/`: AIModule 内部子模块
+      - `AISettingsService.ts`
+      - `AITranslationOrchestrator.ts`
+      - `AITextTranslator.ts`
+      - `SegmentPagingIterator.ts`
+      - `dialogueTranslation.ts` / `promptReferences.ts` / `types.ts`
+    - `modules/tm/`: TMModule 内部子模块
+      - `TMQueryService.ts`
+      - `TMImportService.ts`
+      - `TMBatchOpsService.ts`
+      - `types.ts`
   - `adapters/`: SQLite 端口适配器
   - `providers/`: 外部能力提供者（当前为 `OpenAITransport`）
 
@@ -47,9 +57,12 @@ simple-cat-tool/
 - `components/`: 页面与业务组件
   - `ProjectDetail.tsx` + `components/project-detail/*`
   - `Editor.tsx`, `EditorRow.tsx`, `TMPanel.tsx`, `ConcordancePanel.tsx`
+  - `components/editor/*`：编辑器拆分子组件（`EditorHeader` / `EditorFilterBar` / `EditorListPane` / `EditorSidebar` / `EditorBatchActionBar`）
   - `TMManager.tsx`, `TBManager.tsx`, 导入向导等
 - `hooks/`
-  - `useEditor.ts`, `useProjects.ts`
+  - `useEditor.ts`（控制器聚合入口）
+  - `hooks/editor/*`：编辑器拆分子 hook（`useEditorDataLoader` / `useSegmentPersistence` / `useSegmentQaWorkflow` / `useActiveSegmentMatches` / `useEditorLayout` / `useConcordanceShortcut` / `useEditorBatchActions`）
+  - `useProjects.ts`
   - `hooks/projectDetail/*`（详情页拆分后的 hooks）
 - `services/apiClient.ts`: renderer 统一 API 边界
 - `env.d.ts`: 渲染进程全局类型声明
@@ -62,12 +75,15 @@ simple-cat-tool/
 
 - Token/Tag 模型
 - Tag 编解码与验证（`TagCodec` / `TagValidator` / `TagManager`）
+- 标签纯函数操作：`tag/operations.ts`（`TagManager` 当前为轻量事件封装门面）
 - TM/TB 匹配相关公共算法
 
 ## `packages/db`（数据库层）
 
 - `index.ts`: `CATDatabase` 聚合入口
-- `migration/runMigrations.ts`: schema 迁移（当前至 v12）
+- `migration/runMigrations.ts`: schema 迁移 runner（当前至 v14）
+- `migration/migrations/v003.ts ... v014.ts`: 版本化迁移步骤
+- `migration/types.ts` + `migration/utils.ts`: 迁移类型与公共工具
 - `repos/*`: Project/Segment/TM/TB/Settings 仓储实现
 
 ## 运行数据与构建

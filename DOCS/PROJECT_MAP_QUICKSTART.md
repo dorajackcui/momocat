@@ -36,7 +36,8 @@ Renderer (React 组件 + Hooks)
   - `components/ProjectDetail.tsx`：项目详情聚合页
   - `components/Editor.tsx`：编辑器主界面
   - `components/editor/EditorBatchActionBar.tsx`：编辑器批量功能栏（AI 批量翻译 / 文件级 QA / 非打印符号开关）
-  - `hooks/useEditor.ts`：编辑页状态 + 段落更新 + TM/TB 请求
+  - `hooks/useEditor.ts`：编辑器 controller 聚合入口（对外 API 兼容）
+  - `hooks/editor/*`：编辑器子 hook（数据加载/持久化/QA/匹配/布局/批量动作）
   - `hooks/projectDetail/*`：项目详情数据、导入流程、AI 设置
   - `services/apiClient.ts`：renderer 到 preload 的唯一 API 边界
 
@@ -49,16 +50,18 @@ Renderer (React 组件 + Hooks)
 - `services/ProjectService.ts`：应用服务编排入口（main 的总门面）。
 - `services/modules/`：按业务拆分：
   - `ProjectFileModule`：项目/文件导入导出
-  - `TMModule`：TM 管理、匹配、导入、批量应用、commit
+  - `TMModule`：TM façade（管理、匹配、导入、批量应用、commit）
   - `TBModule`：TB 管理、匹配、导入
-  - `AIModule`：AI 配置、测试翻译、单段 AI 翻译、单段 AI 微调、批量 AI 预翻译（含对话分组模式）
-  - `modules/ai/*`：AIModule 内部子模块（dialogue 分组翻译、TM/TB 引用解析、AI 相关内部类型）
+  - `AIModule`：AI façade（配置、测试翻译、单段翻译/微调、批量翻译）
+  - `modules/ai/*`：AIModule 内部子模块（`AISettingsService` / `AITranslationOrchestrator` / `AITextTranslator` / `SegmentPagingIterator` + dialogue/prompt helpers）
+  - `modules/tm/*`：TMModule 内部子模块（`TMQueryService` / `TMImportService` / `TMBatchOpsService`）
 - `services/SegmentService.ts`：段落更新、确认后传播、事件广播。
 - `filters/SpreadsheetFilter.ts`：CSV/XLSX 导入导出（文件过滤器）。
 - `JobManager.ts`：长任务进度（AI 翻译 + TM/TB 导入）统一事件中心。
 
 ### `packages/core/src`
 - 领域类型和算法（Token、Segment、TM/TB、Tag 编解码与校验）。
+- `TagManager` 当前为轻量事件封装，标签纯函数操作在 `tag/operations.ts`。
 - 你在改“标签安全、匹配 key、hash、文本与 token 转换”时看这里。
 
 ### `packages/db/src`
@@ -234,6 +237,10 @@ TMImportWizard / TBImportWizard
 
 ### 4.2 想改“编辑器输入、确认、自动跳转”
 - `apps/desktop/src/renderer/src/hooks/useEditor.ts`
+- `apps/desktop/src/renderer/src/hooks/editor/useEditorDataLoader.ts`
+- `apps/desktop/src/renderer/src/hooks/editor/useSegmentPersistence.ts`
+- `apps/desktop/src/renderer/src/hooks/editor/useSegmentQaWorkflow.ts`
+- `apps/desktop/src/renderer/src/hooks/editor/useActiveSegmentMatches.ts`
 - `apps/desktop/src/renderer/src/components/Editor.tsx`
 - `apps/desktop/src/renderer/src/components/EditorRow.tsx`
 - `apps/desktop/src/renderer/src/components/editor/EditorBatchActionBar.tsx`
@@ -242,6 +249,8 @@ TMImportWizard / TBImportWizard
 ### 4.3 想改“TM 匹配阈值/排序/模糊匹配”
 - `apps/desktop/src/main/services/TMService.ts`
 - `apps/desktop/src/main/services/modules/TMModule.ts`
+- `apps/desktop/src/main/services/modules/tm/TMQueryService.ts`
+- `apps/desktop/src/main/services/modules/tm/TMBatchOpsService.ts`
 - `packages/db/src/repos/TMRepo.ts`
 
 当前行为（2026-02-19）：
@@ -261,6 +270,10 @@ TMImportWizard / TBImportWizard
 - `apps/desktop/src/renderer/src/hooks/useEditor.ts`
 - `apps/desktop/src/renderer/src/hooks/projectDetail/useProjectAI.ts`
 - `apps/desktop/src/main/services/modules/AIModule.ts`
+- `apps/desktop/src/main/services/modules/ai/AISettingsService.ts`
+- `apps/desktop/src/main/services/modules/ai/AITranslationOrchestrator.ts`
+- `apps/desktop/src/main/services/modules/ai/AITextTranslator.ts`
+- `apps/desktop/src/main/services/modules/ai/SegmentPagingIterator.ts`
 - `apps/desktop/src/main/services/modules/ai/dialogueTranslation.ts`
 - `apps/desktop/src/main/services/modules/ai/promptReferences.ts`
 - `apps/desktop/src/main/services/modules/ai/types.ts`
@@ -275,6 +288,7 @@ TMImportWizard / TBImportWizard
 
 ### 4.7 想改“数据库 schema 或 SQL”
 - `packages/db/src/migration/runMigrations.ts`
+- `packages/db/src/migration/migrations/*.ts`
 - `packages/db/src/repos/*.ts`
 - `DOCS/DATABASE_SCHEMA.md`
 
