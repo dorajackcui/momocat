@@ -1,6 +1,6 @@
 # Simple CAT Tool 架构说明
 
-最后更新：2026-02-21
+最后更新：2026-02-23
 
 > 文档定位：描述“当前实现边界 + 演进目标”。  
 > 若与代码冲突，以代码为准；优先参考：`DOCS/PROJECT_STRUCTURE.md`、`DOCS/DATABASE_SCHEMA.md`、`DOCS/DEVELOPMENT_GUIDE.md`。
@@ -45,6 +45,10 @@
   - 组翻译失败时自动降级为逐段翻译，优先保证可完成性。
   - dialogue 进度语义已修正为“按实际处理完成递增”，避免预先计数造成进度虚高。
   - renderer 侧已对未知 `jobId` 进度事件做 upsert，规避 job 事件先到导致的 UI 状态丢失。
+- 编辑器渲染链路（As-Is）：
+  - 顶部批量功能区为独立 UI 组件 `EditorBatchActionBar`，由 `Editor` 编排动作与状态（AI 批量翻译、文件级 QA、非打印符号开关）。
+  - 非打印符号可视化已支持普通空格、NBSP 与 NNBSP 区分（法语排版场景），并支持 Tab 可视化。
+  - 活动编辑行采用“可视符号输入 + 反解回原始字符”策略，确保显示非打印符号时光标定位准确。
 - 架构守卫（Gate-05）限制：
   - `ProjectService` 只做编排。
   - `CATDatabase` 不新增跨 repo 编排。

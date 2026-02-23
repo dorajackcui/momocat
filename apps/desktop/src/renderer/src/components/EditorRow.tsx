@@ -12,6 +12,7 @@ interface EditorRowProps {
   sourceHighlightQuery?: string;
   targetHighlightQuery?: string;
   highlightMode?: EditorMatchMode;
+  showNonPrintingSymbols?: boolean;
   onActivate: (id: string, options?: { autoFocusTarget?: boolean }) => void;
   onAutoFocus?: (id: string) => void;
   onChange: (id: string, value: string) => void;
@@ -34,6 +35,55 @@ export function normalizeRefinementInstruction(instruction: string): string {
   return instruction.trim();
 }
 
+interface NonPrintingVisualizationOptions {
+  showLineBreakSymbol?: boolean;
+}
+
+export function visualizeNonPrintingSymbols(
+  text: string,
+  options: NonPrintingVisualizationOptions = {},
+): string {
+  const { showLineBreakSymbol = true } = options;
+  let visualized = text
+    .replace(/\u202F/g, '⎵')
+    .replace(/\u00A0/g, '⍽')
+    .replace(/ /g, '·')
+    .replace(/\t/g, '⇥');
+  if (showLineBreakSymbol) {
+    visualized = visualized.replace(/\n/g, '↵\n');
+  }
+  return visualized;
+}
+
+export function parseVisualizedNonPrintingSymbols(text: string): string {
+  let result = '';
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+    if (char === '·') {
+      result += ' ';
+      continue;
+    }
+    if (char === '⍽') {
+      result += '\u00A0';
+      continue;
+    }
+    if (char === '⎵') {
+      result += '\u202F';
+      continue;
+    }
+    if (char === '⇥') {
+      result += '\t';
+      continue;
+    }
+    if (char === '↵' && next === '\n') {
+      continue;
+    }
+    result += char;
+  }
+  return result;
+}
+
 export const EditorRow: React.FC<EditorRowProps> = ({
   segment,
   rowNumber,
@@ -43,6 +93,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
   sourceHighlightQuery = '',
   targetHighlightQuery = '',
   highlightMode = 'contains',
+  showNonPrintingSymbols = false,
   onActivate,
   onAutoFocus,
   onChange,
@@ -344,13 +395,39 @@ export const EditorRow: React.FC<EditorRowProps> = ({
     [contextText, copyContextText],
   );
 
+  const sourceDisplayText = useMemo(
+    () =>
+      showNonPrintingSymbols ? visualizeNonPrintingSymbols(sourceEditorText) : sourceEditorText,
+    [showNonPrintingSymbols, sourceEditorText],
+  );
+  const targetEditorDisplayText = useMemo(
+    () =>
+      showNonPrintingSymbols
+        ? visualizeNonPrintingSymbols(draftText, { showLineBreakSymbol: false })
+        : draftText,
+    [draftText, showNonPrintingSymbols],
+  );
+  const sourceDisplayQuery = useMemo(
+    () =>
+      showNonPrintingSymbols
+        ? visualizeNonPrintingSymbols(sourceHighlightQuery)
+        : sourceHighlightQuery,
+    [showNonPrintingSymbols, sourceHighlightQuery],
+  );
+  const targetDisplayQuery = useMemo(
+    () =>
+      showNonPrintingSymbols
+        ? visualizeNonPrintingSymbols(targetHighlightQuery, { showLineBreakSymbol: false })
+        : targetHighlightQuery,
+    [showNonPrintingSymbols, targetHighlightQuery],
+  );
   const sourceHighlightChunks = useMemo(
-    () => buildHighlightChunks(sourceEditorText, sourceHighlightQuery, highlightMode),
-    [sourceEditorText, sourceHighlightQuery, highlightMode],
+    () => buildHighlightChunks(sourceDisplayText, sourceDisplayQuery, highlightMode),
+    [sourceDisplayText, sourceDisplayQuery, highlightMode],
   );
   const targetHighlightChunks = useMemo(
-    () => buildHighlightChunks(draftText, targetHighlightQuery, highlightMode),
-    [draftText, targetHighlightQuery, highlightMode],
+    () => buildHighlightChunks(targetEditorDisplayText, targetDisplayQuery, highlightMode),
+    [targetEditorDisplayText, targetDisplayQuery, highlightMode],
   );
   const showTargetHighlightOverlay = targetHighlightQuery.trim().length > 0;
   const canInsertTags = sourceTags.length > 0;
@@ -435,10 +512,16 @@ export const EditorRow: React.FC<EditorRowProps> = ({
         <div className="relative">
           <textarea
             ref={textareaRef}
-            value={draftText}
+            value={targetEditorDisplayText}
             readOnly={!isActive}
             onFocus={() => onActivate(segment.segmentId)}
-            onChange={(e) => emitTranslationChange(e.target.value)}
+            onChange={(e) =>
+              emitTranslationChange(
+                showNonPrintingSymbols
+                  ? parseVisualizedNonPrintingSymbols(e.target.value)
+                  : e.target.value,
+              )
+            }
             onInput={(e) => resizeTextarea(e.currentTarget)}
             onKeyDown={handleTargetKeyDown}
             onDoubleClick={(e) => e.currentTarget.select()}
@@ -515,7 +598,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
                       strokeLinejoin="round"
                       strokeWidth={2}
                       d="M3 18h18M7 18c0-6 3-10 5-10s5 4 5 10"
-                      />
+                    />
                   </svg>
                 )}
               </button>

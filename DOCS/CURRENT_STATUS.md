@@ -1,4 +1,4 @@
-# 当前开发状态（更新于 2026-02-21）
+# 当前开发状态（更新于 2026-02-23）
 
 > 这是“执行面板”文档：记录当前阶段、门禁状态、近期优先级。  
 > 需要实时准确，过时信息优先改这里。
@@ -11,10 +11,10 @@
 
 ## 2. 门禁状态（本地核验）
 
-核验日期：2026-02-21
+核验日期：2026-02-23
 
 1. `npm run typecheck --workspace=apps/desktop`：通过。
-2. `npm run lint --workspace=apps/desktop`：通过（`0 error / 7 warnings`，均为历史存量 warning）。
+2. `npm run lint --workspace=apps/desktop`：通过（`0 error / 6 warnings`，均为历史存量 warning）。
 3. `npm run gate:check`：未通过（`gate:style` 阻断，当前命中 `apps/desktop/src/renderer/src/components/EditorRow.tsx` 的硬编码颜色类）。
 
 最新同步：
@@ -48,6 +48,11 @@
   - dialogue 批量翻译进度语义已修复：进度只在段落实际处理完成后递增，不再在组开始前“提前计数”。
   - `AIModule` 已做文件级最小拆分：`services/modules/ai/dialogueTranslation.ts`、`services/modules/ai/promptReferences.ts`、`services/modules/ai/types.ts`。
   - 相关回归测试通过：main 侧（44 tests）+ renderer 侧（14 tests）。
+- 已完成编辑器批量功能栏重构与扩展（2026-02-23）：
+  - 编辑器顶部批量功能区已从 `Editor.tsx` 内联 JSX 抽离为独立组件 `components/editor/EditorBatchActionBar.tsx`，行为仍由 `Editor` 编排。
+  - 批量功能区当前包含 3 个图标按钮（`translation` 项目显示）：`AI Batch Translate`、`Batch QA`、`Show/Hide non-printing symbols`。
+  - 新增“非打印符号显示”能力（`EditorRow`）：普通空格、NBSP（`\u00A0`）、NNBSP（`\u202F`）与 Tab 可视化；其中法语常见 NBSP 与普通空格可直接区分。
+  - 已修复开启非打印符号后的光标错位：活动编辑行采用“显示符号 + 输入反解回原始字符”策略，保持编辑定位准确。
 - 当前 warning 分布（root lint）：
   - `packages/core`: `24`
   - `packages/db`: `19`

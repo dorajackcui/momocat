@@ -4,6 +4,12 @@ import { EditorRow } from './EditorRow';
 import { useEditor } from '../hooks/useEditor';
 import { TMPanel } from './TMPanel';
 import { ConcordancePanel } from './ConcordancePanel';
+import { EditorBatchActionBar } from './editor/EditorBatchActionBar';
+import {
+  ProjectAITranslateModal,
+  type ProjectAITranslateSubmit,
+} from './project-detail/ProjectAITranslateModal';
+import { buildFileQaFeedback } from './project-detail/fileQaFeedback';
 import { apiClient } from '../services/apiClient';
 import { feedbackService } from '../services/feedbackService';
 import {
@@ -32,6 +38,11 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
   const [isSearchInputFocused, setIsSearchInputFocused] = useState(false);
   const [manualActivationSegmentId, setManualActivationSegmentId] = useState<string | null>(null);
   const [suppressAutoFocusSegmentId, setSuppressAutoFocusSegmentId] = useState<string | null>(null);
+  const [isBatchAIModalOpen, setIsBatchAIModalOpen] = useState(false);
+  const [trackedBatchAIJobId, setTrackedBatchAIJobId] = useState<string | null>(null);
+  const [isBatchAITranslating, setIsBatchAITranslating] = useState(false);
+  const [isBatchQARunning, setIsBatchQARunning] = useState(false);
+  const [showNonPrintingSymbols, setShowNonPrintingSymbols] = useState(false);
   const layoutRef = useRef<HTMLDivElement>(null);
   const sourceSearchInputRef = useRef<HTMLInputElement>(null);
   const targetSearchInputRef = useRef<HTMLInputElement>(null);
@@ -54,11 +65,13 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
     handleApplyMatch,
     handleApplyTerm,
     projectId,
+    reloadEditorData,
   } = useEditor({ activeFileId: fileId });
 
   const totalSegments = segments.length;
   const confirmedSegments = segments.filter((s) => s.status === 'confirmed').length;
   const saveErrorCount = Object.keys(segmentSaveErrors).length;
+  const supportsBatchActions = project?.projectType === 'translation';
 
   const {
     sourceQueryInput,
@@ -143,6 +156,13 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
   }, [fileId]);
 
   useEffect(() => {
+    setIsBatchAIModalOpen(false);
+    setTrackedBatchAIJobId(null);
+    setIsBatchAITranslating(false);
+    setIsBatchQARunning(false);
+  }, [fileId]);
+
+  useEffect(() => {
     const getSelectedTextForConcordance = (): string => {
       const activeElement = document.activeElement;
       if (
@@ -219,6 +239,30 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
     return () => window.removeEventListener('resize', clampSidebarByViewport);
   }, []);
 
+  useEffect(() => {
+    if (!trackedBatchAIJobId) return;
+
+    const unsubscribe = apiClient.onJobProgress((progress) => {
+      if (progress.jobId !== trackedBatchAIJobId) return;
+      if (progress.status === 'running') return;
+
+      setIsBatchAITranslating(false);
+      setTrackedBatchAIJobId(null);
+
+      if (progress.status === 'failed') {
+        const errorMessage = progress.error?.message || progress.message || 'Unknown error';
+        feedbackService.error(`AI batch translation failed: ${errorMessage}`);
+        return;
+      }
+
+      if (progress.status === 'cancelled') {
+        feedbackService.info(progress.message || 'AI batch translation cancelled.');
+      }
+    });
+
+    return unsubscribe;
+  }, [trackedBatchAIJobId]);
+
   const handleExport = async () => {
     if (!file) return;
 
@@ -257,6 +301,45 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
     }
   };
 
+  const handleBatchAITranslate = async (options: ProjectAITranslateSubmit) => {
+    if (!supportsBatchActions) return;
+    setIsBatchAIModalOpen(false);
+    try {
+      const jobId = await apiClient.aiTranslateFile(fileId, {
+        mode: options.mode,
+        targetScope: options.targetScope,
+      });
+      setTrackedBatchAIJobId(jobId);
+      setIsBatchAITranslating(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setTrackedBatchAIJobId(null);
+      setIsBatchAITranslating(false);
+      feedbackService.error(`Failed to start AI translation: ${message}`);
+    }
+  };
+
+  const handleBatchQA = async () => {
+    if (!file) return;
+    setIsBatchQARunning(true);
+    try {
+      const report = await apiClient.runFileQA(fileId);
+      await reloadEditorData();
+      const feedback = buildFileQaFeedback(file.name, report);
+      if (feedback.level === 'success') {
+        feedbackService.success(feedback.message);
+      } else {
+        feedbackService.info(feedback.message);
+      }
+    } catch (error) {
+      feedbackService.error(
+        `Run QA failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    } finally {
+      setIsBatchQARunning(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center bg-muted text-text-faint">
@@ -270,6 +353,17 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-muted">
+      {supportsBatchActions && (
+        <ProjectAITranslateModal
+          open={isBatchAIModalOpen}
+          fileName={file?.name || null}
+          onClose={() => setIsBatchAIModalOpen(false)}
+          onConfirm={(options) => {
+            void handleBatchAITranslate(options);
+          }}
+        />
+      )}
+
       {/* Editor Header */}
       <header className="px-6 py-3 border-b border-border flex justify-between items-center bg-surface shadow-sm z-10">
         <div className="flex items-center gap-4">
@@ -335,6 +429,17 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
         >
           <div className="min-w-[800px]">
             <div className="sticky top-0 z-20 bg-surface border-b border-border shadow-sm">
+              <EditorBatchActionBar
+                visible={supportsBatchActions}
+                canRunActions={Boolean(file)}
+                isBatchAITranslating={isBatchAITranslating}
+                isBatchQARunning={isBatchQARunning}
+                showNonPrintingSymbols={showNonPrintingSymbols}
+                onOpenBatchAIModal={() => setIsBatchAIModalOpen(true)}
+                onRunBatchQA={() => void handleBatchQA()}
+                onToggleNonPrintingSymbols={() => setShowNonPrintingSymbols((prev) => !prev)}
+              />
+
               <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/80 backdrop-blur-sm">
                 <div ref={sortMenuRef} className="relative shrink-0">
                   <button
@@ -622,6 +727,7 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
                 sourceHighlightQuery={debouncedSourceQuery}
                 targetHighlightQuery={debouncedTargetQuery}
                 highlightMode={matchMode}
+                showNonPrintingSymbols={showNonPrintingSymbols}
               />
             ))}
 

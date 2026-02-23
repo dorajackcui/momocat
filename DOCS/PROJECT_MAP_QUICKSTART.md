@@ -1,6 +1,6 @@
 # 项目上手地图（快速定位版）
 
-最后更新：2026-02-21
+最后更新：2026-02-23
 
 这份文档的目标不是“讲全”，而是帮你在改功能时 1-2 分钟内找到入口，不再迷路。
 
@@ -35,6 +35,7 @@ Renderer (React 组件 + Hooks)
   - `App.tsx`：页面视图切换（dashboard/projectDetail/editor/tms/tbs）
   - `components/ProjectDetail.tsx`：项目详情聚合页
   - `components/Editor.tsx`：编辑器主界面
+  - `components/editor/EditorBatchActionBar.tsx`：编辑器批量功能栏（AI 批量翻译 / 文件级 QA / 非打印符号开关）
   - `hooks/useEditor.ts`：编辑页状态 + 段落更新 + TM/TB 请求
   - `hooks/projectDetail/*`：项目详情数据、导入流程、AI 设置
   - `services/apiClient.ts`：renderer 到 preload 的唯一 API 边界
@@ -184,6 +185,19 @@ AI Translate File:
        并注入上一组(原文+译文+speaker)上下文
      - dialogue 进度语义：仅在段落实际处理完成后递增
   -> SegmentService.updateSegment / updateSegmentsAtomically(status=translated)
+
+Editor Batch Action Bar (translation only):
+  -> Editor 顶部 sticky 区渲染 EditorBatchActionBar（纯 UI）
+  -> AI Batch Translate:
+     - 打开 ProjectAITranslateModal
+     - 提交后调用 apiClient.aiTranslateFile(fileId, { mode, targetScope })
+     - 由 onJobProgress 跟踪批量任务状态
+  -> Batch QA:
+     - 调用 apiClient.runFileQA(fileId)
+     - 调用 useEditor.reloadEditorData() 刷新 QA 标记与段落状态
+  -> Non-printing symbols:
+     - 开关由 Editor 持有
+     - EditorRow 显示并区分普通空格 / NBSP / NNBSP（法语场景）
 ```
 
 补充行为（2026-02-21）：
@@ -193,6 +207,10 @@ AI Translate File:
 - 同段并发锁已由主进程兜底：并发请求会快速失败，防止后返回覆盖先返回。
 - 文件级批量翻译新增 `AI Dialogue` 手动入口（仅 `translation` 项目显示）。
 - 对话模式当前将 `meta.context` 视为 `speaker`；组翻译失败会自动降级到逐段翻译。
+- 编辑器批量功能区已组件化：`EditorBatchActionBar`（2026-02-23）。
+- 编辑器新增非打印符号可视化开关（2026-02-23）：
+  - 符号映射：普通空格 `·`、NBSP `⍽`、NNBSP `⎵`、Tab `⇥`。
+  - 活动编辑行已修复光标错位：输入时会将可视符号反解回原始字符。
 
 ### 3.6 TM/TB 导入任务（Job 化）
 
@@ -217,6 +235,8 @@ TMImportWizard / TBImportWizard
 ### 4.2 想改“编辑器输入、确认、自动跳转”
 - `apps/desktop/src/renderer/src/hooks/useEditor.ts`
 - `apps/desktop/src/renderer/src/components/Editor.tsx`
+- `apps/desktop/src/renderer/src/components/EditorRow.tsx`
+- `apps/desktop/src/renderer/src/components/editor/EditorBatchActionBar.tsx`
 - `apps/desktop/src/main/services/SegmentService.ts`
 
 ### 4.3 想改“TM 匹配阈值/排序/模糊匹配”
@@ -236,6 +256,7 @@ TMImportWizard / TBImportWizard
 
 ### 4.5 想改“AI Prompt/温度/翻译容错”
 - `apps/desktop/src/renderer/src/components/EditorRow.tsx`
+- `apps/desktop/src/renderer/src/components/editor/EditorBatchActionBar.tsx`
 - `apps/desktop/src/renderer/src/components/project-detail/ProjectFilesPane.tsx`
 - `apps/desktop/src/renderer/src/hooks/useEditor.ts`
 - `apps/desktop/src/renderer/src/hooks/projectDetail/useProjectAI.ts`

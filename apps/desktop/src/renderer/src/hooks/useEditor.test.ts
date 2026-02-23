@@ -5,7 +5,7 @@ vi.mock('../services/apiClient', () => ({
   apiClient: {},
 }));
 
-import { createSegmentPersistor } from './useEditor';
+import { createSegmentPersistor, useEditor } from './useEditor';
 
 function createSegment(segmentId: string, targetText: string): Segment {
   return {
@@ -129,5 +129,12 @@ describe('createSegmentPersistor', () => {
 
     expect(rollbackSegment).not.toHaveBeenCalled();
     expect(setSegmentSaveError).not.toHaveBeenCalled();
+  });
+
+  it('exposes reloadEditorData in useEditor return type', () => {
+    type UseEditorResult = ReturnType<typeof useEditor>;
+    const acceptsReload = (reload: UseEditorResult['reloadEditorData']) => reload;
+    const reload = acceptsReload(async () => undefined);
+    expect(typeof reload).toBe('function');
   });
 });

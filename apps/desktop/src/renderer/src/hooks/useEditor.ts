@@ -641,5 +641,6 @@ export function useEditor({ activeFileId }: UseEditorProps) {
     handleApplyMatch,
     handleApplyTerm,
     getActiveSegment,
+    reloadEditorData: loadEditorData,
   };
 }

@@ -13,6 +13,7 @@ import { ProjectTMPane } from './project-detail/ProjectTMPane';
 import { ProjectTBPane } from './project-detail/ProjectTBPane';
 import { ProjectQASettingsModal } from './project-detail/ProjectQASettingsModal';
 import { runFileQaWithRefresh } from './project-detail/runFileQaWithRefresh';
+import { buildFileQaFeedback } from './project-detail/fileQaFeedback';
 
 interface ProjectDetailProps {
   projectId: number;
@@ -231,19 +232,12 @@ export function ProjectDetail({ projectId, onBack, onOpenFile }: ProjectDetailPr
         runFileQA: (nextFileId: number) => apiClient.runFileQA(nextFileId),
         loadData,
       });
-      if (report.errorCount === 0 && report.warningCount === 0) {
-        feedbackService.success(
-          `QA passed for "${fileName}" (${report.checkedSegments} segments).`,
-        );
-        return;
+      const feedback = buildFileQaFeedback(fileName, report);
+      if (feedback.level === 'success') {
+        feedbackService.success(feedback.message);
+      } else {
+        feedbackService.info(feedback.message);
       }
-      const previewLines = report.issues
-        .slice(0, 5)
-        .map((issue) => `Row ${issue.row} [${issue.severity}] ${issue.ruleId}: ${issue.message}`)
-        .join('\n');
-      feedbackService.info(
-        `QA finished for "${fileName}".\nErrors: ${report.errorCount}, Warnings: ${report.warningCount}\n${previewLines}${report.issues.length > 5 ? `\n...and ${report.issues.length - 5} more.` : ''}`,
-      );
     } catch (error) {
       feedbackService.error(
         `Run QA failed: ${error instanceof Error ? error.message : String(error)}`,
