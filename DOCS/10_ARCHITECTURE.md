@@ -7,14 +7,14 @@ Describe current system boundaries and module responsibilities so implementation
 Read before modifying module boundaries, cross-layer contracts, or multi-subsystem workflows.
 
 ## Source of Truth
-- Runtime behavior: implementation in `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/apps` and `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/packages`
-- Guardrails: `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/DOCS/architecture/GATE05_GUARDRAILS.json`
+- Runtime behavior: implementation in `apps` and `packages`
+- Guardrails: `DOCS/architecture/GATE05_GUARDRAILS.json`
 
 ## Last Updated
 2026-02-23
 
 ## Owner
-Core maintainers of `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool`
+Core maintainers of `simple-cat-tool`
 
 ## Layered Boundaries
 1. Renderer (`apps/desktop/src/renderer/src`)

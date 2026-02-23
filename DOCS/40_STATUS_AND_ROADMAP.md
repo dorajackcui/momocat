@@ -8,13 +8,13 @@ Read at task start, before planning scope, and before merge.
 
 ## Source of Truth
 - Validation commands and outputs in local environment
-- Guard scripts in `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/package.json` and `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/scripts`
+- Guard scripts in `package.json` and `scripts`
 
 ## Last Updated
 2026-02-23
 
 ## Owner
-Core maintainers of `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool`
+Core maintainers of `simple-cat-tool`
 
 ## Live Status Contract
 This is the only active documentation page that may contain live gate status and live risk status.

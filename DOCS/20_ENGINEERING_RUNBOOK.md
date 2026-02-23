@@ -7,18 +7,18 @@ Define execution workflow, quality gates, and failure handling so contributors c
 Read before coding, before opening PRs, and whenever gate/test failures occur.
 
 ## Source of Truth
-- Package scripts: `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/package.json`
-- Architecture guard config: `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/DOCS/architecture/GATE05_GUARDRAILS.json`
-- Current project status and priorities: `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/DOCS/40_STATUS_AND_ROADMAP.md`
+- Package scripts: `package.json`
+- Architecture guard config: `DOCS/architecture/GATE05_GUARDRAILS.json`
+- Current project status and priorities: `DOCS/40_STATUS_AND_ROADMAP.md`
 
 ## Last Updated
 2026-02-23
 
 ## Owner
-Core maintainers of `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool`
+Core maintainers of `simple-cat-tool`
 
 ## Workflow Rules
-1. Start from `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/DOCS/00_START_HERE.md`.
+1. Start from `DOCS/00_START_HERE.md`.
 2. Keep changes scoped: feature + direct blockers + required tests.
 3. Preserve public contracts unless a migration plan is explicitly documented.
 4. Update docs in the same change when behavior, boundaries, or process changes.
@@ -51,10 +51,10 @@ Current `gate:check` chain:
 5. Documentation update is included.
 
 ## Documentation Update Policy
-1. Keep architecture facts only in `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/DOCS/10_ARCHITECTURE.md`.
-2. Keep data model facts only in `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/DOCS/30_DATA_MODEL.md`.
-3. Keep live status only in `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/DOCS/40_STATUS_AND_ROADMAP.md`.
-4. Keep historical retrospective content only in `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/DOCS/90_HISTORY_CONSOLIDATED.md`.
+1. Keep architecture facts only in `DOCS/10_ARCHITECTURE.md`.
+2. Keep data model facts only in `DOCS/30_DATA_MODEL.md`.
+3. Keep live status only in `DOCS/40_STATUS_AND_ROADMAP.md`.
+4. Keep historical retrospective content only in `DOCS/90_HISTORY_CONSOLIDATED.md`.
 
 ## Failure Playbooks
 ### Gate failure triage order
@@ -82,7 +82,7 @@ Current `gate:check` chain:
 ### DB migration issues
 1. Re-run migration tests.
 2. Verify idempotency and v3->latest upgrade path.
-3. Update `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/DOCS/30_DATA_MODEL.md` in same change.
+3. Update `DOCS/30_DATA_MODEL.md` in same change.
 
 ## Operational Conventions
 1. Use `rg` for search and `rg --files` for discovery.

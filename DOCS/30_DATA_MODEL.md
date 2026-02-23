@@ -7,15 +7,15 @@ Document the persistent data model, migration execution model, and compatibility
 Read before changing schema, migration steps, repositories, or SQL-level behavior.
 
 ## Source of Truth
-- Migration runner: `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/packages/db/src/migration/runMigrations.ts`
-- Migration steps: `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/packages/db/src/migration/migrations/*.ts`
-- Repositories: `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/packages/db/src/repos/*.ts`
+- Migration runner: `packages/db/src/migration/runMigrations.ts`
+- Migration steps: `packages/db/src/migration/migrations/*.ts`
+- Repositories: `packages/db/src/repos/*.ts`
 
 ## Last Updated
 2026-02-23
 
 ## Owner
-Core maintainers of `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool`
+Core maintainers of `simple-cat-tool`
 
 ## Schema Version
 - Current target schema version: `v14`
@@ -78,6 +78,6 @@ Key fields:
 4. Update this document in the same change.
 
 ## Related Code Entry Points
-- `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/packages/db/src/index.ts`
-- `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/packages/db/src/migration/types.ts`
-- `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool/packages/db/src/migration/utils.ts`
+- `packages/db/src/index.ts`
+- `packages/db/src/migration/types.ts`
+- `packages/db/src/migration/utils.ts`

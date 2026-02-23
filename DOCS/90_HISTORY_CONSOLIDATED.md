@@ -13,7 +13,7 @@ Read only for context on legacy decisions, prior incidents, or rationale behind 
 2026-02-23
 
 ## Owner
-Core maintainers of `/Users/zhiyangcui/Documents/trae_projects/simple-cat-tool`
+Core maintainers of `simple-cat-tool`
 
 ## Not Active Policy
 This document is historical context only. It is not an active development policy source.
