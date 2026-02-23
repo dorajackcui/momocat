@@ -6,7 +6,7 @@
 
 - 当前主线：`v0.3` 进行中
 - 当前重点：**正确性收口 + 解耦改造 + 类型契约收紧**
-- 版本路线：`DOCS/ROADMAP.md`
+- 版本与状态：`DOCS/40_STATUS_AND_ROADMAP.md`
 
 ## 主要能力
 
@@ -54,17 +54,16 @@ packages/db/     # SQLite 数据层（迁移 + repos）
 DOCS/            # 项目文档
 ```
 
-详细结构见：`DOCS/PROJECT_STRUCTURE.md`
+详细结构见：`DOCS/10_ARCHITECTURE.md`
 
 ## 文档入口
 
-- 交接轻入口：`DOCS/HANDOFF_LITE.md`
-- 交接完整版：`DOCS/HANDOFF.md`
-- 文档导航：`DOCS/README.md`
-- 当前状态：`DOCS/CURRENT_STATUS.md`
-- 路线图：`DOCS/ROADMAP.md`
-- 开发规范：`DOCS/DEVELOPMENT_GUIDE.md`
-- 数据库结构：`DOCS/DATABASE_SCHEMA.md`
+- Start here: `DOCS/00_START_HERE.md`
+- Architecture: `DOCS/10_ARCHITECTURE.md`
+- Engineering runbook: `DOCS/20_ENGINEERING_RUNBOOK.md`
+- Data model: `DOCS/30_DATA_MODEL.md`
+- Status and roadmap: `DOCS/40_STATUS_AND_ROADMAP.md`
+- Historical consolidation: `DOCS/90_HISTORY_CONSOLIDATED.md`
 
 ## 运行数据说明
 
