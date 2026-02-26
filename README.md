@@ -22,13 +22,18 @@
 
 ### 环境
 
-- Node.js 18+
-- npm
+- Volta（推荐，用于锁定 Node/npm 版本）
+- Node.js `20.19.0`（若不使用 Volta）
+- npm `10.8.2`（若不使用 Volta）
+- Git
+- VS Code（可选）
+
+首次安装 Volta 后，在仓库根目录执行命令会自动使用 `package.json` 中固定的 Node/npm 版本。
 
 ### 运行
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
@@ -39,11 +44,28 @@ npm run build
 npm run pack
 ```
 
+平台定向打包命令：
+
+```bash
+# 仅可在 macOS 执行（产出 .dmg）
+npm run pack:mac
+
+# 仅可在 Windows 执行（产出 .exe）
+npm run pack:win
+```
+
 ### 测试
 
 ```bash
 npm test
 ```
+
+## Win + Mac 双环境开发约定
+
+- 通用命令统一为：`npm ci`、`npm run dev`、`npm test`、`npm run build`
+- 原生模块重建统一为：`npm run rebuild:electron`（已兼容 zsh / PowerShell）
+- Windows 仅在 Windows 机器上验收 `.exe`；macOS 仅在 macOS 机器上验收 `.dmg`
+- 跨平台质量门由 GitHub Actions 矩阵（`macos-latest` + `windows-latest`）执行
 
 ## 项目结构（简版）
 

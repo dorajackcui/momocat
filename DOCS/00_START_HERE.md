@@ -12,7 +12,7 @@ Read first for every new task, new session, or handoff.
 - Current project status and priorities: `DOCS/40_STATUS_AND_ROADMAP.md`
 
 ## Last Updated
-2026-02-23
+2026-02-26
 
 ## Owner
 Core maintainers of `simple-cat-tool`
@@ -23,6 +23,19 @@ Core maintainers of `simple-cat-tool`
 3. Read `DOCS/10_ARCHITECTURE.md` for boundaries and entrypoints.
 4. If data-layer changes are involved, read `DOCS/30_DATA_MODEL.md`.
 5. Implement and validate with the canonical command checklist below.
+
+## Dual-Platform Quick Boot (Windows + macOS)
+Run from repo root:
+
+```bash
+npm ci
+npm run rebuild:electron
+npm run dev
+```
+
+Package validation by target OS:
+1. Windows: `npm run pack:win`
+2. macOS: `npm run pack:mac`
 
 ## If Task Is X, Open Y
 | Task type | Open first |

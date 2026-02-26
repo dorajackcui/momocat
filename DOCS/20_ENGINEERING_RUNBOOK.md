@@ -12,7 +12,7 @@ Read before coding, before opening PRs, and whenever gate/test failures occur.
 - Current project status and priorities: `DOCS/40_STATUS_AND_ROADMAP.md`
 
 ## Last Updated
-2026-02-23
+2026-02-26
 
 ## Owner
 Core maintainers of `simple-cat-tool`
@@ -22,6 +22,27 @@ Core maintainers of `simple-cat-tool`
 2. Keep changes scoped: feature + direct blockers + required tests.
 3. Preserve public contracts unless a migration plan is explicitly documented.
 4. Update docs in the same change when behavior, boundaries, or process changes.
+
+## Cross-Platform Baseline (Windows + macOS)
+Use the same command set on both platforms:
+
+```bash
+npm ci
+npm run dev
+npm test
+npm run build
+```
+
+Native module rebuild:
+
+```bash
+npm run rebuild:electron
+```
+
+Packaging boundary:
+1. `npm run pack:win` must run on Windows only.
+2. `npm run pack:mac` must run on macOS only.
+3. Do not rely on cross-platform packaging for release signoff.
 
 ## Gates and Checks
 Primary command:
@@ -65,6 +86,11 @@ Current `gate:check` chain:
 5. `lint`
 6. `gate:smoke:large-file`
 
+CI matrix:
+1. `macos-latest`: `npm ci` -> `npm run rebuild:electron` -> `npm run gate:check`
+2. `windows-latest`: `npm ci` -> `npm run rebuild:electron` -> `npm run gate:check`
+3. Nightly/manual smoke pack job runs platform-native pack commands only.
+
 ### `gate:arch` failed
 1. Compare changed callsites with guardrail definitions.
 2. Decide whether to refactor code back into allowed boundary or update guardrail config intentionally.
@@ -83,6 +109,16 @@ Current `gate:check` chain:
 1. Re-run migration tests.
 2. Verify idempotency and v3->latest upgrade path.
 3. Update `DOCS/30_DATA_MODEL.md` in same change.
+
+### Windows/macOS command mismatch
+1. Verify Node/npm versions match `package.json` `volta` pins.
+2. Run `npm run rebuild:electron` to rebind native module ABI.
+3. Confirm platform-native packaging command (`pack:win` or `pack:mac`) is used.
+
+### Worktree dependency link issues
+1. Run `npm run worktree:deps:link` first; if local `node_modules` already exists, rerun with `npm run worktree:deps:link:force`.
+2. On Windows, the script automatically falls back from directory symlink to junction.
+3. If source worktree has no `node_modules`, run `npm ci` in source first.
 
 ## Operational Conventions
 1. Use `rg` for search and `rg --files` for discovery.
