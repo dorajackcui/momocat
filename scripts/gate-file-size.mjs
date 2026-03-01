@@ -10,9 +10,7 @@ const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx']);
 const EXCLUDED_SEGMENTS = new Set(['node_modules', 'dist', 'out', '.git']);
 const EXCLUDED_SUFFIXES = ['.test.ts', '.test.tsx', '.d.ts'];
 
-const LEGACY_ALLOWLIST = new Set([
-  'apps/desktop/src/renderer/src/components/EditorRow.tsx',
-]);
+const LEGACY_ALLOWLIST = new Set([]);
 
 function walk(dir, files) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });

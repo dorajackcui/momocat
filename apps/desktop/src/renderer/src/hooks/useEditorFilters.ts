@@ -1,23 +1,34 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Segment, serializeTokensToEditorText } from '@cat/core';
+import { Segment } from '@cat/core';
 import {
   EditorFilterCriteria,
   EditorMatchMode,
   EditorQualityFilter,
   EditorQuickPreset,
+  SearchableEditorSegment,
   EditorSortBy,
   EditorSortDirection,
   EditorStatusFilter,
-  SearchableEditorSegment,
   countActiveFilterFields,
   createDefaultEditorFilterCriteria,
   filterSearchableSegments,
   getQuickPresetPatch,
   sortSearchableSegments,
 } from '../components/editorFilterUtils';
+import {
+  buildEditorFilterStorageKey as buildEditorFilterStorageKeyInternal,
+  loadPersistedFilterState,
+  persistFilterState,
+  sanitizePersistedEditorFilterState as sanitizePersistedEditorFilterStateInternal,
+} from './editor/editorFilterStateStorage';
+import {
+  buildSearchableEditorSegments,
+  buildSearchableEditorSegmentsWithWeakCache,
+  resolveActiveSegmentIdForFilteredList,
+} from './editor/editorSearchableSegments';
+import { useEditorFilterMenus } from './editor/useEditorFilterMenus';
 
 const SEARCH_DEBOUNCE_MS = 120;
-const FILTER_STATE_STORAGE_KEY_PREFIX = 'editor-filter-state:v1:file:';
 
 export const FILTER_STATUS_OPTIONS: Array<{ value: EditorStatusFilter; label: string }> = [
   { value: 'all', label: 'All' },
@@ -66,17 +77,6 @@ export interface UseEditorFiltersParams {
   setActiveSegmentId: (segmentId: string) => void;
 }
 
-interface PersistedFilterShape {
-  sourceQuery: string;
-  targetQuery: string;
-  status: EditorStatusFilter;
-  matchMode: EditorMatchMode;
-  qualityFilters: EditorQualityFilter[];
-  quickPreset: EditorQuickPreset;
-  sortBy: EditorSortBy;
-  sortDirection: EditorSortDirection;
-}
-
 const STATUS_VALUES = new Set(FILTER_STATUS_OPTIONS.map((item) => item.value));
 const MATCH_MODE_VALUES = new Set(FILTER_MATCH_MODE_OPTIONS.map((item) => item.value));
 const QUALITY_VALUES = new Set(FILTER_QUALITY_OPTIONS.map((item) => item.value));
@@ -84,152 +84,28 @@ const QUICK_PRESET_VALUES = new Set(FILTER_QUICK_PRESET_OPTIONS.map((item) => it
 const SORT_BY_VALUES = new Set<EditorSortBy>(['default', 'source_length', 'target_length']);
 const SORT_DIRECTION_VALUES = new Set<EditorSortDirection>(['asc', 'desc']);
 
+export {
+  buildSearchableEditorSegments,
+  buildSearchableEditorSegmentsWithWeakCache,
+  resolveActiveSegmentIdForFilteredList,
+};
+
 export function buildEditorFilterStorageKey(fileId: number): string {
-  return `${FILTER_STATE_STORAGE_KEY_PREFIX}${fileId}`;
+  return buildEditorFilterStorageKeyInternal(fileId);
 }
 
 export function sanitizePersistedEditorFilterState(raw: unknown): EditorFilterCriteria {
-  const defaults = createDefaultEditorFilterCriteria();
-  if (!raw || typeof raw !== 'object') {
-    return defaults;
-  }
-
-  const parsed = raw as Partial<PersistedFilterShape>;
-  const sourceQuery =
-    typeof parsed.sourceQuery === 'string' ? parsed.sourceQuery : defaults.sourceQuery;
-  const targetQuery =
-    typeof parsed.targetQuery === 'string' ? parsed.targetQuery : defaults.targetQuery;
-  const status = STATUS_VALUES.has(parsed.status as EditorStatusFilter)
-    ? (parsed.status as EditorStatusFilter)
-    : defaults.status;
-  const matchMode = MATCH_MODE_VALUES.has(parsed.matchMode as EditorMatchMode)
-    ? (parsed.matchMode as EditorMatchMode)
-    : defaults.matchMode;
-  const quickPreset = QUICK_PRESET_VALUES.has(parsed.quickPreset as EditorQuickPreset)
-    ? (parsed.quickPreset as EditorQuickPreset)
-    : defaults.quickPreset;
-  const qualityFilters = Array.isArray(parsed.qualityFilters)
-    ? parsed.qualityFilters.filter((value): value is EditorQualityFilter =>
-        QUALITY_VALUES.has(value as EditorQualityFilter),
-      )
-    : defaults.qualityFilters;
-  const sortBy = SORT_BY_VALUES.has(parsed.sortBy as EditorSortBy)
-    ? (parsed.sortBy as EditorSortBy)
-    : defaults.sortBy;
-  const sortDirection = SORT_DIRECTION_VALUES.has(parsed.sortDirection as EditorSortDirection)
-    ? (parsed.sortDirection as EditorSortDirection)
-    : defaults.sortDirection;
-
-  return {
-    sourceQuery,
-    targetQuery,
-    status,
-    matchMode,
-    qualityFilters,
-    quickPreset,
-    sortBy,
-    sortDirection,
-  };
-}
-
-export function buildSearchableEditorSegments(
-  segments: Segment[],
-  segmentSaveErrors: Record<string, string>,
-): SearchableEditorSegment[] {
-  return segments.map((segment, index) => {
-    const sourceText = serializeTokensToEditorText(segment.sourceTokens, segment.sourceTokens)
-      .replace(/\r\n/g, '\n')
-      .replace(/\r/g, '\n');
-    const targetText = serializeTokensToEditorText(segment.targetTokens, segment.sourceTokens)
-      .replace(/\r\n/g, '\n')
-      .replace(/\r/g, '\n');
-    const qaIssues = segment.qaIssues || [];
-    const hasQaError = qaIssues.some((issue) => issue.severity === 'error');
-    const hasQaWarning = qaIssues.some((issue) => issue.severity === 'warning');
-    const hasSaveError = Boolean(segmentSaveErrors[segment.segmentId]);
-    const isUntranslated = targetText.trim().length === 0;
-    const hasIssue = hasQaError || hasQaWarning || hasSaveError;
-
-    return {
-      segment,
-      originalIndex: index,
-      sourceText,
-      targetText,
-      hasQaError,
-      hasQaWarning,
-      hasSaveError,
-      isUntranslated,
-      hasIssue,
-    };
+  return sanitizePersistedEditorFilterStateInternal({
+    raw,
+    guards: {
+      statusValues: STATUS_VALUES,
+      matchModeValues: MATCH_MODE_VALUES,
+      qualityValues: QUALITY_VALUES,
+      quickPresetValues: QUICK_PRESET_VALUES,
+      sortByValues: SORT_BY_VALUES,
+      sortDirectionValues: SORT_DIRECTION_VALUES,
+    },
   });
-}
-
-export function buildSearchableEditorSegmentsWithWeakCache(params: {
-  segments: Segment[];
-  segmentSaveErrors: Record<string, string>;
-  cache: WeakMap<Segment, SearchableEditorSegment>;
-}): SearchableEditorSegment[] {
-  const { segments, segmentSaveErrors, cache } = params;
-  return segments.map((segment, index) => {
-    const cached = cache.get(segment);
-    const hasSaveError = Boolean(segmentSaveErrors[segment.segmentId]);
-    if (cached && cached.originalIndex === index && cached.hasSaveError === hasSaveError) {
-      return cached;
-    }
-
-    if (cached) {
-      const nextCached: SearchableEditorSegment = {
-        ...cached,
-        originalIndex: index,
-        hasSaveError,
-        hasIssue: cached.hasQaError || cached.hasQaWarning || hasSaveError,
-      };
-      cache.set(segment, nextCached);
-      return nextCached;
-    }
-
-    const sourceText = serializeTokensToEditorText(segment.sourceTokens, segment.sourceTokens)
-      .replace(/\r\n/g, '\n')
-      .replace(/\r/g, '\n');
-    const targetText = serializeTokensToEditorText(segment.targetTokens, segment.sourceTokens)
-      .replace(/\r\n/g, '\n')
-      .replace(/\r/g, '\n');
-    const qaIssues = segment.qaIssues || [];
-    const hasQaError = qaIssues.some((issue) => issue.severity === 'error');
-    const hasQaWarning = qaIssues.some((issue) => issue.severity === 'warning');
-    const isUntranslated = targetText.trim().length === 0;
-    const nextSearchable: SearchableEditorSegment = {
-      segment,
-      originalIndex: index,
-      sourceText,
-      targetText,
-      hasQaError,
-      hasQaWarning,
-      hasSaveError,
-      isUntranslated,
-      hasIssue: hasQaError || hasQaWarning || hasSaveError,
-    };
-    cache.set(segment, nextSearchable);
-    return nextSearchable;
-  });
-}
-
-export function resolveActiveSegmentIdForFilteredList(params: {
-  activeSegmentId: string | null;
-  segments: Segment[];
-  filteredSegments: SearchableEditorSegment[];
-}): string | null {
-  const { activeSegmentId, segments, filteredSegments } = params;
-  if (filteredSegments.length === 0) return null;
-
-  const fallbackId = filteredSegments[0].segment.segmentId;
-  if (!activeSegmentId) return fallbackId;
-
-  const activeStillExists = segments.some((segment) => segment.segmentId === activeSegmentId);
-  if (!activeStillExists) return fallbackId;
-
-  // Keep current active segment even if it is filtered out.
-  return activeSegmentId;
 }
 
 export function useEditorFilters({
@@ -244,23 +120,22 @@ export function useEditorFilters({
   );
   const [debouncedSourceQuery, setDebouncedSourceQuery] = useState('');
   const [debouncedTargetQuery, setDebouncedTargetQuery] = useState('');
-  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
-  const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
-  const filterMenuRef = useRef<HTMLDivElement>(null);
-  const sortMenuRef = useRef<HTMLDivElement>(null);
   const filterStateHydratedRef = useRef(false);
-  const searchableSegmentCacheRef = useRef<WeakMap<Segment, SearchableEditorSegment>>(
-    new WeakMap(),
+  const searchableSegmentCache = useMemo<WeakMap<Segment, SearchableEditorSegment>>(
+    () => new WeakMap(),
+    [],
   );
+
+  const menus = useEditorFilterMenus();
 
   const searchableSegments = useMemo(
     () =>
       buildSearchableEditorSegmentsWithWeakCache({
         segments,
         segmentSaveErrors,
-        cache: searchableSegmentCacheRef.current,
+        cache: searchableSegmentCache,
       }),
-    [segments, segmentSaveErrors],
+    [searchableSegmentCache, segments, segmentSaveErrors],
   );
 
   const effectiveCriteria = useMemo(
@@ -290,9 +165,8 @@ export function useEditorFilters({
     setFilterState(defaults);
     setDebouncedSourceQuery(defaults.sourceQuery);
     setDebouncedTargetQuery(defaults.targetQuery);
-    setIsFilterMenuOpen(false);
-    setIsSortMenuOpen(false);
-  }, []);
+    menus.closeMenus();
+  }, [menus]);
 
   const setSourceQueryInput = useCallback((value: string) => {
     setFilterState((prev) => ({ ...prev, sourceQuery: value }));
@@ -347,87 +221,31 @@ export function useEditorFilters({
         sortBy,
         sortDirection,
       }));
-      setIsSortMenuOpen(false);
+      menus.setIsSortMenuOpen(false);
     },
-    [],
+    [menus],
   );
-
-  const toggleFilterMenu = useCallback(() => {
-    setIsFilterMenuOpen((prev) => {
-      const next = !prev;
-      if (next) {
-        setIsSortMenuOpen(false);
-      }
-      return next;
-    });
-  }, []);
-
-  const toggleSortMenu = useCallback(() => {
-    setIsSortMenuOpen((prev) => {
-      const next = !prev;
-      if (next) {
-        setIsFilterMenuOpen(false);
-      }
-      return next;
-    });
-  }, []);
 
   useEffect(() => {
     filterStateHydratedRef.current = false;
-    const defaults = createDefaultEditorFilterCriteria();
-    const storageKey = buildEditorFilterStorageKey(fileId);
 
-    const resetToDefault = () => {
-      setFilterState(defaults);
-      setDebouncedSourceQuery(defaults.sourceQuery);
-      setDebouncedTargetQuery(defaults.targetQuery);
-    };
+    const loadedState = loadPersistedFilterState({
+      fileId,
+      sanitize: sanitizePersistedEditorFilterState,
+      onError: (error) => {
+        console.warn('[useEditorFilters] Failed to hydrate filter state from localStorage', error);
+      },
+    });
 
-    try {
-      const raw = window.localStorage.getItem(storageKey);
-      if (!raw) {
-        resetToDefault();
-      } else {
-        const parsed = JSON.parse(raw) as unknown;
-        const nextState = sanitizePersistedEditorFilterState(parsed);
-        setFilterState(nextState);
-        setDebouncedSourceQuery(nextState.sourceQuery);
-        setDebouncedTargetQuery(nextState.targetQuery);
-      }
-    } catch (error) {
-      console.warn('[useEditorFilters] Failed to hydrate filter state from localStorage', error);
-      resetToDefault();
-    } finally {
-      filterStateHydratedRef.current = true;
-      setIsFilterMenuOpen(false);
-      setIsSortMenuOpen(false);
-    }
-  }, [fileId]);
-
-  useEffect(() => {
-    if (!isFilterMenuOpen && !isSortMenuOpen) return;
-
-    const handlePointerDown = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (filterMenuRef.current?.contains(target) || sortMenuRef.current?.contains(target)) return;
-      setIsFilterMenuOpen(false);
-      setIsSortMenuOpen(false);
-    };
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsFilterMenuOpen(false);
-        setIsSortMenuOpen(false);
-      }
-    };
-
-    window.addEventListener('mousedown', handlePointerDown);
-    window.addEventListener('keydown', handleEscape);
-    return () => {
-      window.removeEventListener('mousedown', handlePointerDown);
-      window.removeEventListener('keydown', handleEscape);
-    };
-  }, [isFilterMenuOpen, isSortMenuOpen]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Hydrate per-file state after file switch.
+    setFilterState(loadedState);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Keep debounced state aligned with hydrated source query.
+    setDebouncedSourceQuery(loadedState.sourceQuery);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Keep debounced state aligned with hydrated target query.
+    setDebouncedTargetQuery(loadedState.targetQuery);
+    filterStateHydratedRef.current = true;
+    menus.closeMenus();
+  }, [fileId, menus]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -445,13 +263,13 @@ export function useEditorFilters({
 
   useEffect(() => {
     if (!filterStateHydratedRef.current) return;
-    const storageKey = buildEditorFilterStorageKey(fileId);
-
-    try {
-      window.localStorage.setItem(storageKey, JSON.stringify(filterState));
-    } catch (error) {
-      console.warn('[useEditorFilters] Failed to persist filter state to localStorage', error);
-    }
+    persistFilterState({
+      fileId,
+      filterState,
+      onError: (error) => {
+        console.warn('[useEditorFilters] Failed to persist filter state to localStorage', error);
+      },
+    });
   }, [fileId, filterState]);
 
   useEffect(() => {
@@ -474,15 +292,15 @@ export function useEditorFilters({
     quickPreset: filterState.quickPreset,
     sortBy: filterState.sortBy,
     sortDirection: filterState.sortDirection,
-    isFilterMenuOpen,
-    isSortMenuOpen,
-    filterMenuRef,
-    sortMenuRef,
+    isFilterMenuOpen: menus.isFilterMenuOpen,
+    isSortMenuOpen: menus.isSortMenuOpen,
+    filterMenuRef: menus.filterMenuRef,
+    sortMenuRef: menus.sortMenuRef,
     filteredSegments,
     activeFilterCount,
     hasActiveFilter,
-    toggleFilterMenu,
-    toggleSortMenu,
+    toggleFilterMenu: menus.toggleFilterMenu,
+    toggleSortMenu: menus.toggleSortMenu,
     setSourceQueryInput,
     setTargetQueryInput,
     handleStatusFilterChange,

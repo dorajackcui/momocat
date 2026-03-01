@@ -7,6 +7,11 @@ import {
   shouldShowAIRefineControl,
   visualizeNonPrintingSymbols,
 } from './EditorRow';
+import { resolveEditorRowShortcutAction } from './editor-row/useEditorRowCommandHandlers';
+import {
+  getEditorRowStatusLineClass,
+  getEditorRowStatusTitle,
+} from './editor-row/useEditorRowDisplayModel';
 
 describe('EditorRow AI refine decisions', () => {
   it('identifies refinable target text correctly', () => {
@@ -103,5 +108,89 @@ describe('EditorRow draft sync gating', () => {
         isActive: true,
       }),
     ).toBe(false);
+  });
+});
+
+describe('EditorRow keyboard shortcut decisions', () => {
+  it('resolves confirm command for ctrl/cmd + enter', () => {
+    expect(
+      resolveEditorRowShortcutAction({
+        key: 'Enter',
+        ctrlKey: true,
+        metaKey: false,
+        shiftKey: false,
+      }),
+    ).toEqual({ type: 'confirm' });
+
+    expect(
+      resolveEditorRowShortcutAction({
+        key: 'Enter',
+        ctrlKey: false,
+        metaKey: true,
+        shiftKey: false,
+      }),
+    ).toEqual({ type: 'confirm' });
+  });
+
+  it('resolves insert tag commands for ctrl/cmd + shift + number', () => {
+    expect(
+      resolveEditorRowShortcutAction({
+        key: '1',
+        ctrlKey: true,
+        metaKey: false,
+        shiftKey: true,
+      }),
+    ).toEqual({ type: 'insertTag', tagIndex: 0 });
+
+    expect(
+      resolveEditorRowShortcutAction({
+        key: '9',
+        ctrlKey: false,
+        metaKey: true,
+        shiftKey: true,
+      }),
+    ).toEqual({ type: 'insertTag', tagIndex: 8 });
+  });
+
+  it('resolves insert all tags for ctrl/cmd + shift + 0/)', () => {
+    expect(
+      resolveEditorRowShortcutAction({
+        key: '0',
+        ctrlKey: true,
+        metaKey: false,
+        shiftKey: true,
+      }),
+    ).toEqual({ type: 'insertAllTags' });
+
+    expect(
+      resolveEditorRowShortcutAction({
+        key: ')',
+        ctrlKey: false,
+        metaKey: true,
+        shiftKey: true,
+      }),
+    ).toEqual({ type: 'insertAllTags' });
+  });
+});
+
+describe('EditorRow status display decisions', () => {
+  it('maps status/qa state to status line classes', () => {
+    expect(getEditorRowStatusLineClass('translated', false, false)).toBe('bg-brand');
+    expect(getEditorRowStatusLineClass('reviewed', false, false)).toBe('bg-info');
+    expect(getEditorRowStatusLineClass('confirmed', false, false)).toBe('bg-success');
+    expect(getEditorRowStatusLineClass('draft', false, false)).toBe('bg-warning');
+    expect(getEditorRowStatusLineClass('new', false, false)).toBe('bg-text-faint');
+    expect(getEditorRowStatusLineClass('new', false, true)).toBe('bg-warning');
+    expect(getEditorRowStatusLineClass('new', true, false)).toBe('bg-danger');
+  });
+
+  it('includes qa suffix in status title when needed', () => {
+    expect(getEditorRowStatusTitle('translated', false, false)).toBe('Status: translated');
+    expect(getEditorRowStatusTitle('translated', false, true)).toBe(
+      'Status: translated (QA warning)',
+    );
+    expect(getEditorRowStatusTitle('translated', true, false)).toBe(
+      'Status: translated (QA error)',
+    );
   });
 });
