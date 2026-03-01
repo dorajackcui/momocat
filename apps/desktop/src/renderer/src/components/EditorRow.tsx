@@ -16,6 +16,8 @@ interface EditorRowProps {
   onActivate: (id: string, options?: { autoFocusTarget?: boolean }) => void;
   onAutoFocus?: (id: string) => void;
   onChange: (id: string, value: string) => void;
+  onBlur?: (id: string) => Promise<void>;
+  onEditStateChange?: (id: string, editing: boolean) => void;
   onAITranslate: (id: string) => void;
   onAIRefine: (id: string, instruction: string) => void;
   onConfirm: (id: string) => void;
@@ -33,6 +35,26 @@ export function shouldShowAIRefineControl(isActive: boolean, targetText: string)
 
 export function normalizeRefinementInstruction(instruction: string): string {
   return instruction.trim();
+}
+
+interface DraftSyncDecisionInput {
+  isDraftSyncSuspended: boolean;
+  draftText: string;
+  targetEditorText: string;
+  isActive: boolean;
+}
+
+export function shouldSyncDraftFromExternalTarget({
+  isDraftSyncSuspended,
+  draftText,
+  targetEditorText,
+  isActive,
+}: DraftSyncDecisionInput): boolean {
+  // Keep blur-flush protection only after row becomes inactive.
+  // This lets TM/TB side-panel apply updates reflect immediately on the active row.
+  if (isDraftSyncSuspended && !isActive) return false;
+  if (draftText === targetEditorText) return false;
+  return true;
 }
 
 interface NonPrintingVisualizationOptions {
@@ -84,7 +106,7 @@ export function parseVisualizedNonPrintingSymbols(text: string): string {
   return result;
 }
 
-export const EditorRow: React.FC<EditorRowProps> = ({
+const EditorRowComponent: React.FC<EditorRowProps> = ({
   segment,
   rowNumber,
   isActive,
@@ -97,6 +119,8 @@ export const EditorRow: React.FC<EditorRowProps> = ({
   onActivate,
   onAutoFocus,
   onChange,
+  onBlur,
+  onEditStateChange,
   onAITranslate,
   onAIRefine,
   onConfirm,
@@ -104,13 +128,22 @@ export const EditorRow: React.FC<EditorRowProps> = ({
   isAIRefining = false,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mirrorRef = useRef<HTMLDivElement>(null);
   const aiRefineInputRef = useRef<HTMLInputElement>(null);
+  const wasActiveRef = useRef(false);
+  const isMountedRef = useRef(true);
   const [isContextExpanded, setIsContextExpanded] = useState(false);
   const [contextCopied, setContextCopied] = useState(false);
   const [showTagInsertionUI, setShowTagInsertionUI] = useState(false);
   const [showAIRefineInput, setShowAIRefineInput] = useState(false);
   const [aiRefineDraft, setAiRefineDraft] = useState('');
-  const [draftText, setDraftText] = useState('');
+  const [isTargetFocused, setIsTargetFocused] = useState(false);
+  const [draftText, setDraftText] = useState(() =>
+    serializeTokensToEditorText(segment.targetTokens, segment.sourceTokens)
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n'),
+  );
+  const [isDraftSyncSuspended, setIsDraftSyncSuspended] = useState(false);
   const [isSourceHovered, setIsSourceHovered] = useState(false);
   const contextCopiedTimerRef = useRef<number | null>(null);
 
@@ -144,21 +177,49 @@ export const EditorRow: React.FC<EditorRowProps> = ({
     [segment.targetTokens, segment.sourceTokens],
   );
 
-  const resizeTextarea = useCallback((el: HTMLTextAreaElement | null) => {
-    if (!el) return;
-    // Reset first, then measure to keep autosize stable when content shrinks/expands.
-    el.style.height = '0px';
-    el.style.height = `${Math.max(36, el.scrollHeight)}px`;
+  const resizeTextarea = useCallback(() => {
+    const textarea = textareaRef.current;
+    const mirror = mirrorRef.current;
+    if (!textarea || !mirror) return;
+    const nextHeight = Math.max(36, Math.ceil(mirror.getBoundingClientRect().height));
+    textarea.style.height = `${nextHeight}px`;
   }, []);
 
   useEffect(() => {
-    // Sync local draft when active segment changes or external updates arrive.
+    if (
+      !shouldSyncDraftFromExternalTarget({
+        isDraftSyncSuspended,
+        draftText,
+        targetEditorText,
+        isActive,
+      })
+    ) {
+      return;
+    }
+    const textarea = textareaRef.current;
+    const isTextareaFocused =
+      typeof document !== 'undefined' && document.activeElement === textarea;
+    const selectionStart = isTextareaFocused ? (textarea?.selectionStart ?? 0) : null;
+    const selectionEnd = isTextareaFocused ? (textarea?.selectionEnd ?? selectionStart) : null;
+
+    // Sync local draft from external updates, and preserve caret/selection when focused.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraftText(targetEditorText);
-  }, [targetEditorText, segment.segmentId]);
+    if (selectionStart === null || selectionEnd === null) return;
+
+    const maxPosition = targetEditorText.length;
+    const clampedStart = Math.min(selectionStart, maxPosition);
+    const clampedEnd = Math.min(selectionEnd, maxPosition);
+    requestAnimationFrame(() => {
+      const nextTextarea = textareaRef.current;
+      if (!nextTextarea || document.activeElement !== nextTextarea) return;
+      nextTextarea.setSelectionRange(clampedStart, clampedEnd);
+    });
+  }, [draftText, isActive, isDraftSyncSuspended, targetEditorText]);
 
   useEffect(() => {
-    if (isActive && !disableAutoFocus && textareaRef.current) {
+    const becameActive = isActive && !wasActiveRef.current;
+    if (becameActive && !disableAutoFocus && textareaRef.current) {
       textareaRef.current.focus();
       onAutoFocus?.(segment.segmentId);
     }
@@ -171,7 +232,15 @@ export const EditorRow: React.FC<EditorRowProps> = ({
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setAiRefineDraft('');
     }
-  }, [disableAutoFocus, isActive, onAutoFocus, segment.segmentId]);
+    wasActiveRef.current = isActive;
+  }, [disableAutoFocus, isActive, onAutoFocus, onEditStateChange, segment.segmentId]);
+
+  useEffect(
+    () => () => {
+      onEditStateChange?.(segment.segmentId, false);
+    },
+    [onEditStateChange, segment.segmentId],
+  );
 
   useEffect(() => {
     if (!showAIRefineInput || !isActive) return;
@@ -181,6 +250,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
 
   useEffect(() => {
     return () => {
+      isMountedRef.current = false;
       if (contextCopiedTimerRef.current !== null) {
         window.clearTimeout(contextCopiedTimerRef.current);
       }
@@ -188,22 +258,24 @@ export const EditorRow: React.FC<EditorRowProps> = ({
   }, []);
 
   useLayoutEffect(() => {
-    resizeTextarea(textareaRef.current);
-  }, [draftText, resizeTextarea]);
+    resizeTextarea();
+  }, [draftText, resizeTextarea, showNonPrintingSymbols, targetHighlightQuery]);
 
   useEffect(() => {
-    const syncHeight = () => {
-      resizeTextarea(textareaRef.current);
-    };
-    window.addEventListener('resize', syncHeight);
-    return () => window.removeEventListener('resize', syncHeight);
+    const container = textareaRef.current?.parentElement;
+    if (!container) return undefined;
+    const observer = new ResizeObserver(() => {
+      resizeTextarea();
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
   }, [resizeTextarea]);
 
   const emitTranslationChange = useCallback(
     (nextText: string) => {
       setDraftText(nextText);
       onChange(segment.segmentId, nextText);
-      requestAnimationFrame(() => resizeTextarea(textareaRef.current));
+      requestAnimationFrame(() => resizeTextarea());
     },
     [onChange, segment.segmentId, resizeTextarea],
   );
@@ -304,7 +376,7 @@ export const EditorRow: React.FC<EditorRowProps> = ({
   const handleTargetKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
-      onConfirm(segment.segmentId);
+      void onConfirm(segment.segmentId);
       return;
     }
 
@@ -400,12 +472,13 @@ export const EditorRow: React.FC<EditorRowProps> = ({
       showNonPrintingSymbols ? visualizeNonPrintingSymbols(sourceEditorText) : sourceEditorText,
     [showNonPrintingSymbols, sourceEditorText],
   );
+  const showNonPrintingTargetOverlay = showNonPrintingSymbols && !isTargetFocused;
   const targetEditorDisplayText = useMemo(
     () =>
-      showNonPrintingSymbols
+      showNonPrintingTargetOverlay
         ? visualizeNonPrintingSymbols(draftText, { showLineBreakSymbol: false })
         : draftText,
-    [draftText, showNonPrintingSymbols],
+    [draftText, showNonPrintingTargetOverlay],
   );
   const sourceDisplayQuery = useMemo(
     () =>
@@ -416,10 +489,10 @@ export const EditorRow: React.FC<EditorRowProps> = ({
   );
   const targetDisplayQuery = useMemo(
     () =>
-      showNonPrintingSymbols
+      showNonPrintingTargetOverlay
         ? visualizeNonPrintingSymbols(targetHighlightQuery, { showLineBreakSymbol: false })
         : targetHighlightQuery,
-    [showNonPrintingSymbols, targetHighlightQuery],
+    [showNonPrintingTargetOverlay, targetHighlightQuery],
   );
   const sourceHighlightChunks = useMemo(
     () => buildHighlightChunks(sourceDisplayText, sourceDisplayQuery, highlightMode),
@@ -436,9 +509,8 @@ export const EditorRow: React.FC<EditorRowProps> = ({
   const showAIRefineControl = shouldShowAIRefineControl(isActive, draftText);
   const showTargetActionButtons =
     isActive && (canInsertTags || canAITranslate || hasRefinableTarget);
-  const targetTextLayerClass = showTargetActionButtons
-    ? 'editor-target-text-layer pr-12'
-    : 'editor-target-text-layer';
+  const targetTextLayerClass = 'editor-target-text-layer';
+  const showTargetOverlay = showNonPrintingTargetOverlay || showTargetHighlightOverlay;
 
   const renderChunks = useCallback(
     (chunks: ReturnType<typeof buildHighlightChunks>) =>
@@ -510,31 +582,63 @@ export const EditorRow: React.FC<EditorRowProps> = ({
         />
 
         <div className="relative">
+          <div
+            ref={mirrorRef}
+            aria-hidden="true"
+            className={`${targetTextLayerClass} pointer-events-none absolute left-0 top-0 w-full invisible whitespace-pre-wrap break-words`}
+          >
+            {(showNonPrintingTargetOverlay
+              ? visualizeNonPrintingSymbols(draftText, { showLineBreakSymbol: false })
+              : draftText) || ' '}
+          </div>
+
           <textarea
             ref={textareaRef}
-            value={targetEditorDisplayText}
+            value={draftText}
             readOnly={!isActive}
-            onFocus={() => onActivate(segment.segmentId)}
-            onChange={(e) =>
-              emitTranslationChange(
-                showNonPrintingSymbols
-                  ? parseVisualizedNonPrintingSymbols(e.target.value)
-                  : e.target.value,
-              )
-            }
-            onInput={(e) => resizeTextarea(e.currentTarget)}
+            onFocus={() => {
+              onActivate(segment.segmentId);
+              setIsTargetFocused(true);
+              setIsDraftSyncSuspended(false);
+              onEditStateChange?.(segment.segmentId, true);
+            }}
+            onBlur={() => {
+              setIsTargetFocused(false);
+              if (!onBlur) {
+                onEditStateChange?.(segment.segmentId, false);
+                return;
+              }
+              setIsDraftSyncSuspended(true);
+              void onBlur(segment.segmentId)
+                .catch(() => {
+                  // Error state is handled by persistence layer.
+                })
+                .finally(() => {
+                  if (!isMountedRef.current) return;
+                  setIsDraftSyncSuspended(false);
+                  onEditStateChange?.(segment.segmentId, false);
+                });
+            }}
+            onChange={(e) => emitTranslationChange(e.target.value)}
             onKeyDown={handleTargetKeyDown}
             onDoubleClick={(e) => e.currentTarget.select()}
             spellCheck={false}
+            style={
+              showNonPrintingTargetOverlay
+                ? { caretColor: 'rgb(var(--color-editor-text))' }
+                : undefined
+            }
             className={`${targetTextLayerClass} relative z-10 bg-transparent outline-none resize-none overflow-hidden ${
               !isActive ? 'pointer-events-none' : ''
-            } ${!isActive ? 'caret-transparent' : ''}`}
+            } ${!isActive ? 'caret-transparent' : ''} ${showNonPrintingTargetOverlay ? 'text-transparent' : ''}`}
           />
 
-          {showTargetHighlightOverlay && (
+          {showTargetOverlay && (
             <div
               aria-hidden="true"
-              className={`${targetTextLayerClass} pointer-events-none absolute inset-0 overflow-hidden text-transparent select-none`}
+              className={`${targetTextLayerClass} pointer-events-none absolute inset-0 overflow-hidden select-none ${
+                showNonPrintingTargetOverlay ? '' : 'text-transparent'
+              }`}
             >
               {renderChunks(targetHighlightChunks)}
             </div>
@@ -557,120 +661,112 @@ export const EditorRow: React.FC<EditorRowProps> = ({
           </div>
         )}
 
-        {showTargetActionButtons && (
-          <div className="absolute top-1.5 right-1.5 z-20 flex flex-col items-end gap-1">
-            {showAIRefineControl && (
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  if (isAIRefining) return;
-                  toggleAIRefineInput();
-                }}
-                disabled={isAIRefining}
-                className="relative z-20 p-1 rounded bg-surface/80 border border-border/70 hover:bg-brand-soft/75 hover:border-brand/40 text-text-muted hover:text-brand transition-all shadow-sm disabled:opacity-60 disabled:cursor-wait"
-                title="AI refine this translation"
-                aria-label="AI refine this translation"
-              >
-                {isAIRefining ? (
-                  <svg
-                    className="w-3.5 h-3.5 animate-spin"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 4v4m0 8v4m8-8h-4M8 12H4m12.364 5.364l-2.828-2.828M9.464 9.464L6.636 6.636m9.728 0l-2.828 2.828m-4.072 4.072l-2.828 2.828"
-                    />
-                  </svg>
-                ) : (
-                  <svg
-                    className="w-3.5 h-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 18h18M7 18c0-6 3-10 5-10s5 4 5 10"
-                    />
-                  </svg>
-                )}
-              </button>
-            )}
-
-            {canAITranslate && (
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onAITranslate(segment.segmentId);
-                }}
-                disabled={isAITranslating}
-                className="relative z-20 p-1 rounded bg-surface/70 border border-border/70 hover:bg-brand-soft/75 hover:border-brand/40 text-text-muted hover:text-brand transition-all shadow-sm disabled:opacity-60 disabled:cursor-wait"
-                title="AI translate this segment"
-                aria-label="AI translate this segment"
-              >
-                {isAITranslating ? (
-                  <svg
-                    className="w-3.5 h-3.5 animate-spin"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 4v4m0 8v4m8-8h-4M8 12H4m12.364 5.364l-2.828-2.828M9.464 9.464L6.636 6.636m9.728 0l-2.828 2.828m-4.072 4.072l-2.828 2.828"
-                    />
-                  </svg>
-                ) : (
-                  <svg
-                    className="w-3.5 h-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 3l2.5 5.5L20 11l-5.5 2.5L12 19l-2.5-5.5L4 11l5.5-2.5L12 3z"
-                    />
-                  </svg>
-                )}
-              </button>
-            )}
-
-            {canInsertTags && (
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setShowTagInsertionUI(!showTagInsertionUI);
-                }}
-                className="relative z-20 p-1 rounded bg-surface/90 border border-border/80 hover:bg-brand-soft/80 hover:border-brand/40 text-text-muted hover:text-brand transition-all shadow-sm"
-                title="Insert tags from source (Ctrl+Shift+1-9)"
-                aria-label="Toggle tag insertion menu"
-              >
+        <div
+          className={`absolute top-1.5 right-1.5 z-20 flex min-w-[30px] flex-col items-end gap-1 transition-opacity ${
+            showTargetActionButtons ? 'opacity-100' : 'pointer-events-none opacity-0'
+          }`}
+        >
+          {showAIRefineControl && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                if (isAIRefining) return;
+                toggleAIRefineInput();
+              }}
+              disabled={isAIRefining}
+              className="relative z-20 p-1 rounded bg-surface/80 border border-border/70 hover:bg-brand-soft/75 hover:border-brand/40 text-text-muted hover:text-brand transition-all shadow-sm disabled:opacity-60 disabled:cursor-wait"
+              title="AI refine this translation"
+              aria-label="AI refine this translation"
+            >
+              {isAIRefining ? (
+                <svg
+                  className="w-3.5 h-3.5 animate-spin"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v4m0 8v4m8-8h-4M8 12H4m12.364 5.364l-2.828-2.828M9.464 9.464L6.636 6.636m9.728 0l-2.828 2.828m-4.072 4.072l-2.828 2.828"
+                  />
+                </svg>
+              ) : (
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
+                    d="M3 18h18M7 18c0-6 3-10 5-10s5 4 5 10"
                   />
                 </svg>
-              </button>
-            )}
-          </div>
-        )}
+              )}
+            </button>
+          )}
+
+          {canAITranslate && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onAITranslate(segment.segmentId);
+              }}
+              disabled={isAITranslating}
+              className="relative z-20 p-1 rounded bg-surface/70 border border-border/70 hover:bg-brand-soft/75 hover:border-brand/40 text-text-muted hover:text-brand transition-all shadow-sm disabled:opacity-60 disabled:cursor-wait"
+              title="AI translate this segment"
+              aria-label="AI translate this segment"
+            >
+              {isAITranslating ? (
+                <svg
+                  className="w-3.5 h-3.5 animate-spin"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v4m0 8v4m8-8h-4M8 12H4m12.364 5.364l-2.828-2.828M9.464 9.464L6.636 6.636m9.728 0l-2.828 2.828m-4.072 4.072l-2.828 2.828"
+                  />
+                </svg>
+              ) : (
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 3l2.5 5.5L20 11l-5.5 2.5L12 19l-2.5-5.5L4 11l5.5-2.5L12 3z"
+                  />
+                </svg>
+              )}
+            </button>
+          )}
+
+          {canInsertTags && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                setShowTagInsertionUI(!showTagInsertionUI);
+              }}
+              className="relative z-20 p-1 rounded bg-surface/90 border border-border/80 hover:bg-brand-soft/80 hover:border-brand/40 text-text-muted hover:text-brand transition-all shadow-sm"
+              title="Insert tags from source (Ctrl+Shift+1-9)"
+              aria-label="Toggle tag insertion menu"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
+                />
+              </svg>
+            </button>
+          )}
+        </div>
 
         <TagInsertionUI
           sourceTags={sourceTags}
@@ -746,3 +842,26 @@ export const EditorRow: React.FC<EditorRowProps> = ({
     </div>
   );
 };
+
+const areEditorRowPropsEqual = (prev: EditorRowProps, next: EditorRowProps): boolean =>
+  prev.segment === next.segment &&
+  prev.rowNumber === next.rowNumber &&
+  prev.isActive === next.isActive &&
+  prev.disableAutoFocus === next.disableAutoFocus &&
+  prev.saveError === next.saveError &&
+  prev.sourceHighlightQuery === next.sourceHighlightQuery &&
+  prev.targetHighlightQuery === next.targetHighlightQuery &&
+  prev.highlightMode === next.highlightMode &&
+  prev.showNonPrintingSymbols === next.showNonPrintingSymbols &&
+  prev.isAITranslating === next.isAITranslating &&
+  prev.isAIRefining === next.isAIRefining &&
+  prev.onActivate === next.onActivate &&
+  prev.onAutoFocus === next.onAutoFocus &&
+  prev.onChange === next.onChange &&
+  prev.onBlur === next.onBlur &&
+  prev.onEditStateChange === next.onEditStateChange &&
+  prev.onAITranslate === next.onAITranslate &&
+  prev.onAIRefine === next.onAIRefine &&
+  prev.onConfirm === next.onConfirm;
+
+export const EditorRow = React.memo(EditorRowComponent, areEditorRowPropsEqual);

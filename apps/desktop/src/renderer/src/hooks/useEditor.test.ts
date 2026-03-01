@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { Segment } from '@cat/core';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { Segment, Token } from '@cat/core';
 
 vi.mock('../services/apiClient', () => ({
   apiClient: {},
@@ -25,116 +25,187 @@ function createSegment(segmentId: string, targetText: string): Segment {
 }
 
 describe('createSegmentPersistor', () => {
-  it('clears error and persists successfully', async () => {
-    const updateSegment = vi.fn().mockResolvedValue(undefined);
-    const rollbackSegment = vi.fn();
-    const setSegmentSaveError = vi.fn();
-    const clearSegmentSaveError = vi.fn();
-    const persistor = createSegmentPersistor({
-      updateSegment,
-      rollbackSegment,
-      setSegmentSaveError,
-      clearSegmentSaveError,
-    });
-
-    const previousSegment = createSegment('seg-1', '旧译文');
-    const nextTokens = [{ type: 'text' as const, content: '新译文' }];
-
-    await persistor.persistSegmentUpdate({
-      segmentId: 'seg-1',
-      targetTokens: nextTokens,
-      status: 'draft',
-      previousSegment,
-    });
-
-    expect(updateSegment).toHaveBeenCalledWith('seg-1', nextTokens, 'draft');
-    expect(rollbackSegment).not.toHaveBeenCalled();
-    expect(setSegmentSaveError).not.toHaveBeenCalled();
-    expect(clearSegmentSaveError).toHaveBeenCalledTimes(2);
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
-  it('rolls back and records error on persist failure', async () => {
-    const updateSegment = vi.fn().mockRejectedValue(new Error('network down'));
-    const rollbackSegment = vi.fn();
+  it('debounces consecutive updates and persists only the latest payload', async () => {
+    vi.useFakeTimers();
+    const updateSegment = vi.fn().mockResolvedValue(undefined);
     const setSegmentSaveError = vi.fn();
     const clearSegmentSaveError = vi.fn();
     const persistor = createSegmentPersistor({
       updateSegment,
-      rollbackSegment,
+      setSegmentSaveError,
+      clearSegmentSaveError,
+      debounceMs: 350,
+    });
+
+    persistor.queueSegmentUpdate({
+      segmentId: 'seg-1',
+      targetTokens: [{ type: 'text', content: 'old' }],
+      status: 'draft',
+    });
+    persistor.queueSegmentUpdate({
+      segmentId: 'seg-1',
+      targetTokens: [{ type: 'text', content: 'new' }],
+      status: 'draft',
+    });
+
+    await vi.advanceTimersByTimeAsync(350);
+    await Promise.resolve();
+
+    expect(updateSegment).toHaveBeenCalledTimes(1);
+    expect(updateSegment).toHaveBeenCalledWith(
+      'seg-1',
+      [{ type: 'text', content: 'new' }],
+      'draft',
+      expect.any(String),
+    );
+    expect(setSegmentSaveError).not.toHaveBeenCalled();
+  });
+
+  it('flushes pending segment updates immediately', async () => {
+    vi.useFakeTimers();
+    const updateSegment = vi.fn().mockResolvedValue(undefined);
+    const setSegmentSaveError = vi.fn();
+    const clearSegmentSaveError = vi.fn();
+    const persistor = createSegmentPersistor({
+      updateSegment,
       setSegmentSaveError,
       clearSegmentSaveError,
     });
 
-    const previousSegment = createSegment('seg-2', '原目标');
-    const nextTokens = [{ type: 'text' as const, content: '改后目标' }];
-
-    await persistor.persistSegmentUpdate({
+    persistor.queueSegmentUpdate({
       segmentId: 'seg-2',
-      targetTokens: nextTokens,
+      targetTokens: [{ type: 'text', content: 'flush-now' }],
       status: 'draft',
-      previousSegment,
     });
 
-    expect(rollbackSegment).toHaveBeenCalledWith('seg-2', previousSegment);
-    expect(setSegmentSaveError).toHaveBeenCalledWith(
+    await persistor.flushSegment('seg-2');
+
+    expect(updateSegment).toHaveBeenCalledTimes(1);
+    expect(updateSegment).toHaveBeenCalledWith(
       'seg-2',
+      [{ type: 'text', content: 'flush-now' }],
+      'draft',
+      expect.any(String),
+    );
+  });
+
+  it('marks stale remote events by client request id', async () => {
+    const capturedRequestIds: string[] = [];
+    const updateSegment = vi
+      .fn()
+      .mockImplementation(
+        async (
+          _segmentId: string,
+          _targetTokens: Token[],
+          _status: string,
+          clientRequestId?: string,
+        ) => {
+          if (clientRequestId) {
+            capturedRequestIds.push(clientRequestId);
+          }
+        },
+      );
+    const persistor = createSegmentPersistor({
+      updateSegment,
+      setSegmentSaveError: vi.fn(),
+      clearSegmentSaveError: vi.fn(),
+      debounceMs: 0,
+    });
+
+    persistor.queueSegmentUpdate({
+      segmentId: 'seg-3',
+      targetTokens: [{ type: 'text', content: 'v1' }],
+      status: 'draft',
+    });
+    await persistor.flushSegment('seg-3');
+    persistor.queueSegmentUpdate({
+      segmentId: 'seg-3',
+      targetTokens: [{ type: 'text', content: 'v2' }],
+      status: 'draft',
+    });
+    await persistor.flushSegment('seg-3');
+
+    expect(capturedRequestIds).toHaveLength(2);
+    expect(persistor.isRemoteUpdateStale('seg-3', capturedRequestIds[0])).toBe(true);
+    expect(persistor.isRemoteUpdateStale('seg-3', capturedRequestIds[1])).toBe(false);
+  });
+
+  it('reports remote-update delay state for pending/in-flight segments only', async () => {
+    let resolveUpdate: (() => void) | undefined;
+    const updateSegment = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveUpdate = resolve;
+        }),
+    );
+    const persistor = createSegmentPersistor({
+      updateSegment,
+      setSegmentSaveError: vi.fn(),
+      clearSegmentSaveError: vi.fn(),
+      debounceMs: 0,
+    });
+
+    persistor.setSegmentEditing('seg-4', true);
+    expect(persistor.shouldDelayRemoteUpdate('seg-4')).toBe(false);
+    persistor.setSegmentEditing('seg-4', false);
+
+    persistor.queueSegmentUpdate({
+      segmentId: 'seg-4',
+      targetTokens: [{ type: 'text', content: 'queued' }],
+      status: 'draft',
+    });
+    expect(persistor.shouldDelayRemoteUpdate('seg-4')).toBe(true);
+
+    const flushPromise = persistor.flushSegment('seg-4');
+    expect(persistor.shouldDelayRemoteUpdate('seg-4')).toBe(true);
+    resolveUpdate?.();
+    await flushPromise;
+    expect(persistor.shouldDelayRemoteUpdate('seg-4')).toBe(false);
+  });
+
+  it('records save errors for latest failed request without rollback', async () => {
+    const updateSegment = vi.fn().mockRejectedValue(new Error('network down'));
+    const setSegmentSaveError = vi.fn();
+    const clearSegmentSaveError = vi.fn();
+    const persistor = createSegmentPersistor({
+      updateSegment,
+      setSegmentSaveError,
+      clearSegmentSaveError,
+      debounceMs: 0,
+    });
+
+    persistor.queueSegmentUpdate({
+      segmentId: 'seg-5',
+      targetTokens: [{ type: 'text', content: 'text' }],
+      status: 'draft',
+    });
+    await persistor.flushSegment('seg-5');
+
+    expect(setSegmentSaveError).toHaveBeenCalledWith(
+      'seg-5',
       expect.stringContaining('network down'),
     );
   });
 
-  it('ignores stale failure when a newer save request succeeds', async () => {
-    let rejectOldRequest: ((reason?: unknown) => void) | undefined;
-    let resolveNewRequest: (() => void) | undefined;
-
-    const oldRequest = new Promise<void>((_, reject) => {
-      rejectOldRequest = reject;
-    });
-    const newRequest = new Promise<void>((resolve) => {
-      resolveNewRequest = resolve;
-    });
-
-    const updateSegment = vi
-      .fn()
-      .mockImplementationOnce(() => oldRequest)
-      .mockImplementationOnce(() => newRequest);
-    const rollbackSegment = vi.fn();
-    const setSegmentSaveError = vi.fn();
-    const clearSegmentSaveError = vi.fn();
-    const persistor = createSegmentPersistor({
-      updateSegment,
-      rollbackSegment,
-      setSegmentSaveError,
-      clearSegmentSaveError,
-    });
-
-    const previousSegment = createSegment('seg-3', '旧值');
-    const oldCall = persistor.persistSegmentUpdate({
-      segmentId: 'seg-3',
-      targetTokens: [{ type: 'text', content: 'old' }],
-      status: 'draft',
-      previousSegment,
-    });
-
-    const newCall = persistor.persistSegmentUpdate({
-      segmentId: 'seg-3',
-      targetTokens: [{ type: 'text', content: 'new' }],
-      status: 'draft',
-      previousSegment: createSegment('seg-3', 'old'),
-    });
-
-    resolveNewRequest?.();
-    await newCall;
-    rejectOldRequest?.(new Error('stale failure'));
-    await oldCall;
-
-    expect(rollbackSegment).not.toHaveBeenCalled();
-    expect(setSegmentSaveError).not.toHaveBeenCalled();
-  });
-
-  it('exposes reloadEditorData in useEditor return type', () => {
+  it('exposes editor persistence controls in useEditor return type', () => {
     type UseEditorResult = ReturnType<typeof useEditor>;
+    const acceptsFlush = (flush: UseEditorResult['flushSegmentDraft']) => flush;
+    const flush = acceptsFlush(async () => undefined);
+    expect(typeof flush).toBe('function');
+    const acceptsEditState = (fn: UseEditorResult['handleSegmentEditStateChange']) => fn;
+    const editState = acceptsEditState(() => undefined);
+    expect(typeof editState).toBe('function');
     const acceptsReload = (reload: UseEditorResult['reloadEditorData']) => reload;
     const reload = acceptsReload(async () => undefined);
     expect(typeof reload).toBe('function');
+  });
+
+  it('keeps helper segment builder valid', () => {
+    const segment = createSegment('seg-helper', 'value');
+    expect(segment.segmentId).toBe('seg-helper');
   });
 });

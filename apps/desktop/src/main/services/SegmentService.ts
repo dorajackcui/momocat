@@ -19,10 +19,12 @@ interface SegmentUpdateInput {
   segmentId: string;
   targetTokens: Token[];
   status: SegmentStatus;
+  clientRequestId?: string;
 }
 
 interface SegmentUpdateEventPayload extends SegmentUpdateInput {
   propagatedIds: string[];
+  serverAppliedAt: string;
 }
 
 export class SegmentService extends EventEmitter {
@@ -45,19 +47,27 @@ export class SegmentService extends EventEmitter {
   /**
    * Update segment target and status, ensuring file stats and TM are updated
    */
-  public async updateSegment(segmentId: string, targetTokens: Token[], status: SegmentStatus) {
+  public async updateSegment(
+    segmentId: string,
+    targetTokens: Token[],
+    status: SegmentStatus,
+    clientRequestId?: string,
+  ) {
     const { propagatedIds } = this.tx.runInTransaction(() =>
       this.updateSegmentInternal(segmentId, targetTokens, status),
     );
+    const serverAppliedAt = new Date().toISOString();
 
     this.emitSegmentUpdated({
       segmentId,
       targetTokens,
       status,
       propagatedIds,
+      clientRequestId,
+      serverAppliedAt,
     });
 
-    return { propagatedIds };
+    return { propagatedIds, clientRequestId, serverAppliedAt };
   }
 
   /**
@@ -79,6 +89,7 @@ export class SegmentService extends EventEmitter {
         return {
           ...update,
           propagatedIds,
+          serverAppliedAt: new Date().toISOString(),
         };
       }),
     );

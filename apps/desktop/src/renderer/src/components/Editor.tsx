@@ -1,15 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Project, ProjectFile } from '@cat/core';
 import { ProjectAITranslateModal } from './project-detail/ProjectAITranslateModal';
 import { useEditor } from '../hooks/useEditor';
-import {
-  useEditorFilters,
-} from '../hooks/useEditorFilters';
+import { useEditorFilters } from '../hooks/useEditorFilters';
 import { apiClient } from '../services/apiClient';
 import { EditorHeader } from './editor/EditorHeader';
 import { EditorFilterBar } from './editor/EditorFilterBar';
 import { EditorListPane } from './editor/EditorListPane';
 import { EditorSidebar } from './editor/EditorSidebar';
+import { isVirtualizedEditorListEnabled } from './editor/editorVirtualizationFlag';
 import { useEditorLayout } from '../hooks/editor/useEditorLayout';
 import { useConcordanceShortcut } from '../hooks/editor/useConcordanceShortcut';
 import { useEditorBatchActions } from '../hooks/editor/useEditorBatchActions';
@@ -26,8 +25,13 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
   const [manualActivationSegmentId, setManualActivationSegmentId] = useState<string | null>(null);
   const [suppressAutoFocusSegmentId, setSuppressAutoFocusSegmentId] = useState<string | null>(null);
   const [showNonPrintingSymbols, setShowNonPrintingSymbols] = useState(false);
+  const listScrollRef = useRef<HTMLDivElement>(null);
   const sourceSearchInputRef = useRef<HTMLInputElement>(null);
   const targetSearchInputRef = useRef<HTMLInputElement>(null);
+  const isVirtualizedListEnabled = useMemo(
+    () => isVirtualizedEditorListEnabled(window.localStorage),
+    [],
+  );
 
   const {
     segments,
@@ -39,6 +43,8 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
     loading,
     setActiveSegmentId,
     handleTranslationChange,
+    handleSegmentEditStateChange,
+    flushSegmentDraft,
     translateSegmentWithAI,
     refineSegmentWithAI,
     confirmSegment,
@@ -105,35 +111,38 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
   const confirmedSegments = segments.filter((segment) => segment.status === 'confirmed').length;
   const saveErrorCount = Object.keys(segmentSaveErrors).length;
 
-  const syncSearchInputFocus = () => {
+  const syncSearchInputFocus = useCallback(() => {
     const active = document.activeElement;
     setIsSearchInputFocused(
       active === sourceSearchInputRef.current || active === targetSearchInputRef.current,
     );
-  };
+  }, []);
 
-  const handleSearchInputFocus = () => {
+  const handleSearchInputFocus = useCallback(() => {
     setIsSearchInputFocused(true);
-  };
+  }, []);
 
-  const handleSearchInputBlur = () => {
+  const handleSearchInputBlur = useCallback(() => {
     requestAnimationFrame(syncSearchInputFocus);
-  };
+  }, [syncSearchInputFocus]);
 
-  const handleRowActivate = (segmentId: string, options?: { autoFocusTarget?: boolean }) => {
-    setManualActivationSegmentId(segmentId);
-    if (options?.autoFocusTarget === false) {
-      setSuppressAutoFocusSegmentId(segmentId);
-    } else {
-      setSuppressAutoFocusSegmentId(null);
-    }
-    setActiveSegmentId(segmentId);
-  };
+  const handleRowActivate = useCallback(
+    (segmentId: string, options?: { autoFocusTarget?: boolean }) => {
+      setManualActivationSegmentId(segmentId);
+      if (options?.autoFocusTarget === false) {
+        setSuppressAutoFocusSegmentId(segmentId);
+      } else {
+        setSuppressAutoFocusSegmentId(null);
+      }
+      setActiveSegmentId(segmentId);
+    },
+    [setActiveSegmentId],
+  );
 
-  const handleRowAutoFocus = (segmentId: string) => {
+  const handleRowAutoFocus = useCallback((segmentId: string) => {
     setManualActivationSegmentId((prev) => (prev === segmentId ? null : prev));
     setSuppressAutoFocusSegmentId((prev) => (prev === segmentId ? null : prev));
-  };
+  }, []);
 
   useEffect(() => {
     const loadInfo = async () => {
@@ -191,7 +200,11 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
       />
 
       <div ref={layoutRef as React.RefObject<HTMLDivElement>} className="flex-1 flex min-h-0">
-        <div className="flex-1 overflow-y-auto bg-surface custom-scrollbar" style={{ scrollbarGutter: 'stable' }}>
+        <div
+          ref={listScrollRef}
+          className="flex-1 overflow-y-auto bg-surface custom-scrollbar"
+          style={{ scrollbarGutter: 'stable' }}
+        >
           <div className="min-w-[800px]">
             <EditorFilterBar
               supportsBatchActions={supportsBatchActions}
@@ -235,6 +248,8 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
             />
 
             <EditorListPane
+              scrollParentRef={listScrollRef}
+              virtualized={isVirtualizedListEnabled}
               filteredSegments={filteredSegments}
               activeSegmentId={activeSegmentId}
               manualActivationSegmentId={manualActivationSegmentId}
@@ -243,6 +258,8 @@ export const Editor: React.FC<EditorProps> = ({ fileId, onBack }) => {
               onRowActivate={handleRowActivate}
               onRowAutoFocus={handleRowAutoFocus}
               onTranslationChange={handleTranslationChange}
+              onTranslationBlur={flushSegmentDraft}
+              onSegmentEditStateChange={handleSegmentEditStateChange}
               onAITranslate={translateSegmentWithAI}
               onAIRefine={refineSegmentWithAI}
               onConfirm={confirmSegment}

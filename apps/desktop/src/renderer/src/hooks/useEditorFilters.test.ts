@@ -3,6 +3,7 @@ import { Segment } from '@cat/core';
 import {
   buildEditorFilterStorageKey,
   buildSearchableEditorSegments,
+  buildSearchableEditorSegmentsWithWeakCache,
   resolveActiveSegmentIdForFilteredList,
   sanitizePersistedEditorFilterState,
 } from './useEditorFilters';
@@ -99,6 +100,36 @@ describe('useEditorFilters helpers', () => {
       hasSaveError: true,
       hasIssue: true,
     });
+  });
+
+  it('reuses cached searchable items for unchanged segment objects', () => {
+    const segments: Segment[] = [
+      createSegment({ id: 's1', source: 'Alpha', target: 'A' }),
+      createSegment({ id: 's2', source: 'Beta', target: 'B' }),
+    ];
+    const cache = new WeakMap<Segment, ReturnType<typeof buildSearchableEditorSegments>[number]>();
+
+    const first = buildSearchableEditorSegmentsWithWeakCache({
+      segments,
+      segmentSaveErrors: {},
+      cache,
+    });
+    const second = buildSearchableEditorSegmentsWithWeakCache({
+      segments,
+      segmentSaveErrors: {},
+      cache,
+    });
+    const third = buildSearchableEditorSegmentsWithWeakCache({
+      segments,
+      segmentSaveErrors: { s2: 'save failed' },
+      cache,
+    });
+
+    expect(second[0]).toBe(first[0]);
+    expect(second[1]).toBe(first[1]);
+    expect(third[0]).toBe(first[0]);
+    expect(third[1]).not.toBe(first[1]);
+    expect(third[1].hasSaveError).toBe(true);
   });
 
   it('keeps active segment when it still exists but is filtered out', () => {

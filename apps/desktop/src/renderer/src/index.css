@@ -281,8 +281,14 @@
   }
 
   .editor-target-text-layer {
-    @apply editor-text-base pl-1.5 pr-9 py-0.5;
+    @apply editor-text-base pl-1.5 pr-12 py-0.5;
     color: rgb(var(--color-editor-text));
+  }
+
+  .editor-target-non-printing {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+      'Courier New', monospace;
+    font-variant-ligatures: none;
   }
 }
 

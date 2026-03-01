@@ -106,8 +106,13 @@ export function registerProjectHandlers({ ipcMain, projectService }: MainHandler
   });
 
   registerHandle({ ipcMain, projectService }, IPC_CHANNELS.segment.update, (_event, ...args) => {
-    const [segmentId, targetTokens, status] = args as [string, Token[], SegmentStatus];
-    return projectService.updateSegment(segmentId, targetTokens, status);
+    const [segmentId, targetTokens, status, clientRequestId] = args as [
+      string,
+      Token[],
+      SegmentStatus,
+      string | undefined,
+    ];
+    return projectService.updateSegment(segmentId, targetTokens, status, clientRequestId);
   });
 
   registerHandle({ ipcMain, projectService }, IPC_CHANNELS.file.export, (_event, ...args) => {

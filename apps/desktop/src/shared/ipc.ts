@@ -89,6 +89,8 @@ export interface TMConcordanceEntry extends TMEntry {
 
 export interface SegmentUpdateResult {
   propagatedIds: string[];
+  clientRequestId?: string;
+  serverAppliedAt: string;
 }
 
 export interface TMBatchMatchResult {
@@ -163,6 +165,8 @@ export interface SegmentsUpdatedEvent {
   targetTokens: Token[];
   status: SegmentStatus;
   propagatedIds: string[];
+  clientRequestId?: string;
+  serverAppliedAt: string;
 }
 
 export interface AppProgressEvent {
@@ -226,6 +230,7 @@ export interface DesktopApi {
     segmentId: string,
     targetTokens: Token[],
     status: SegmentStatus,
+    clientRequestId?: string,
   ) => Promise<SegmentUpdateResult>;
 
   get100Match: (projectId: number, srcHash: string) => Promise<TMMatch | null>;

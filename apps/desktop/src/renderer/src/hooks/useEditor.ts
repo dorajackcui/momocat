@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   DEFAULT_PROJECT_QA_SETTINGS,
   Segment,
@@ -11,10 +11,7 @@ import {
   TagValidator,
 } from '@cat/core';
 import { useActiveSegmentMatches } from './editor/useActiveSegmentMatches';
-import {
-  createSegmentPersistor,
-  useSegmentPersistence,
-} from './editor/useSegmentPersistence';
+import { createSegmentPersistor, useSegmentPersistence } from './editor/useSegmentPersistence';
 import { useEditorDataLoader } from './editor/useEditorDataLoader';
 import { useSegmentQaWorkflow } from './editor/useSegmentQaWorkflow';
 import { apiClient } from '../services/apiClient';
@@ -98,7 +95,16 @@ export function useEditor({ activeFileId }: UseEditorProps) {
     });
   }, []);
 
-  const { applyOptimisticSegmentUpdate, clearPersistQueue } = useSegmentPersistence({
+  const {
+    applyOptimisticSegmentUpdate,
+    setSegmentEditingState,
+    flushSegmentUpdate,
+    flushAllSegmentUpdates,
+    shouldDelayRemoteUpdate,
+    isRemoteUpdateStale,
+    syncStateVersion,
+    clearPersistQueue,
+  } = useSegmentPersistence({
     setSegments,
     setSegmentSaveError,
     clearSegmentSaveError,
@@ -115,87 +121,149 @@ export function useEditor({ activeFileId }: UseEditorProps) {
     setSegmentSaveErrors,
     setAiTranslatingSegmentIds,
     setActiveSegmentId,
+    shouldDelayRemoteUpdate,
+    isRemoteUpdateStale,
+    syncStateVersion,
     clearPersistQueue,
     setLoading,
   });
 
+  const activeSegmentSourceHash = useMemo(() => {
+    if (!activeSegmentId) return null;
+    const segment = segments.find((item) => item.segmentId === activeSegmentId);
+    return segment?.srcHash ?? null;
+  }, [activeSegmentId, segments]);
+
   const { activeMatches, activeTerms } = useActiveSegmentMatches({
     activeSegmentId,
+    activeSegmentSourceHash,
     projectId,
     segments,
   });
 
-  const { confirmSegment } = useSegmentQaWorkflow({
+  const { confirmSegment: confirmSegmentWithQa } = useSegmentQaWorkflow({
     segments,
     projectId,
     enabledQaRuleIds,
     instantQaOnConfirm,
     setSegments,
     setActiveSegmentId,
+    setSegmentSaveError,
+    clearSegmentSaveError,
     tagValidator,
   });
 
-  const handleTranslationChange = (segmentId: string, text: string) => {
-    try {
-      applyOptimisticSegmentUpdate(segmentId, (segment) => {
-        const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-        const tokens = parseEditorTextToTokens(normalizedText, segment.sourceTokens);
-        const nextStatus: SegmentStatus = normalizedText.trim() ? 'draft' : 'new';
+  useEffect(
+    () => () => {
+      void flushAllSegmentUpdates();
+    },
+    [flushAllSegmentUpdates],
+  );
+
+  useEffect(() => {
+    const flushPendingChanges = () => {
+      void flushAllSegmentUpdates();
+    };
+    window.addEventListener('beforeunload', flushPendingChanges);
+    window.addEventListener('pagehide', flushPendingChanges);
+    return () => {
+      window.removeEventListener('beforeunload', flushPendingChanges);
+      window.removeEventListener('pagehide', flushPendingChanges);
+    };
+  }, [flushAllSegmentUpdates]);
+
+  const handleTranslationChange = useCallback(
+    (segmentId: string, text: string) => {
+      try {
+        applyOptimisticSegmentUpdate(segmentId, (segment) => {
+          const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+          const tokens = parseEditorTextToTokens(normalizedText, segment.sourceTokens);
+          const nextStatus: SegmentStatus = normalizedText.trim() ? 'draft' : 'new';
+          return {
+            ...segment,
+            targetTokens: tokens,
+            status: nextStatus,
+            qaIssues: undefined,
+            autoFixSuggestions: undefined,
+          };
+        });
+      } catch (error) {
+        console.error('Error in handleTranslationChange:', error);
+        console.error('Segment ID:', segmentId);
+        console.error('Text:', text);
+      }
+    },
+    [applyOptimisticSegmentUpdate],
+  );
+
+  const handleSegmentEditStateChange = useCallback(
+    (segmentId: string, editing: boolean) => {
+      setSegmentEditingState(segmentId, editing);
+    },
+    [setSegmentEditingState],
+  );
+
+  const flushSegmentDraft = useCallback(
+    async (segmentId: string) => {
+      await flushSegmentUpdate(segmentId);
+    },
+    [flushSegmentUpdate],
+  );
+
+  const confirmSegment = useCallback(
+    async (segmentId: string) => {
+      await flushSegmentDraft(segmentId);
+      await confirmSegmentWithQa(segmentId);
+    },
+    [confirmSegmentWithQa, flushSegmentDraft],
+  );
+
+  const handleApplyMatch = useCallback(
+    (tokens: Token[]) => {
+      if (!activeSegmentId) return;
+
+      applyOptimisticSegmentUpdate(activeSegmentId, (segment) => ({
+        ...segment,
+        targetTokens: tokens,
+        status: 'draft',
+        qaIssues: undefined,
+        autoFixSuggestions: undefined,
+      }));
+    },
+    [activeSegmentId, applyOptimisticSegmentUpdate],
+  );
+
+  const shouldInsertSpace = useCallback((current: string, term: string): boolean => {
+    const left = current.slice(-1);
+    const right = term.slice(0, 1);
+    if (!left || !right) return false;
+    return /[A-Za-z0-9]$/.test(left) && /^[A-Za-z0-9]/.test(right);
+  }, []);
+
+  const handleApplyTerm = useCallback(
+    (term: string) => {
+      if (!activeSegmentId) return;
+
+      applyOptimisticSegmentUpdate(activeSegmentId, (segment) => {
+        const currentText = serializeTokensToEditorText(segment.targetTokens, segment.sourceTokens)
+          .replace(/\r\n/g, '\n')
+          .replace(/\r/g, '\n');
+        const spacer = shouldInsertSpace(currentText, term) ? ' ' : '';
+        const nextText = `${currentText}${spacer}${term}`;
+        const nextTokens = parseEditorTextToTokens(nextText, segment.sourceTokens);
+        const nextStatus: SegmentStatus = nextText.trim() ? 'draft' : 'new';
+
         return {
           ...segment,
-          targetTokens: tokens,
+          targetTokens: nextTokens,
           status: nextStatus,
           qaIssues: undefined,
           autoFixSuggestions: undefined,
         };
       });
-    } catch (error) {
-      console.error('Error in handleTranslationChange:', error);
-      console.error('Segment ID:', segmentId);
-      console.error('Text:', text);
-    }
-  };
-
-  const handleApplyMatch = (tokens: Token[]) => {
-    if (!activeSegmentId) return;
-
-    applyOptimisticSegmentUpdate(activeSegmentId, (segment) => ({
-      ...segment,
-      targetTokens: tokens,
-      status: 'draft',
-      qaIssues: undefined,
-      autoFixSuggestions: undefined,
-    }));
-  };
-
-  const shouldInsertSpace = (current: string, term: string): boolean => {
-    const left = current.slice(-1);
-    const right = term.slice(0, 1);
-    if (!left || !right) return false;
-    return /[A-Za-z0-9]$/.test(left) && /^[A-Za-z0-9]/.test(right);
-  };
-
-  const handleApplyTerm = (term: string) => {
-    if (!activeSegmentId) return;
-
-    applyOptimisticSegmentUpdate(activeSegmentId, (segment) => {
-      const currentText = serializeTokensToEditorText(segment.targetTokens, segment.sourceTokens)
-        .replace(/\r\n/g, '\n')
-        .replace(/\r/g, '\n');
-      const spacer = shouldInsertSpace(currentText, term) ? ' ' : '';
-      const nextText = `${currentText}${spacer}${term}`;
-      const nextTokens = parseEditorTextToTokens(nextText, segment.sourceTokens);
-      const nextStatus: SegmentStatus = nextText.trim() ? 'draft' : 'new';
-
-      return {
-        ...segment,
-        targetTokens: nextTokens,
-        status: nextStatus,
-        qaIssues: undefined,
-        autoFixSuggestions: undefined,
-      };
-    });
-  };
+    },
+    [activeSegmentId, applyOptimisticSegmentUpdate, shouldInsertSpace],
+  );
 
   const getActiveSegment = () => segments.find((segment) => segment.segmentId === activeSegmentId);
 
@@ -298,6 +366,8 @@ export function useEditor({ activeFileId }: UseEditorProps) {
     loading,
     aiTranslatingSegmentIds,
     handleTranslationChange,
+    handleSegmentEditStateChange,
+    flushSegmentDraft,
     translateSegmentWithAI,
     refineSegmentWithAI,
     confirmSegment,

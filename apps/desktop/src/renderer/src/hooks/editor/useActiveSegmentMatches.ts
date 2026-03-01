@@ -7,12 +7,14 @@ const MATCH_REQUEST_DEBOUNCE_MS = 150;
 
 interface UseActiveSegmentMatchesParams {
   activeSegmentId: string | null;
+  activeSegmentSourceHash: string | null;
   projectId: number | null;
   segments: Segment[];
 }
 
 export function useActiveSegmentMatches({
   activeSegmentId,
+  activeSegmentSourceHash,
   projectId,
   segments,
 }: UseActiveSegmentMatchesParams): {
@@ -23,17 +25,24 @@ export function useActiveSegmentMatches({
   const [activeTerms, setActiveTerms] = useState<TBMatch[]>([]);
   const matchRequestSeqRef = useRef(0);
   const termRequestSeqRef = useRef(0);
+  const segmentsRef = useRef(segments);
+
+  useEffect(() => {
+    segmentsRef.current = segments;
+  }, [segments]);
 
   useEffect(() => {
     if (!activeSegmentId || projectId === null) {
       matchRequestSeqRef.current += 1;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveMatches([]);
       return;
     }
 
-    const segment = segments.find((item) => item.segmentId === activeSegmentId);
+    const segment = segmentsRef.current.find((item) => item.segmentId === activeSegmentId);
     if (!segment) {
       matchRequestSeqRef.current += 1;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveMatches([]);
       return;
     }
@@ -58,18 +67,20 @@ export function useActiveSegmentMatches({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [activeSegmentId, segments, projectId]);
+  }, [activeSegmentId, activeSegmentSourceHash, projectId]);
 
   useEffect(() => {
     if (!activeSegmentId || projectId === null) {
       termRequestSeqRef.current += 1;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveTerms([]);
       return;
     }
 
-    const segment = segments.find((item) => item.segmentId === activeSegmentId);
+    const segment = segmentsRef.current.find((item) => item.segmentId === activeSegmentId);
     if (!segment) {
       termRequestSeqRef.current += 1;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveTerms([]);
       return;
     }
@@ -94,7 +105,7 @@ export function useActiveSegmentMatches({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [activeSegmentId, segments, projectId]);
+  }, [activeSegmentId, activeSegmentSourceHash, projectId]);
 
   return {
     activeMatches,

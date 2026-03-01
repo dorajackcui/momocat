@@ -164,6 +164,56 @@ export function buildSearchableEditorSegments(
   });
 }
 
+export function buildSearchableEditorSegmentsWithWeakCache(params: {
+  segments: Segment[];
+  segmentSaveErrors: Record<string, string>;
+  cache: WeakMap<Segment, SearchableEditorSegment>;
+}): SearchableEditorSegment[] {
+  const { segments, segmentSaveErrors, cache } = params;
+  return segments.map((segment, index) => {
+    const cached = cache.get(segment);
+    const hasSaveError = Boolean(segmentSaveErrors[segment.segmentId]);
+    if (cached && cached.originalIndex === index && cached.hasSaveError === hasSaveError) {
+      return cached;
+    }
+
+    if (cached) {
+      const nextCached: SearchableEditorSegment = {
+        ...cached,
+        originalIndex: index,
+        hasSaveError,
+        hasIssue: cached.hasQaError || cached.hasQaWarning || hasSaveError,
+      };
+      cache.set(segment, nextCached);
+      return nextCached;
+    }
+
+    const sourceText = serializeTokensToEditorText(segment.sourceTokens, segment.sourceTokens)
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n');
+    const targetText = serializeTokensToEditorText(segment.targetTokens, segment.sourceTokens)
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n');
+    const qaIssues = segment.qaIssues || [];
+    const hasQaError = qaIssues.some((issue) => issue.severity === 'error');
+    const hasQaWarning = qaIssues.some((issue) => issue.severity === 'warning');
+    const isUntranslated = targetText.trim().length === 0;
+    const nextSearchable: SearchableEditorSegment = {
+      segment,
+      originalIndex: index,
+      sourceText,
+      targetText,
+      hasQaError,
+      hasQaWarning,
+      hasSaveError,
+      isUntranslated,
+      hasIssue: hasQaError || hasQaWarning || hasSaveError,
+    };
+    cache.set(segment, nextSearchable);
+    return nextSearchable;
+  });
+}
+
 export function resolveActiveSegmentIdForFilteredList(params: {
   activeSegmentId: string | null;
   segments: Segment[];
@@ -199,9 +249,17 @@ export function useEditorFilters({
   const filterMenuRef = useRef<HTMLDivElement>(null);
   const sortMenuRef = useRef<HTMLDivElement>(null);
   const filterStateHydratedRef = useRef(false);
+  const searchableSegmentCacheRef = useRef<WeakMap<Segment, SearchableEditorSegment>>(
+    new WeakMap(),
+  );
 
   const searchableSegments = useMemo(
-    () => buildSearchableEditorSegments(segments, segmentSaveErrors),
+    () =>
+      buildSearchableEditorSegmentsWithWeakCache({
+        segments,
+        segmentSaveErrors,
+        cache: searchableSegmentCacheRef.current,
+      }),
     [segments, segmentSaveErrors],
   );
 

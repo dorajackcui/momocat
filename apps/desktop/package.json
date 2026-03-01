@@ -69,6 +69,7 @@
     "@cat/db": "*",
     "@electron-toolkit/preload": "^3.0.0",
     "@electron-toolkit/utils": "^3.0.0",
+    "@tanstack/react-virtual": "^3.13.19",
     "better-sqlite3": "^12.6.2",
     "fastest-levenshtein": "^1.0.16",
     "react": "^18.2.0",

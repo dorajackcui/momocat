@@ -88,12 +88,13 @@ export function createProjectApi(ipcRenderer: IpcRendererLike): DesktopApiSlice<
       ) as ReturnType<DesktopApi['exportFile']>,
     runFileQA: (fileId) =>
       ipcRenderer.invoke(IPC_CHANNELS.file.runQA, fileId) as ReturnType<DesktopApi['runFileQA']>,
-    updateSegment: (segmentId, targetTokens, status) =>
+    updateSegment: (segmentId, targetTokens, status, clientRequestId) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.segment.update,
         segmentId,
         targetTokens,
         status,
+        clientRequestId,
       ) as ReturnType<DesktopApi['updateSegment']>,
   };
 }

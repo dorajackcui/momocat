@@ -175,6 +175,8 @@ export interface SegmentsUpdatedPayload {
   targetTokens: Token[];
   status: SegmentStatus;
   propagatedIds: string[];
+  clientRequestId?: string;
+  serverAppliedAt: string;
 }
 
 export type ProgressEmitter = (payload: ProgressPayload) => void;

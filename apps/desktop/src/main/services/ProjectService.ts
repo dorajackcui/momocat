@@ -200,8 +200,13 @@ export class ProjectService {
     return this.projectModule.getSpreadsheetPreview(filePath);
   }
 
-  public async updateSegment(segmentId: string, targetTokens: Token[], status: SegmentStatus) {
-    return this.segmentService.updateSegment(segmentId, targetTokens, status);
+  public async updateSegment(
+    segmentId: string,
+    targetTokens: Token[],
+    status: SegmentStatus,
+    clientRequestId?: string,
+  ) {
+    return this.segmentService.updateSegment(segmentId, targetTokens, status, clientRequestId);
   }
 
   public onSegmentsUpdated(callback: (data: SegmentsUpdatedPayload) => void) {
