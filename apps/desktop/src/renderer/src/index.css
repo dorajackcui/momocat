@@ -285,10 +285,23 @@
     color: rgb(var(--color-editor-text));
   }
 
-  .editor-target-non-printing {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
-      'Courier New', monospace;
-    font-variant-ligatures: none;
+  .editor-target-editor-host {
+    @apply relative w-full;
+  }
+
+  /* CM6 target filter highlight fallback: keep this global so highlight remains visible
+     even if theme-injected style order changes. */
+  .cm-target-highlight {
+    background-color: rgba(var(--color-warning), 0.58) !important;
+    box-shadow:
+      inset 0 0 0 1px rgba(var(--color-warning), 0.92),
+      0 0 0 1px rgba(var(--color-warning), 0.55) !important;
+    border-radius: 3px !important;
+    text-decoration-line: underline !important;
+    text-decoration-color: rgba(var(--color-warning), 0.95) !important;
+    text-decoration-thickness: 2px !important;
+    text-underline-offset: 2px !important;
+    font-weight: 600 !important;
   }
 }
 

@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Token, formatTagAsMemoQMarker } from '@cat/core';
+import { resolveEditorShortcutAction } from '../editor-engine/shortcut';
+import { EditorShortcutAction } from '../editor-engine/types';
 import { normalizeRefinementInstruction } from './editorRowUtils';
 
 interface UseEditorRowCommandHandlersParams {
@@ -11,15 +13,21 @@ interface UseEditorRowCommandHandlersParams {
   onActivate: (id: string, options?: { autoFocusTarget?: boolean }) => void;
   onAIRefine: (id: string, instruction: string) => void;
   onConfirm: (id: string) => void;
-  emitTranslationChange: (nextText: string) => void;
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  editorController: {
+    getSnapshot: () =>
+      | {
+          text: string;
+          selectionFrom: number;
+          selectionTo: number;
+        }
+      | null;
+    setText: (nextText: string, preserveSelection?: boolean) => void;
+    replaceSelection: (insertText: string) => void;
+    focus: () => void;
+  };
 }
 
-type EditorRowShortcutAction =
-  | { type: 'confirm' }
-  | { type: 'insertAllTags' }
-  | { type: 'insertTag'; tagIndex: number }
-  | null;
+type EditorRowShortcutAction = EditorShortcutAction;
 
 interface EditorRowShortcutKeyInput {
   key: string;
@@ -41,7 +49,7 @@ interface EditorRowCommandHandlersResult {
   handleCopySourceToTarget: (event: React.MouseEvent<HTMLButtonElement>) => void;
   handleSourceCellClick: (event: React.MouseEvent<HTMLDivElement>) => void;
   handleAIRefineInputKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
-  handleTargetKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  handleShortcutAction: (action: EditorRowShortcutAction) => void;
 }
 
 export function resolveEditorRowShortcutAction({
@@ -50,23 +58,7 @@ export function resolveEditorRowShortcutAction({
   metaKey,
   shiftKey,
 }: EditorRowShortcutKeyInput): EditorRowShortcutAction {
-  if ((ctrlKey || metaKey) && key === 'Enter') {
-    return { type: 'confirm' };
-  }
-
-  if (!(ctrlKey || metaKey) || !shiftKey) {
-    return null;
-  }
-
-  if (key === '0' || key === ')') {
-    return { type: 'insertAllTags' };
-  }
-
-  if (/^[1-9]$/.test(key)) {
-    return { type: 'insertTag', tagIndex: Number.parseInt(key, 10) - 1 };
-  }
-
-  return null;
+  return resolveEditorShortcutAction({ key, ctrlKey, metaKey, shiftKey });
 }
 
 export function useEditorRowCommandHandlers({
@@ -78,8 +70,7 @@ export function useEditorRowCommandHandlers({
   onActivate,
   onAIRefine,
   onConfirm,
-  emitTranslationChange,
-  textareaRef,
+  editorController,
 }: UseEditorRowCommandHandlersParams): EditorRowCommandHandlersResult {
   const aiRefineInputRef = useRef<HTMLInputElement>(null);
   const [showTagInsertionUI, setShowTagInsertionUI] = useState(false);
@@ -88,24 +79,10 @@ export function useEditorRowCommandHandlers({
 
   const insertAtSelection = useCallback(
     (insertText: string) => {
-      const textarea = textareaRef.current;
-      if (!textarea) return;
-
-      const start = textarea.selectionStart ?? 0;
-      const end = textarea.selectionEnd ?? start;
-      const current = textarea.value;
-      const nextText = current.slice(0, start) + insertText + current.slice(end);
-      const nextCursor = start + insertText.length;
-
-      emitTranslationChange(nextText);
-
-      requestAnimationFrame(() => {
-        if (!textareaRef.current) return;
-        textareaRef.current.focus();
-        textareaRef.current.setSelectionRange(nextCursor, nextCursor);
-      });
+      if (!editorController.getSnapshot()) return;
+      editorController.replaceSelection(insertText);
     },
-    [emitTranslationChange, textareaRef],
+    [editorController],
   );
 
   const handleInsertTag = useCallback(
@@ -131,12 +108,12 @@ export function useEditorRowCommandHandlers({
     (event: React.MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation();
       onActivate(segmentId);
-      emitTranslationChange(sourceEditorText);
+      editorController.setText(sourceEditorText, false);
       requestAnimationFrame(() => {
-        textareaRef.current?.focus();
+        editorController.focus();
       });
     },
-    [emitTranslationChange, onActivate, segmentId, sourceEditorText, textareaRef],
+    [editorController, onActivate, segmentId, sourceEditorText],
   );
 
   const handleSourceCellClick = useCallback(
@@ -189,23 +166,17 @@ export function useEditorRowCommandHandlers({
     [submitAIRefinement],
   );
 
-  const handleTargetKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      const action = resolveEditorRowShortcutAction(event);
+  const handleShortcutAction = useCallback(
+    (action: EditorRowShortcutAction) => {
       if (!action) return;
-
-      event.preventDefault();
-
       if (action.type === 'confirm') {
         void onConfirm(segmentId);
         return;
       }
-
       if (action.type === 'insertAllTags') {
         handleInsertAllTags();
         return;
       }
-
       handleInsertTag(action.tagIndex);
     },
     [handleInsertAllTags, handleInsertTag, onConfirm, segmentId],
@@ -242,7 +213,7 @@ export function useEditorRowCommandHandlers({
     handleCopySourceToTarget,
     handleSourceCellClick,
     handleAIRefineInputKeyDown,
-    handleTargetKeyDown,
+    handleShortcutAction,
   };
 }
 

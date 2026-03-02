@@ -127,6 +127,16 @@ export function useEditorFilters({
   );
 
   const menus = useEditorFilterMenus();
+  const {
+    isFilterMenuOpen,
+    isSortMenuOpen,
+    filterMenuRef,
+    sortMenuRef,
+    toggleFilterMenu,
+    toggleSortMenu,
+    closeMenus,
+    setIsSortMenuOpen,
+  } = menus;
 
   const searchableSegments = useMemo(
     () =>
@@ -165,8 +175,8 @@ export function useEditorFilters({
     setFilterState(defaults);
     setDebouncedSourceQuery(defaults.sourceQuery);
     setDebouncedTargetQuery(defaults.targetQuery);
-    menus.closeMenus();
-  }, [menus]);
+    closeMenus();
+  }, [closeMenus]);
 
   const setSourceQueryInput = useCallback((value: string) => {
     setFilterState((prev) => ({ ...prev, sourceQuery: value }));
@@ -221,9 +231,9 @@ export function useEditorFilters({
         sortBy,
         sortDirection,
       }));
-      menus.setIsSortMenuOpen(false);
+      setIsSortMenuOpen(false);
     },
-    [menus],
+    [setIsSortMenuOpen],
   );
 
   useEffect(() => {
@@ -244,8 +254,8 @@ export function useEditorFilters({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Keep debounced state aligned with hydrated target query.
     setDebouncedTargetQuery(loadedState.targetQuery);
     filterStateHydratedRef.current = true;
-    menus.closeMenus();
-  }, [fileId, menus]);
+    closeMenus();
+  }, [closeMenus, fileId]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -292,15 +302,15 @@ export function useEditorFilters({
     quickPreset: filterState.quickPreset,
     sortBy: filterState.sortBy,
     sortDirection: filterState.sortDirection,
-    isFilterMenuOpen: menus.isFilterMenuOpen,
-    isSortMenuOpen: menus.isSortMenuOpen,
-    filterMenuRef: menus.filterMenuRef,
-    sortMenuRef: menus.sortMenuRef,
+    isFilterMenuOpen,
+    isSortMenuOpen,
+    filterMenuRef,
+    sortMenuRef,
     filteredSegments,
     activeFilterCount,
     hasActiveFilter,
-    toggleFilterMenu: menus.toggleFilterMenu,
-    toggleSortMenu: menus.toggleSortMenu,
+    toggleFilterMenu,
+    toggleSortMenu,
     setSourceQueryInput,
     setTargetQueryInput,
     handleStatusFilterChange,

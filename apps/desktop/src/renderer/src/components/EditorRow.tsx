@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { Segment, Token, serializeTokensToEditorText } from '@cat/core';
 import { TagInsertionUI } from './TagInsertionUI';
 import { EditorMatchMode } from './editorFilterUtils';
@@ -91,21 +91,18 @@ const EditorRowComponent: React.FC<EditorRowProps> = ({
   );
 
   const {
-    textareaRef,
-    mirrorRef,
+    editorHostRef,
     draftText,
-    isTargetFocused,
-    emitTranslationChange,
-    handleTargetFocus,
-    handleTargetBlur,
-    handleTargetChange,
+    setShortcutActionHandler,
+    editorController,
   } = useEditorRowDraftController({
     segmentId: segment.segmentId,
     targetEditorText,
+    targetHighlightQuery,
+    highlightMode,
     isActive,
     disableAutoFocus,
     showNonPrintingSymbols,
-    targetHighlightQuery,
     onAutoFocus,
     onChange,
     onBlur,
@@ -125,7 +122,7 @@ const EditorRowComponent: React.FC<EditorRowProps> = ({
     handleCopySourceToTarget,
     handleSourceCellClick,
     handleAIRefineInputKeyDown,
-    handleTargetKeyDown,
+    handleShortcutAction,
   } = useEditorRowCommandHandlers({
     segmentId: segment.segmentId,
     isActive,
@@ -135,8 +132,7 @@ const EditorRowComponent: React.FC<EditorRowProps> = ({
     onActivate,
     onAIRefine,
     onConfirm,
-    emitTranslationChange,
-    textareaRef,
+    editorController,
   });
 
   const displayModel = useEditorRowDisplayModel({
@@ -147,17 +143,18 @@ const EditorRowComponent: React.FC<EditorRowProps> = ({
     sourceEditorText,
     sourceTagsCount: sourceTags.length,
     sourceHighlightQuery,
-    targetHighlightQuery,
     highlightMode,
     showNonPrintingSymbols,
-    isTargetFocused,
   });
 
   const renderChunks = useCallback(
     (chunks: { text: string; isMatch: boolean }[]) =>
       chunks.map((chunk, index) =>
         chunk.isMatch ? (
-          <mark key={index} className="bg-warning-soft text-inherit rounded-[2px]">
+          <mark
+            key={index}
+            className="bg-warning/40 text-text rounded-[2px] shadow-[inset_0_0_0_1px_rgba(169,119,37,0.55)]"
+          >
             {chunk.text}
           </mark>
         ) : (
@@ -167,10 +164,9 @@ const EditorRowComponent: React.FC<EditorRowProps> = ({
     [],
   );
 
-  const handleTargetFocusWithActivation = useCallback(() => {
-    onActivate(segment.segmentId);
-    handleTargetFocus();
-  }, [handleTargetFocus, onActivate, segment.segmentId]);
+  useEffect(() => {
+    setShortcutActionHandler(handleShortcutAction);
+  }, [handleShortcutAction, setShortcutActionHandler]);
 
   return (
     <div
@@ -210,18 +206,8 @@ const EditorRowComponent: React.FC<EditorRowProps> = ({
         />
 
         <EditorRowTargetCell
-          textareaRef={textareaRef as React.Ref<HTMLTextAreaElement>}
-          mirrorRef={mirrorRef as React.Ref<HTMLDivElement>}
-          draftText={draftText}
-          mirrorText={displayModel.targetMirrorText}
-          showNonPrintingTargetOverlay={displayModel.showNonPrintingTargetOverlay}
-          showTargetOverlay={displayModel.showTargetOverlay}
-          targetOverlayContent={renderChunks(displayModel.targetHighlightChunks)}
+          editorHostRef={editorHostRef as React.Ref<HTMLDivElement>}
           isActive={isActive}
-          onFocus={handleTargetFocusWithActivation}
-          onBlur={handleTargetBlur}
-          onChange={handleTargetChange}
-          onKeyDown={handleTargetKeyDown}
         />
 
         <EditorRowTargetActions

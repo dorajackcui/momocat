@@ -14,23 +14,15 @@ interface UseEditorRowDisplayModelParams {
   sourceEditorText: string;
   sourceTagsCount: number;
   sourceHighlightQuery: string;
-  targetHighlightQuery: string;
   highlightMode: EditorMatchMode;
   showNonPrintingSymbols: boolean;
-  isTargetFocused: boolean;
 }
 
 interface EditorRowDisplayModel {
   statusLine: string;
   statusTitle: string;
   sourceHighlightChunks: ReturnType<typeof buildHighlightChunks>;
-  targetHighlightChunks: ReturnType<typeof buildHighlightChunks>;
   sourceDisplayText: string;
-  targetEditorDisplayText: string;
-  targetMirrorText: string;
-  showNonPrintingTargetOverlay: boolean;
-  showTargetHighlightOverlay: boolean;
-  showTargetOverlay: boolean;
   canInsertTags: boolean;
   canAITranslate: boolean;
   hasRefinableTarget: boolean;
@@ -104,42 +96,25 @@ export function buildEditorRowDisplayModel({
   sourceEditorText,
   sourceTagsCount,
   sourceHighlightQuery,
-  targetHighlightQuery,
   highlightMode,
   showNonPrintingSymbols,
-  isTargetFocused,
 }: UseEditorRowDisplayModelParams): EditorRowDisplayModel {
   const hasError = qaIssues.some((issue) => issue.severity === 'error');
   const hasWarning = qaIssues.some((issue) => issue.severity === 'warning');
   const statusLine = getEditorRowStatusLineClass(segmentStatus, hasError, hasWarning);
   const statusTitle = getEditorRowStatusTitle(segmentStatus, hasError, hasWarning);
 
-  const showNonPrintingTargetOverlay = showNonPrintingSymbols && !isTargetFocused;
   const sourceDisplayText = showNonPrintingSymbols
     ? visualizeNonPrintingSymbols(sourceEditorText)
     : sourceEditorText;
-  const targetEditorDisplayText = showNonPrintingTargetOverlay
-    ? visualizeNonPrintingSymbols(draftText, { showLineBreakSymbol: false })
-    : draftText;
   const sourceDisplayQuery = showNonPrintingSymbols
     ? visualizeNonPrintingSymbols(sourceHighlightQuery)
     : sourceHighlightQuery;
-  const targetDisplayQuery = showNonPrintingTargetOverlay
-    ? visualizeNonPrintingSymbols(targetHighlightQuery, { showLineBreakSymbol: false })
-    : targetHighlightQuery;
   const sourceHighlightChunks = buildHighlightChunks(
     sourceDisplayText,
     sourceDisplayQuery,
     highlightMode,
   );
-  const targetHighlightChunks = buildHighlightChunks(
-    targetEditorDisplayText,
-    targetDisplayQuery,
-    highlightMode,
-  );
-
-  const showTargetHighlightOverlay = targetHighlightQuery.trim().length > 0;
-  const showTargetOverlay = showNonPrintingTargetOverlay || showTargetHighlightOverlay;
   const { canInsertTags, canAITranslate, hasRefinableTarget, showTargetActionButtons } =
     getEditorRowActionVisibility({
       isActive,
@@ -153,15 +128,7 @@ export function buildEditorRowDisplayModel({
     statusLine,
     statusTitle,
     sourceHighlightChunks,
-    targetHighlightChunks,
     sourceDisplayText,
-    targetEditorDisplayText,
-    targetMirrorText: showNonPrintingTargetOverlay
-      ? visualizeNonPrintingSymbols(draftText, { showLineBreakSymbol: false })
-      : draftText,
-    showNonPrintingTargetOverlay,
-    showTargetHighlightOverlay,
-    showTargetOverlay,
     canInsertTags,
     canAITranslate,
     hasRefinableTarget,

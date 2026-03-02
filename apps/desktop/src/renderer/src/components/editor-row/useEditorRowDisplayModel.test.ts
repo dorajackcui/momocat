@@ -5,7 +5,7 @@ import {
 } from './useEditorRowDisplayModel';
 
 describe('useEditorRowDisplayModel.buildEditorRowDisplayModel', () => {
-  it('builds highlight overlays for non-printing target mode', () => {
+  it('builds source highlight chunks in non-printing mode', () => {
     const model = buildEditorRowDisplayModel({
       segmentStatus: 'draft',
       qaIssues: [],
@@ -14,21 +14,16 @@ describe('useEditorRowDisplayModel.buildEditorRowDisplayModel', () => {
       sourceEditorText: 'S T',
       sourceTagsCount: 1,
       sourceHighlightQuery: 'S',
-      targetHighlightQuery: 'A',
       highlightMode: 'contains',
       showNonPrintingSymbols: true,
-      isTargetFocused: false,
     });
 
-    expect(model.showNonPrintingTargetOverlay).toBe(true);
-    expect(model.showTargetHighlightOverlay).toBe(true);
-    expect(model.showTargetOverlay).toBe(true);
+    expect(model.statusLine).toBe('bg-warning');
     expect(model.sourceHighlightChunks.some((chunk) => chunk.isMatch)).toBe(true);
-    expect(model.targetHighlightChunks.some((chunk) => chunk.isMatch)).toBe(true);
-    expect(model.targetMirrorText).toContain('·');
+    expect(model.sourceDisplayText).toContain('·');
   });
 
-  it('disables non-printing target overlay while actively editing target', () => {
+  it('keeps action visibility and status signals while editing', () => {
     const model = buildEditorRowDisplayModel({
       segmentStatus: 'translated',
       qaIssues: [],
@@ -37,15 +32,13 @@ describe('useEditorRowDisplayModel.buildEditorRowDisplayModel', () => {
       sourceEditorText: 'World',
       sourceTagsCount: 0,
       sourceHighlightQuery: '',
-      targetHighlightQuery: '',
       highlightMode: 'contains',
       showNonPrintingSymbols: true,
-      isTargetFocused: true,
     });
 
-    expect(model.showNonPrintingTargetOverlay).toBe(false);
-    expect(model.showTargetOverlay).toBe(false);
-    expect(model.targetMirrorText).toBe('Hello');
+    expect(model.statusLine).toBe('bg-brand');
+    expect(model.canAITranslate).toBe(true);
+    expect(model.showTargetActionButtons).toBe(true);
   });
 });
 
